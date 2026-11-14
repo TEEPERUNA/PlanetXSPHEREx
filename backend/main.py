@@ -29,6 +29,9 @@ from fastapi.staticfiles import StaticFiles
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "science"))
 import fetch_spherex as fs  # noqa: E402
+sys.path.insert(0, str(ROOT / "backend"))
+import fetch  # noqa: E402  fast S3 data access (backend/fetch.py)
+import time  # noqa: E402
 
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", ROOT / "output")).resolve()
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -37,6 +40,8 @@ PREVIEW_PER_GROUP = int(os.environ.get("PREVIEW_PER_GROUP", "1"))  # quick first
 DOWNLOAD_WORKERS = int(os.environ.get("DOWNLOAD_WORKERS", "6"))
 MAX_FOV_ARCMIN = float(os.environ.get("MAX_FOV_ARCMIN", "10"))
 WARMUP = os.environ.get("WARMUP", "1") == "1"
+FETCH_MODE = os.environ.get("FETCH_MODE", "s3")             # "s3" (fast) or "irsa" (cutout service)
+CACHE_TTL_HOURS = float(os.environ.get("CACHE_TTL_HOURS", "24"))  # how often to check for new data
 
 app = FastAPI(title="SPHEREx Sky API", version="0.1")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -127,13 +132,116 @@ def start_job(slug: str, work, preview: bool = True) -> dict:
     return {"status": "queued", "job": slug}
 
 
+class Pipeline:
+    """One pipeline for one position + FOV. Keeps the image list and downloaded cutouts
+    between the quick preview run and the full run, so nothing is fetched twice."""
+
+    def __init__(self, resolve, fov: float):
+        self.resolve = resolve          # () -> (coord, label, info)
+        self.fov = fov
+        self._target = None
+        self._images = None
+        self.memo: dict = {}
+
+    def target(self):
+        if self._target is None:
+            self._target = self.resolve()
+        return self._target
+
+    def images(self):
+        if self._images is None:
+            c, _, _ = self.target()
+            self._images = fetch.find_images(c)
+        return self._images
+
+    def __call__(self, progress, out_slug: str, per_group: int):
+        c, label, info = self.target()
+        args = make_args(self.fov, per_group)
+        fingerprint = None
+        if FETCH_MODE == "s3":
+            try:
+                imgs = self.images()                      # LookupError = no coverage
+                fingerprint = imgs.fingerprint
+                rows = fetch.select(imgs, per_group)
+                cutouts = fetch.fetch_cutouts(rows, c, self.fov, info, progress, self.memo)
+                if cutouts:
+                    fs.run(c, label, out_slug, args, info, progress=progress, cutouts=cutouts)
+                    write_cache_info(out_slug, fingerprint, imgs.collection, "s3")
+                    return
+                print("  S3 returned no cutouts -> falling back to IRSA cutout service")
+            except LookupError:
+                raise
+            except Exception:  # noqa: BLE001  any S3/SIA problem -> IRSA fallback
+                traceback.print_exc()
+                print("  S3 route failed -> falling back to IRSA cutout service")
+        fs.run(c, label, out_slug, args, info, progress=progress)
+        write_cache_info(out_slug, fingerprint, None, "irsa")
+
+
+def cache_info_path(slug: str) -> Path:
+    return OUTPUT_DIR / slug / "cache.json"
+
+
+def write_cache_info(slug: str, fingerprint, collection, source: str):
+    p = cache_info_path(slug)
+    if p.parent.exists():
+        p.write_text(json.dumps({"fingerprint": fingerprint, "collection": collection,
+                                 "source": source, "checked_at": time.time()}))
+
+
+def read_cache_info(slug: str):
+    try:
+        return json.loads(cache_info_path(slug).read_text())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def maybe_refresh(slug: str, make_pipeline) -> bool:
+    """Stale-while-revalidate: the cached result is returned right away; if it is older than
+    CACHE_TTL_HOURS we check IRSA for new SPHEREx data in the background and rebuild if needed.
+    Returns True if a refresh is running."""
+    rkey = f"{slug}__refresh"
+    if jobs.get(rkey, {}).get("status") == "processing":
+        return True
+    if jobs.get(slug, {}).get("status") in ("queued", "processing"):
+        return False
+    info = read_cache_info(slug)
+    if info and time.time() - info.get("checked_at", 0) < CACHE_TTL_HOURS * 3600:
+        return False
+    jobs[rkey] = {"status": "processing"}
+
+    def runner():
+        try:
+            pipe = make_pipeline()
+            new_fp = pipe.images().fingerprint
+            if info and info.get("fingerprint") == new_fp:
+                write_cache_info(slug, new_fp, info.get("collection"), info.get("source", "s3"))
+            else:
+                print(f"  New SPHEREx data for {slug} ({new_fp}) -> rebuilding")
+                pipe(lambda *a: None, slug, PER_GROUP)
+            jobs[rkey] = {"status": "done"}
+        except Exception as e:  # noqa: BLE001
+            traceback.print_exc()
+            jobs[rkey] = {"status": "error", "error": str(e)}
+
+    executor.submit(runner)
+    return True
+
+
 def target_job(key: str, fov: float):
     slug = key if fov == 3.0 else f"{key}_fov{fov:g}"
 
-    def work(progress, out_slug, per_group):
-        c, label, info = fs.target_coord(key)
-        fs.run(c, label, out_slug, make_args(fov, per_group), info, progress=progress)
-    return slug, work
+    def make_pipeline():
+        return Pipeline(lambda: fs.target_coord(key), fov)
+    return slug, make_pipeline
+
+
+def coord_job(c, fov: float):
+    slug = slug_for(c.ra.deg, c.dec.deg, fov)
+
+    def make_pipeline():
+        return Pipeline(lambda: (c, f"RA {c.ra.deg:.4f} Dec {c.dec.deg:+.4f}", {}), fov)
+    return slug, make_pipeline
 
 
 # --------------------------------------------------------------------------- endpoints
@@ -159,26 +267,24 @@ def sky(ra: str | None = None, dec: str | None = None,
     if target:
         if target not in fs.TARGETS:
             raise HTTPException(404, f"unknown target '{target}'")
-        slug, work = target_job(target, fov)
+        slug, make_pipeline = target_job(target, fov)
     elif ra is not None and dec is not None:
         try:
             c = fs.parse_coord(ra, dec)
         except Exception:  # noqa: BLE001
             raise HTTPException(400, "could not parse ra/dec")
-        slug = slug_for(c.ra.deg, c.dec.deg, fov)
-
-        def work(progress, out_slug, per_group, c=c):
-            fs.run(c, f"RA {c.ra.deg:.4f} Dec {c.dec.deg:+.4f}", out_slug,
-                    make_args(fov, per_group), {}, progress=progress)
+        slug, make_pipeline = coord_job(c, fov)
     else:
         raise HTTPException(400, "give either target or ra+dec")
 
     if find_cached(slug):
-        return done_response(slug)
+        resp = done_response(slug)
+        resp["refreshing"] = maybe_refresh(slug, make_pipeline)
+        return resp
     j = jobs.get(slug)
     if j and j["status"] == "error":
         jobs.pop(slug)  # allow retry
-    return start_job(slug, work)
+    return start_job(slug, make_pipeline())
 
 
 @app.get("/api/status/{job}")
@@ -197,5 +303,5 @@ def warmup():
         return
     for key in fs.TARGETS:
         if cached_meta(key) is None:
-            slug, work = target_job(key, 3.0)
-            start_job(slug, work, preview=False)
+            slug, make_pipeline = target_job(key, 3.0)
+            start_job(slug, make_pipeline(), preview=False)
