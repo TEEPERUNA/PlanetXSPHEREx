@@ -91,8 +91,38 @@
   text-align: center;
 }
 
-.status--error .status__message {
+.status--error .status__message,
+.status__hint {
   opacity: 0.8;
+}
+
+/* Progress (loading state and preview notice) */
+.progress {
+  display: grid;
+  gap: 4px;
+}
+
+.progress__label {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress progress {
+  width: 100%;
+}
+
+/* Shown above the image during the quick preview */
+.viewer__notice {
+  display: grid;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px dashed currentColor;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.viewer__notice p {
+  margin: 0;
 }
 
 /* Spectrum */

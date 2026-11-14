@@ -33,11 +33,18 @@ export interface Meta {
   credit?: string;
 }
 
+// A finished result: meta.json + absolute base URL for its files.
+export interface Result {
+  meta: Meta;
+  baseUrl: string;
+}
+
 // What the app tells the viewer to show.
+// `preview` is optional: the quick result the backend sends while the full run continues.
 export type ViewerStatus =
   | { kind: "empty" }
-  | { kind: "loading"; stage: string; done: number; total: number }
-  | { kind: "done"; meta: Meta; baseUrl: string }
+  | { kind: "loading"; stage: string; done: number; total: number; preview?: Result }
+  | ({ kind: "done" } & Result)
   | { kind: "error"; message: string };
 
 // One image in the blink, with the epoch it belongs to.
