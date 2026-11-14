@@ -100,7 +100,9 @@ def cached_meta(slug: str):
 
 def done_response(slug: str) -> dict:
     meta, base = find_cached(slug)
-    return {"status": "done", "job": slug, "base_url": base, "meta": meta}
+    info = read_cache_info(slug) or {}
+    return {"status": "done", "job": slug, "base_url": base, "meta": meta,
+            "data_release": info.get("collection"), "timing": info.get("timing")}
 
 
 def start_job(slug: str, work, preview: bool = True) -> dict:
@@ -168,18 +170,28 @@ class Pipeline:
         return self._images
 
     def __call__(self, progress, out_slug: str, per_group: int):
+        t0 = time.time()
         c, label, info = self.target()
         args = make_args(self.fov, per_group)
         fingerprint = None
         if FETCH_MODE == "s3":
             try:
                 imgs = self.images()                      # LookupError = no coverage
+                t1 = time.time()
                 fingerprint = imgs.fingerprint
                 rows = fetch.select(imgs, per_group)
                 cutouts = fetch.fetch_cutouts(rows, c, self.fov, info, progress, self.memo)
+                t2 = time.time()
                 if cutouts:
                     fs.run(c, label, out_slug, args, info, progress=progress, cutouts=cutouts)
-                    write_cache_info(out_slug, fingerprint, imgs.collection, "s3")
+                    t3 = time.time()
+                    timing = {"search_s": round(t1 - t0, 1), "download_s": round(t2 - t1, 1),
+                              "processing_s": round(t3 - t2, 1), "total_s": round(t3 - t0, 1),
+                              "images": len(cutouts)}
+                    print(f"  TIMING {out_slug}: search {timing['search_s']} s | "
+                          f"download {timing['download_s']} s ({len(cutouts)} images) | "
+                          f"processing {timing['processing_s']} s | total {timing['total_s']} s")
+                    write_cache_info(out_slug, fingerprint, imgs.collection, "s3", timing)
                     return
                 print("  S3 returned no cutouts -> falling back to IRSA cutout service")
             except LookupError:
@@ -188,18 +200,22 @@ class Pipeline:
                 traceback.print_exc()
                 print("  S3 route failed -> falling back to IRSA cutout service")
         fs.run(c, label, out_slug, args, info, progress=progress)
-        write_cache_info(out_slug, fingerprint, None, "irsa")
+        print(f"  TIMING {out_slug}: IRSA route total {round(time.time() - t0, 1)} s")
+        write_cache_info(out_slug, fingerprint, None, "irsa",
+                         {"total_s": round(time.time() - t0, 1)})
 
 
 def cache_info_path(slug: str) -> Path:
     return OUTPUT_DIR / slug / "cache.json"
 
 
-def write_cache_info(slug: str, fingerprint, collection, source: str):
+def write_cache_info(slug: str, fingerprint, collection, source: str, timing: dict | None = None):
     p = cache_info_path(slug)
     if p.parent.exists():
+        old = read_cache_info(slug) or {}
         p.write_text(json.dumps({"fingerprint": fingerprint, "collection": collection,
-                                 "source": source, "checked_at": time.time()}))
+                                 "source": source, "checked_at": time.time(),
+                                 "timing": timing or old.get("timing")}))
 
 
 def read_cache_info(slug: str):
