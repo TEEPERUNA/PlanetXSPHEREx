@@ -6,3 +6,10 @@ __pycache__/
 node_modules/
 dist/
 .env
+.DS_Store
+backend/cache/*.fits
+backend/cache/*.json
+.pytest_cache/
+.vscode/
+preview*
+preview/

@@ -1,6 +1,9 @@
 astropy>=6.0
 astroquery>=0.4.8
 reproject>=0.13
+photutils>=2.0
+scipy>=1.14
 numpy
 matplotlib
 pillow
+requests
