@@ -10,15 +10,14 @@
 ## 1. Tavoite
 Käyttäjä näkee valitsemansa taivaan kohdan SPHEREx-kuvat peräkkäin animaationa epookista toiseen. Liikkuva kohde, kuten lähitähti tai ruskea kääpiö, erottuu silloin silmällä.
 
-Kohteen voi valita kolmella tavalla:
-- klikkaamalla Aladin Lite -karttaa
+Kohteen voi valita kahdella tavalla:
 - syöttämällä koordinaatit
 - valitsemalla valmiin kohteen
 
-Kaikki kolme päätyvät samaan `setTarget(ra, dec, fov)`-kutsuun. Kartta ja syöttökenttä ovat Juhon osuutta, joten viewerin ei tarvitse tietää, mistä koordinaatit tulivat.
+Molemmat päätyvät samaan `setTarget(ra, dec, fov)`-kutsuun. Syöttökenttä ja kohdelista ovat Juhon osuutta, joten viewerin ei tarvitse tietää, mistä koordinaatit tulivat. Aladin Lite -karttaa ei käytetä.
 
 ```
-Aladin-kartta / syöttö (Juho)  →  RA/Dec
+Syöttö / kohdelista (Juho)  →  RA/Dec
    →  setTarget(ra, dec, fov)    (state.ts)
    →  /api/sky + pollaus         (api/)
    →  Viewer näyttää kuvat       (Elias)
@@ -60,7 +59,7 @@ Aladin-kartta / syöttö (Juho)  →  RA/Dec
 
 ### Tilat
 - **Tyhjä:** kohdetta ei ole vielä valittu.
-- **Lataus:** vaihe (`stage`) ja edistyminen `done/total`. Tämä on tärkeä, koska kartan klikkaus osuu yleensä kohtaan, jota ei ole välimuistissa.
+- **Lataus:** vaihe (`stage`) ja edistyminen `done/total`. Tämä on tärkeä, koska omat koordinaatit osuvat yleensä kohtaan, jota ei ole välimuistissa.
 - **Virhe:** selkeä viesti, esimerkiksi "No SPHEREx images cover this position".
 - **Uusi kohde kesken latauksen:** viewer siirtyy suoraan uuteen kohteeseen, eikä edellisen kohteen kuvia saa jäädä näkyviin.
 
@@ -174,7 +173,7 @@ import { Viewer, type ViewerStatus } from "../viewer";
 |---|---|---|
 | 1 | Blink, kaistan valinta, play/pause ja epookin tiedot mock-datalla | Barnardin tähti näkyy liikkuvan noin 1,7 px pohjoiseen |
 | 2 | Erotuskuva, nopeus, askellus, kirkkaus ja kontrasti sekä koordinaatit hiiren kohdalla | kaikki ohjaimet toimivat ja Barnardin tähden kohdalla näkyy sen koordinaatit |
-| 3 | Tyhjä-, lataus- ja virhetila sekä kytkentä Juhon appiin | kartan klikkaus näyttää kuvat oikealta backendiltä |
+| 3 | Tyhjä-, lataus- ja virhetila sekä kytkentä Juhon appiin | syötetyt koordinaatit näyttävät kuvat oikealta backendiltä |
 | 4 | Spektrikaavio | kaavio näkyy virhepalkkeineen |
 | 5 | Gaia-ympyrät (jos aikaa jää) | ympyrät osuvat tähteen joka epookissa |
 
@@ -184,8 +183,7 @@ Jokaisen vaiheen jälkeen tehdään commit (`feat(viewer): …`) ja merge mainii
 - [ ] Varmistuuko React?
 - [ ] Kuka tekee Vite-pohjan ja kopioi mock-datan (`examples/barnard/` → `public/mock/barnard/`)?
 - [ ] Propsien muoto pitää sopia Juhon kanssa.
-- [ ] Missä viewer näkyy suhteessa isoon Aladin-karttaan (vieressä, päällä ikkunana vai alla) ja miten se toimii mobiilissa?
-- [ ] Klikatun kohdan merkki kartalle (Juho).
+- [ ] Viewerin paikka sivulla ja toiminta mobiilissa (Juho).
 - [ ] Spektrikaavion kirjasto: Chart.js (`react-chartjs-2` ja error bar -plugin) vai uPlot.
 - [ ] Gaia-sijainnit: Emililtä uutena `meta.json`-avaimena (katso `science/gaia_validation.py`) vai suoraan Gaiasta?
-- [ ] CORS backendissä, jos frontend ja backend ovat eri osoitteissa (Erik).
+- [x] CORS backendissä (Erik): kaikki osoitteet sallittu.

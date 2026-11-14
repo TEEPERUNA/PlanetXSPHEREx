@@ -9,7 +9,7 @@ export function StatusView({ status }: Props) {
   if (status.kind === "empty") {
     return (
       <div className="status">
-        <p>Pick a target or click the sky map to see SPHEREx images.</p>
+        <p>Pick a target or enter coordinates to see SPHEREx images.</p>
       </div>
     );
   }

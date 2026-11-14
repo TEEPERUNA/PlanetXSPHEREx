@@ -49,7 +49,7 @@ PlanetXSPHEREx/
 │   ├── public/mock/barnard/ . copy of examples/barnard, so the viewer works without the backend
 │   └── src/                                         │
 │       ├── app/  (Juho)                             │
-│       │     input, URL params, Aladin Lite         │
+│       │     coordinate input, target list, URL     │
 │       │     → state.ts  setTarget(ra, dec, fov)    │
 │       ├── state.ts ......... shared (not created yet)
 │       ├── main.ts .......... shared (not created yet)
@@ -78,7 +78,7 @@ PlanetXSPHEREx/
 
 ## Rules
 - `viewer/` and `app/` never import each other. They talk only through `state.ts` and `api/`.
-- The frontend never calls IRSA, Gaia or SIMBAD directly. Aladin Lite loads its own map tiles from CDS.
+- The frontend never calls IRSA, Gaia or SIMBAD directly. All data comes from the backend.
 - `science/` may add new keys to `meta.json`, but never renames or removes them.
 
 Update this file when you add, move or remove a file.
