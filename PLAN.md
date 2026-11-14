@@ -1,44 +1,44 @@
-# PlanetXSPHEREx: Citizen Science Motion & Variability Web Tool
-## Mission & Engineering Master Plan (4-Person Team)
+# PlanetXSPHEREx: Kansalaistieteen työkalu taivaankappaleiden liikkeen ja muuttuvuuden havaitsemiseen
+## Projektisuunnitelma ja tekninen arkkitehtuuri (4 hengen tiimi)
 
 ---
 
-### 1. Executive Summary & Challenge Objectives
+### 1. Tiivistelmä ja haasteen tavoitteet
 
-NASA's **SPHEREx** (Spectro-Photometer for the History of the Universe, Epoch of Reionization, and Ices Explorer) maps the entire sky once every six months across **102 near-infrared spectral channels** (0.75 µm to 5.0 µm). 
+NASAn **SPHEREx**-missio (Spectro-Photometer for the History of the Universe, Epoch of Reionization, and Ices Explorer) kartoittaa koko taivaan kerran kuudessa kuukaudessa **102 lähi-infrapunan aallonpituuskaistalla** (0,75–5,0 µm).
 
-**The Challenge:** Build an intuitive, public-facing web platform that allows citizen scientists and professional astronomers to:
-1. Input celestial coordinates (Right Ascension & Declination in sexagesimal or decimal degrees) or search astronomical targets by name.
-2. View multi-epoch sky imagery animated as a blink comparator / timelapse video.
-3. Rapidly discover moving objects (high proper motion stars, brown dwarfs, asteroids, comets, Planet X candidates) and brightness-shifting variable stars or transient supernovae.
-4. Test and validate performance against five benchmark targets:
-   - **Barnard’s Star** (highest known proper motion star: $\sim 10.3''/\text{yr}$)
-   - **Epsilon Indi B** (nearby binary brown dwarf system)
-   - **WISE 0855** (coldest, fastest-moving brown dwarf: RA `08h55m10.831s`, Dec `-7d14m42.53s`)
-   - **RW Aurigae** (classical T Tauri eruptive variable star)
-   - **R Draconis** (Mira-type pulsating variable star)
+**Haaste:** Rakentaa helppokäyttöinen, julkinen verkkotyökalu, jonka avulla kansalaistutkijat ja tähtitieteilijät voivat:
+1. Syöttää taivaankoordinaatit (rektaskensio RA ja deklinaatio Dec joko asteina tai aikamuodossa) tai hakea kohteita suoraan nimellä.
+2. Tarkastella kyseisen taivaankaistaleen kuvia eri havaintojaksoilta (epookeilta) aikasarja-animaationa / vilkkukomparaattorina ("blink comparator").
+3. Havaita nopeasti liikkuvia kohteita (suuren ominaisliikkeen tähdet, ruskeat kääpiöt, asteroidit, komeetat, mahdollinen Planeetta Yhdeksän / Planet X) sekä kirkkauttaan muuttavia kohteita (muuttuvat tähdet, supernovat).
+4. Testata ja validoida työkalun toimivuus viidellä pakollisella vertailukohteella:
+   - **Barnardin tähti** (suurin tunnettu ominaisliike: $\sim 10,3''/\text{vuosi}$)
+   - **Epsilon Indi B** (läheinen ruskeiden kääpiöiden kaksoisjärjestelmä tähden kiertoradalla)
+   - **WISE 0855** (kylmin ja erittäin nopeasti liikkuva ruskea kääpiö: RA `08h55m10.831s`, Dec `-7d14m42.53s`)
+   - **RW Aurigae** (purkautuva T Tauri -muuttuja)
+   - **R Draconis** (Mira-tyypin sykkivä jättiläistähti)
 
 ---
 
-### 2. Architecture & Data Strategy
+### 2. Järjestelmäarkkitehtuuri ja datastrategia
 
 ```mermaid
 flowchart TD
-    User["Citizen Scientist / User"] --> UI["Web App (Vite + React + Tailwind CSS)"]
+    User["Kansalaistutkija / Käyttäjä"] --> UI["Web-sovellus (Vite + React + Tailwind CSS)"]
     
-    subgraph Frontend["Interactive Web Client"]
-        Search["Coordinate & Object Name Input (RA/Dec / Sesame API)"]
-        Presets["1-Click Target Selector (Barnard's Star, WISE 0855, etc.)"]
-        CanvasPlayer["Blink / Timelapse Engine (Canvas/WebGL)"]
-        Tools["Image Controls: Contrast / Stretch / Difference / Invert"]
-        Annotation["Candidate Marking & Flagging HUD"]
+    subgraph Frontend["Interaktiivinen käyttöliittymä"]
+        Search["Koordinaatti- ja nimihaku (RA/Dec tai Sesame API)"]
+        Presets["1-klikkauksen testikohteet (Barnardin tähti, WISE 0855 jne.)"]
+        CanvasPlayer["Vilkkukomparaattori / Timelapse-moottori (Canvas/WebGL)"]
+        Tools["Kuvansäätimet: Kontrasti / ZScale / Erotuskuva / Negatiivi"]
+        Annotation["Löytöjen merkintä- ja raportointityökalu"]
     end
     
-    subgraph DataPipeline["Data & Astronomy Layer"]
-        Sesame["CDS Sesame Name Resolver"]
+    subgraph DataPipeline["Dataputki ja tähtitieteen rajapinnat"]
+        Sesame["CDS Sesame -nimipalvelin"]
         IRSA["NASA IPAC / IRSA Cutout Service"]
-        SPHERExMock["SPHEREx Cutout Cache / Mock Epoch Generator"]
-        WISEFallback["unWISE / AllWISE Multi-Epoch Archive Fallback"]
+        SPHERExMock["SPHEREx Cutout -välimuisti / mock-epookit"]
+        WISEFallback["unWISE / AllWISE moniepookkiarkisto (varayhteys)"]
     end
 
     UI --> Search
@@ -50,105 +50,104 @@ flowchart TD
     DataPipeline --> CanvasPlayer
 ```
 
-#### Data Handling & Multi-Epoch Strategy
-- **Coordinate & Name Resolution:** Query the **CDS Sesame Name Resolver** API (`https://cds.unistra.fr/cgi-bin/nph-sesame/-ox/SN?`) so users can type either raw coordinates (`08h55m10.831s -07d14m42.53s` or `133.795, -7.245`) or target names like `"Barnard's Star"`.
-- **SPHEREx & Multi-Epoch Data Ingestion:**
-  - SPHEREx produces all-sky maps in 6-month cycles (epochs).
-  - For immediate full functionality across all five test targets, the engine implements a dual data provider:
-    1. **Primary SPHEREx Gateway:** Ingests SPHEREx data releases / IPAC IRSA cutouts (or pre-computed SPHEREx calibrated mock data cubes in FITS/PNG).
-    2. **Multi-Epoch Infrared Bridge (unWISE / 2MASS / AllWISE):** Uses IRSA cutout APIs to provide real multi-epoch near-IR baseline frames (spanning years of infrared surveys) ensuring users can immediately see real proper motion and variability even for historical epochs.
-- **Client-Side Image Manipulation:**
-  - Hardware-accelerated HTML5 Canvas / WebGL context.
-  - Real-time frame difference: $\Delta I = \text{Frame}_B - \text{Frame}_A$, turning shifts into stark black/white dipole pairs that immediately catch the human eye.
-  - Contrast stretch presets: Linear, ZScale, Asinh, Square Root, Logarithmic, and Invert (negative film mode).
+#### Datanhallinta ja moniepookkistrategia
+- **Koordinaatti- ja nimihaku:** Hyödynnetään **CDS Sesame Name Resolver** -rajapintaa (`https://cds.unistra.fr/cgi-bin/nph-sesame/-ox/SN?`), jotta käyttäjä voi hakea sekä tarkoilla koordinaateilla (`08h55m10.831s -07d14m42.53s` tai `133.795, -7.245`) että suoraan nimellä (esim. *"Barnard's Star"*).
+- **SPHEREx- ja vertailudatan syöttö:**
+  - SPHEREx tuottaa kokotaivaan kartan 6 kuukauden sykleissä.
+  - Välittömän toimivuuden ja testikohteiden havainnollistamisen varmistamiseksi toteutetaan kaksitasoinen datalähde:
+    1. **SPHEREx-rajapinta:** SPHERExin datajulkaisut ja kalibroidut esimerkkidatakuutiot.
+    2. **Moniepookkinen infrapunasilta (unWISE / 2MASS / AllWISE):** IRSA-leikkausrajapinnan kautta saatavat todelliset infrapunakuvat useilta vuosilta, joiden avulla testikohteiden liike ja kirkkauden vaihtelut näkyvät konkreettisesti heti ensimmäisestä päivästä alkaen.
+- **Kuvankäsittely suoraan selaimessa:**
+  - Laitteistokiihdytetty HTML5 Canvas / WebGL -näkymä.
+  - **Reaaliaikainen erotuskuva (Difference Imaging):** $\Delta I = \text{Kuva}_B - \text{Kuva}_A$. Kohteen siirtyminen synnyttää mustavalkoisen dipoliparin, jonka ihmisilmä havaitsee välittömästi.
+  - Dynaamiset kontrastisäädöt: Lineaarinen, ZScale, Asinh, Logaritminen ja Negatiivitila (invertoitu mustavalkokuva on usein paras himmeiden kohteiden etsimiseen).
 
 ---
 
-### 3. Team Roles & Work Breakdown (4-Person Team)
+### 3. Tiimin roolit ja työnjako (4 hengen tiimi)
 
-| Role | Primary Responsibilities | Deliverables |
+| Rooli | Päävastuut | Keskeiset tuotokset |
 | :--- | :--- | :--- |
-| **Person 1: Frontend & Visualization Lead** | Core web architecture, UI/UX, responsive layouts, Canvas/WebGL blink player, playback controls (FPS, loop, bounce), dark-sky aesthetic. | - Single-page web application<br>- Blink player with frame scrubber<br>- Invert/contrast/zoom/pan controls<br>- Animated GIF / MP4 export |
-| **Person 2: Astrophysics & Data Pipeline Lead** | Coordinate conversion (sexagesimal $\leftrightarrow$ decimal degrees), CDS Sesame integration, FITS/cutout fetching, difference imaging algorithm, SPHEREx band groupings. | - Coordinate parser & normalizer<br>- Cutout service connector (IRSA / SPHEREx)<br>- Image subtraction & alignment logic<br>- Multi-band (102 bands) grouping logic |
-| **Person 3: Backend & Candidate Reporting Lead** | Lightweight API / edge functions for caching image cutouts, bookmarking system, citizen science candidate reporting pipeline, export metadata. | - Fast caching proxy (FastAPI or Next.js Edge)<br>- Discovery submission form (tag object type)<br>- Persistent catalog of marked discoveries<br>- Cloud deployment (Vercel / Netlify / Railway) |
-| **Person 4: Science QA, Benchmark Validation & Pitch Lead** | Validating all 5 test targets, crafting citizen scientist "Field Guide" tutorial, creating project documentation, demo video, and hackathon presentation. | - Verified test suites for the 5 benchmark targets<br>- Citizen scientist interactive tutorial / guide<br>- Project presentation slides & demo video<br>- Hackathon submission documentation |
+| **Henkilö 1: Frontend & UI/UX** | Web-sovelluksen arkkitehtuuri, responsiivinen ulkoasu, Canvas/WebGL-vilkkumoottori, toistosäätimet (FPS, pausaus, edestakainen bounce-toisto), tumma NASA-teema. | - Yhden sivun React-sovellus<br>- Suorituskykyinen vilkkukomparaattori<br>- Kontrasti-, zoomaus- ja panikointisäätimet<br>- GIF / WebM -videovienti |
+| **Henkilö 2: Astrofysiikka & Dataputki** | Koordinaattimuunnokset (sexagesimaali $\leftrightarrow$ desimaaliasteet), CDS Sesame -haku, FITS/kuvaleikkausten nouto, erotuskuva-algoritmi, SPHERExin 102 aallonpituuskaistan ryhmittely. | - Koordinaattien jäsennysmoduuli<br>- IRSA/SPHEREx-rajapintaliitäntä<br>- Kuvien kohdistus ja vähennyslaskenta<br>- Aallonpituuskaistojen suodatus ja RGB-komposiitti |
+| **Henkilö 3: Backend & Havaintojen raportointi** | Välimuistipalvelu kuvaleikkauksille, kansalaistieteen löytöjen kirjausjärjestelmä, havaintoraportin tallennus ja vienti. | - Nopea proxy-/välimuistirajapinta<br>- Löytöjen merkintälomake (luokittelu & koordinaatit)<br>- Tallennusjärjestelmä löydöille<br>- Julkaisu pilveen (Vercel / Netlify / Railway) |
+| **Henkilö 4: Tieteellinen laadunvarmistus & Pitchaus** | 5 testikohteen toiminnan varmistus, kansalaistutkijan kenttäoppaan (Field Guide) kirjoitus, dokumentaatio, esittelyvideo ja pitchaus-materiaali. | - Validoidut testitapaukset 5 pakolliselle kohteelle<br>- Interaktiivinen kansalaistutkijan opas<br>- Esityskalvot ja 3 minuutin demo-video<br>- NASA Space Apps -projektisivun tekstit |
 
 ---
 
-### 4. Step-by-Step Execution Roadmap
+### 4. Vaiheittainen etenemissuunnitelma (48 h hackathon)
 
 ```mermaid
 flowchart LR
-    P1["Phase 1: Foundation (0-8h)"] --> P2["Phase 2: Core Player & Data (8-20h)"]
-    P2 --> P3["Phase 3: Difference & Advanced Tools (20-32h)"]
-    P3 --> P4["Phase 4: Target Verification (32-40h)"]
-    P4 --> P5["Phase 5: Polish & Pitch (40-48h)"]
+    P1["Vaihe 1: Perusta (0-8h)"] --> P2["Vaihe 2: Soitin ja data (8-20h)"]
+    P2 --> P3["Vaihe 3: Erotuskuvat ja työkalut (20-32h)"]
+    P3 --> P4["Vaihe 4: Testikohteet (32-40h)"]
+    P4 --> P5["Vaihe 5: Viimeistely ja pitch (40-48h)"]
 ```
 
-#### Phase 1: Setup, Repository & Foundation (Hours 0 – 8)
-- [ ] Initialize repository with modern stack (e.g., Vite + React + TypeScript + Tailwind CSS).
-- [ ] Establish coding standards, directory structure, and CI/CD deployment to Vercel/GitHub Pages.
-- [ ] Create coordinate parser utility (`parseSexagesimalToDeg`, `formatDegToSexagesimal`).
-- [ ] Integrate CDS Sesame API for instant name-to-coordinate lookup.
-- [ ] Implement preset dropdown preloaded with the 5 required targets.
+#### Vaihe 1: Alustus ja pohjatyö (Tunnit 0–8)
+- [ ] Projektin alustus (Vite + React + TypeScript + Tailwind CSS).
+- [ ] Koodauskäytännöt, hakemistorakenne ja automaattinen julkaisu (Vercel / GitHub Pages).
+- [ ] Koordinaattimuuntimen toteutus (`parseSexagesimalToDeg`, `formatDegToSexagesimal`).
+- [ ] CDS Sesame -rajapinnan integrointi (kohteiden automaattihaku nimellä).
+- [ ] Esiasetettujen 5 testikohteen pikavalikko käyttöliittymään.
 
-#### Phase 2: Cutout Fetching & Blink Engine (Hours 8 – 20)
-- [ ] Build high-performance Canvas-based Blink Player:
-  - Play / Pause, Framerate Slider (1 to 15 FPS), Step Backward / Forward.
-  - Playback modes: Sequential Loop (`A -> B -> C -> A`) and Ping-Pong/Bounce (`A -> B -> C -> B -> A`).
-- [ ] Connect multi-epoch image fetcher:
-  - Query multi-epoch cutouts centered at $(RA, Dec)$.
-  - Support user-selected field of view (e.g., $1', 2', 5', 10'$ arcminutes).
-- [ ] Render crosshair overlay with celestial scale indicator ($10''$ or $1'$ ruler).
+#### Vaihe 2: Kuvatiedonsiirto ja vilkkukomparaattori (Tunnit 8–20)
+- [ ] Canvas-pohjainen animaatiosoitin:
+  - Play / Pause, nopeudensäädin (1–15 kuvaa sekunnissa), kuva kerrallaan siirtyminen.
+  - Toistotilat: Jatkuva silmukka (`A -> B -> C -> A`) ja edestakainen ping-pong (`A -> B -> C -> B -> A`).
+- [ ] Moniepookkisen kuvahaun kytkentä:
+  - Kuvien haku annettuihin $(RA, Dec)$ -koordinaatteihin.
+  - Näkökentän (FOV) valinta (esim. $1', 2', 5', 10'$ kaariminuuttia).
+- [ ] Tähtitieteellinen tähtäinristikko ja mittakaava (esim. $10''$ tai $1'$ jana).
 
-#### Phase 3: Astronomical Image Processing & Discovery Features (Hours 20 – 32)
-- [ ] **Difference Imaging (Subtraction Mode):** Compute $(Epoch_2 - Epoch_1)$ pixel differences in real-time on GPU/Canvas.
-- [ ] **Contrast & Filter Controls:**
-  - Negative/Invert mode (crucial for detecting faint extended objects like comets or cold brown dwarfs).
-  - Dynamic min/max sliders with histogram equalization / ZScale.
-- [ ] **SPHEREx Spectral Band Explorer:**
-  - Group SPHEREx's 102 channels into sensible diagnostic bands (e.g., ices/water at 3.0 µm, CO/CO$_2$ at 4.2–4.7 µm, continuum near-IR).
-  - False-color RGB compositor combining 3 infrared bands.
-- [ ] **Citizen Discovery Marker:**
-  - Click on the canvas to place a discovery marker with RA/Dec coordinates calculated from pixel offsets.
-  - Tag candidate: *Moving Object (Asteroid/Comet/Brown Dwarf)*, *Variable Star*, *Dipole*, *False Positive/Artifact*.
+#### Vaihe 3: Kuvankäsittely ja kansalaistutkijan työkalut (Tunnit 20–32)
+- [ ] **Erotuskuvatila (Difference Imaging):** Lasketaan $(Epookki_2 - Epookki_1)$ pikseliero suoraan selaimessa.
+- [ ] **Kontrasti- ja värisäädöt:**
+  - Negatiivitila / värien kääntö.
+  - Histogrammin venytys (ZScale / Asinh).
+- [ ] **SPHEREx-kaistavalitsin:**
+  - 102 aallonpituuskaistan ryhmittely loogisiin osiin (vesijäät 3,0 µm, CO/CO$_2$ 4,2–4,7 µm, jatkumo-infrapuna).
+  - Kolmen eri kaistan yhdistäminen vääräväri-RGB-kuvaksi.
+- [ ] **Löytöjen merkintätyökalu:**
+  - Klikkaa kuvaa ja aseta merkintä (sovellus laskee pikselistä tarkan taivaankoordinaatin).
+  - Luokitteluvaihtoehdot: *Liikkuva kappale (asteroidi/komeetta/ruskea kääpiö)*, *Muuttuva tähti*, *Dipoli*, *Häiriö/artefakti*.
 
-#### Phase 4: Benchmark Target Verification (Hours 32 – 40)
-- [ ] **Barnard’s Star:** Verify dramatic proper motion shift ($10.3''/\text{yr}$) across epochs.
-- [ ] **WISE 0855** (`08h55m10.831s, -07d14m42.53s`): Validate clear motion in cold near-IR bands against background field.
-- [ ] **Epsilon Indi B:** Validate detection of the brown dwarf pair adjacent to the bright primary star.
-- [ ] **RW Aurigae:** Validate large-amplitude photometric dimming and brightness variations.
-- [ ] **R Draconis:** Validate long-period pulsation variability between minimum and maximum light.
+#### Vaihe 4: Testikohteiden validointi ja kalibrointi (Tunnit 32–40)
+- [ ] **Barnardin tähti:** Varmistetaan selkeä ominaisliikkeen siirtymä ($>10''/\text{vuosi}$) epookkien välillä.
+- [ ] **WISE 0855** (`08h55m10.831s, -07d14m42.53s`): Todennetaan kylmän ruskean kääpiön nopea liike taustataivaan suhteen.
+- [ ] **Epsilon Indi B:** Havaitaan kirkkaan päätähden vieressä liikkuva ruskeiden kääpiöiden pari.
+- [ ] **RW Aurigae:** Todennetaan suuri kirkkauden pudotus ja vaihtelu (pölypilvien aiheuttamat pimennykset).
+- [ ] **R Draconis:** Todennetaan Mira-tähden valtava sykkiminen minimin ja maksimin välillä.
 
-#### Phase 5: Polish, Field Guide, Video & Submission (Hours 40 – 48)
-- [ ] Add an interactive **"Field Guide / How-To-Hunt"** modal explaining:
-  - What does a moving asteroid vs. high proper motion star look like?
-  - What does a dipole look like in difference imaging?
-  - How to distinguish optical diffraction spikes from genuine objects.
-- [ ] Export features: Download animated GIF of current blink sequence or export discovery report card as PNG/PDF.
-- [ ] Record 3-minute high-impact demo video.
-- [ ] Finalize README, technical documentation, and NASA Space Apps submission page.
+#### Vaihe 5: Viimeistely, ohjeet, esittelyvideo ja palautus (Tunnit 40–48)
+- [ ] Interaktiivinen **"Kenttäopas / Näin etsit"** -ohjemodaali:
+  - Miltä liikkuva asteroidi tai tähti näyttää vilkutuksessa?
+  - Miltä dipoli näyttää erotuskuvassa?
+  - Miten erottaa tähden diffraktioviikset aidosta kohteesta?
+- [ ] Tiedostovienti: Tallenna vilkutus animaatio-GIFinä tai vie havaintoraportti PNG/PDF-muodossa.
+- [ ] 3 minuutin nasevan esittelyvideon nauhoitus.
+- [ ] README:n ja NASA Space Apps -projektisivun viimeistely.
 
 ---
 
-### 5. Benchmark Targets Calibration Cheat Sheet
+### 5. Testikohteiden kalibrointitaulukko
 
-| Object | RA (J2000) | Dec (J2000) | Type / Phenomenon | What Citizen Scientists Will See |
+| Kohde | RA (J2000) | Dec (J2000) | Tyyppi / Ilmiö | Mitä kansalaistutkija näkee |
 | :--- | :--- | :--- | :--- | :--- |
-| **Barnard's Star** | `17h 57m 48.5s` | `+04° 41′ 36″` | High proper motion red dwarf | Shifts by $>10''$ per year; fast, unmistakable jump across frames |
-| **WISE 0855-0714** | `08h 55m 10.83s` | `-07° 14′ 42.5″` | Coldest known sub-brown dwarf | Faint point source moving quickly against static background stars |
-| **Epsilon Indi B** | `22h 04m 10.5s` | `-56° 46′ 58″` | Binary brown dwarf ($T1 + T6$) | Faint brown dwarf companions sharing proper motion with $\epsilon$ Indi |
-| **RW Aurigae** | `05h 07m 49.5s` | `+30° 24′ 05″` | Eruptive T Tauri variable | Drastic flux variations between epochs due to circumstellar dust occultations |
-| **R Draconis** | `16h 32m 40.2s` | `+66° 45′ 18″` | Mira-type pulsating variable | Period $\approx 245$ days; swings from magnitude 6.7 down to 13.2 |
+| **Barnardin tähti** | `17h 57m 48.5s` | `+04° 41′ 36″` | Suuren ominaisliikkeen punainen kääpiö | Liikkuu $>10''$ vuodessa; huomattava loikka kuvaruudussa |
+| **WISE 0855-0714** | `08h 55m 10.83s` | `-07° 14′ 42.5″` | Kylmin tunnettu aliruskea kääpiö | Himmeä pistemäinen lähde liikkuu nopeasti staattisten taustatähtien ohi |
+| **Epsilon Indi B** | `22h 04m 10.5s` | `-56° 46′ 58″` | Ruskea kääpiöpari ($T1 + T6$) | Himmeä seuralaispari, jolla on sama ominaisliike päätähden kanssa |
+| **RW Aurigae** | `05h 07m 49.5s` | `+30° 24′ 05″` | Nuori purkautuva T Tauri -tähti | Rajuja kirkkauden muutoksia epookkien välillä ympäröivän pölyn takia |
+| **R Draconis** | `16h 32m 40.2s` | `+66° 45′ 18″` | Mira-tyypin sykkivä punainen jättiläinen | Jakso $\approx 245$ päivää; kirkkaus vaihtelee magnitudien 6,7 ja 13,2 välillä |
 
 ---
 
-### 6. Recommended Tech Stack
+### 6. Suositeltu teknologiapino
 
-- **Framework:** React 18 / Next.js with TypeScript
-- **Styling:** Tailwind CSS + Radix UI / Lucide icons (sleek NASA dark theme)
-- **Canvas / Animation:** HTML5 2D Canvas or Pixi.js (GPU accelerated pixel operations)
-- **Astro Libraries:** `astronomy-engine`, `@hscmap/fits` / `fitsjs`, or custom lightweight FITS/WCS parser
-- **APIs:** CDS Sesame (resolver), NASA/IPAC IRSA Cutout Service, unWISE multi-epoch archive
-- **Export:** `gifshot` or `canvas-capture` for client-side animated GIF/WebM export
-- **Hosting:** Vercel or GitHub Pages (instant zero-cost continuous deployment)
+- **Käyttöliittymä:** React 18 / Next.js + TypeScript
+- **Tyylit:** Tailwind CSS + Lucide Icons (avaruusteemainen tumma UI)
+- **Animaatio ja grafiikka:** HTML5 2D Canvas tai Pixi.js (nopea pikselitason laskenta erotuskuville)
+- **Tähtitieteen työkalut:** CDS Sesame (nimipalvelin), NASA/IPAC IRSA Cutout API, unWISE-arkisto
+- **Vienti:** `gifshot` tai `canvas-capture` (selaimessa generoituva GIF/WebM-animaatio)
+- **Julkaisu:** Vercel tai GitHub Pages (ilmainen, välitön ja luotettava hosting)
