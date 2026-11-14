@@ -79,22 +79,21 @@ science/
 
 ## 3. What Still Needs to Be Done (Next Steps & Roadmap)
 
-### Phase 1: Pre-computing Benchmark Data for the 5 Challenge Targets
-* [ ] **Run and cache all 5 challenge targets locally:**
-  Ensure the team has pre-fetched and generated complete data folders in `output/` (or `examples/`) so the hackathon live demo never hangs on internet / archive latency:
-  ```bash
-  python science/fetch_spherex.py --target barnard --per-group 3
-  python science/fetch_spherex.py --target epsindib --per-group 3
-  python science/fetch_spherex.py --target wise0855 --per-group 3
-  python science/fetch_spherex.py --target rwaur --per-group 3
-  python science/fetch_spherex.py --target rdra --per-group 3
-  ```
-* [ ] **Validate outputs:** Check that each target folder has:
+### Phase 1: Pre-computing Benchmark Data for the 5 Challenge Targets (Completed)
+- [x] **Run and cache all 5 challenge targets locally:**
+  Pre-fetched and generated complete data folders in `output/` so the hackathon live demo never hangs on internet / archive latency:
+  - `output/barnard/` (5 epochs, 54 cutouts)
+  - `output/epsindib/` (5 epochs, 66 cutouts, glare suppression)
+  - `output/wise0855/` (3 epochs, 54 cutouts, ZODI subtraction, inverted stretch)
+  - `output/rwaur/` (3 epochs, 54 cutouts, NIR excess spectrum)
+  - `output/rdra/` (9 epochs, 52 cutouts, variable light curve)
+- [x] **Validate outputs:** Verified that each target folder has:
   - `frames/` for each detector (D1–D6, ALL)
   - `diff_*.png` and `blink_*.gif`
   - `spectrum.csv` and `spectrum.png`
   - `lightcurve.csv` and `lightcurve.png`
-  - `meta.json` containing complete `"light_curve"` and `"gaia_validation"` blocks.
+  - `meta.json` containing complete `"light_curve"`, `"gaia_validation"`, `"pixel_coords"`, `"fits"`, and `"propagated_to"`.
+- [x] **Update `CONTRACT.md`:** Documented all new keys (`gaia_validation`, `light_curve`, `propagated_to`, `outputs[band].fits`).
 
 ### Phase 2: Frontend & Backend Integration Support
 * [ ] **Hand-off to Erik (Backend):**

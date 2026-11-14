@@ -495,6 +495,12 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
                 gx, gy = w.world_to_pixel(c_gaia_pred)
                 if 0 <= gx < shape[1] and 0 <= gy < shape[0]:
                     gaia_pix = (float(gx), float(gy))
+                    gaia_meta["pixel_coords"] = {
+                        "canvas_x": round(float(gx), 2),
+                        "canvas_y": round(float(shape[0] - 1 - gy), 2),
+                        "wcs_x": round(float(gx), 2),
+                        "wcs_y": round(float(gy), 2)
+                    }
         except Exception as e:
             print(f"  Gaia-validointi ohitettu: {e}")
 
@@ -513,11 +519,14 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
         pil = []
         for e, img in ims:
             p = out / "frames" / b / f"epoch{e}.png"
-            # Piirretään Gaia-sijainti vain viimeiseen epookkiin tai kaikkiin
-            cur_gaia_pix = gaia_pix if (e == ims[-1][0] and getattr(args, "show_gaia", True)) else None
+            # Piirretään Gaia-sijainti vain jos erikseen pyydetty kiinteänä (oletus: puhdas kuva, viewer piirtää overlayna)
+            cur_gaia_pix = gaia_pix if (e == ims[-1][0] and getattr(args, "show_gaia", False)) else None
             pil.append(to_png(stretch(img, lo, hi, invert=use_invert), p, scale,
                               f"{label} {b}  {epochs_meta[e]['date']}", gaia_pix=cur_gaia_pix))
-        files = {"frames": [f"frames/{b}/epoch{e}.png" for e, _ in ims]}
+        files = {
+            "frames": [f"frames/{b}/epoch{e}.png" for e, _ in ims],
+            "fits": [f"epoch{e}_{b}.fits" for e in range(n_ep) if (e, b) in stacks]
+        }
         if len(pil) > 1:
             pil[0].save(out / f"blink_{b}.gif", save_all=True, append_images=pil[1:],
                         duration=args.frame_ms, loop=0)
@@ -703,7 +712,8 @@ def main():
     p.add_argument("--hi", type=float, default=99.7, help="venytyksen yläpersentiili")
     p.add_argument("--frame-ms", type=int, default=600, help="GIF-framen kesto")
     p.add_argument("--invert", action="store_true", help="käänteiset värit (negatiivi-kontrasti)")
-    p.add_argument("--show-gaia", action="store_true", default=True, help="piirrä Gaia DR3 -sijainti kuviin")
+    p.add_argument("--show-gaia", action="store_true", default=False,
+                   help="piirrä Gaia DR3 -sijainti kiinteästi PNG-kuviin (oletus False: puhdas kuva, viewer piirtää dynaamisena overlayna)")
     p.add_argument("--out", default="output")
     args = p.parse_args()
 

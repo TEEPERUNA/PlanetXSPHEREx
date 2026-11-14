@@ -58,25 +58,80 @@ Static files listed in `meta.json`, e.g. `/api/files/barnard/frames/ALL/epoch0.p
      "detectors": {"D1": {"n_images": 3, "flagged_frac": 0.02}, ...}}
   ],
   "outputs": {                                // per band + "ALL" (all detectors combined)
-    "ALL": {"frames": ["frames/ALL/epoch0.png", "frames/ALL/epoch1.png"],
-            "gif": "blink_ALL.gif", "diff": "diff_ALL.png"},
-    "D1": { ... }
+    "ALL": {
+      "frames": ["frames/ALL/epoch0.png", "frames/ALL/epoch1.png"],
+      "fits": ["epoch0_ALL.fits", "epoch1_ALL.fits"], // raw calibrated float32 FITS stacks
+      "gif": "blink_ALL.gif",
+      "diff": "diff_ALL.png"
+    },
+    "D1": {
+      "frames": ["frames/D1/epoch0.png", "frames/D1/epoch1.png"],
+      "fits": ["epoch0_D1.fits", "epoch1_D1.fits"],
+      "gif": "blink_D1.gif",
+      "diff": "diff_D1.png"
+    }
   },
   "spectrum": "spectrum.csv",
+  "lightcurve": "lightcurve.csv",
+  "lightcurve_png": "lightcurve.png",
+  "light_curve": {                            // band-by-band variability analysis
+    "is_variable": false,
+    "variable_bands": [],
+    "bands": {
+      "D1": {"is_variable": false, "n_points": 5, "min_flux": 288.7, "max_flux": 616.2},
+      ...
+    },
+    "points": [
+      {"epoch": 0, "date": "2025-08-25", "mjd": 60916.08, "band": "D1", "flux": 486.29, "err": 0.95}, ...
+    ]
+  },
+  "gaia_validation": {
+    "status": "CONFIRMED_MATCH",              // "CONFIRMED_MATCH" | "VALIDATED_NON_GAIA" | "NO_GAIA_MATCH"
+    "gaia_dr3_source_id": 4472832130942585856, // or null (e.g. wise0855 optical invisible)
+    "target": "Barnard's Star",
+    "target_key": "barnard",
+    "message": "Vahvistettu Gaia DR3 -kohde (Barnard's Star). Ominaisliike projisoitu epookista J2016.0 vuoteen 2026.65.",
+    "reference_epoch": "J2016.0",
+    "target_epoch": 2026.65,
+    "predicted_ra": 269.449696,
+    "predicted_dec": 4.724044,
+    "pixel_coords": {                         // calculated pixel coordinates in image
+      "canvas_x": 15.2,                       // top-left origin (for HTML5 Canvas)
+      "canvas_y": 14.8,
+      "wcs_x": 15.2,                          // bottom-left origin (FITS standard)
+      "wcs_y": 15.2
+    },
+    "pmra_masyr": -801.551,
+    "pmdec_masyr": 10362.394,
+    "parallax_mas": 546.97,
+    "phot_g_mean_mag": 8.19,
+    "accumulated_shift_arcsec": 110.68,
+    "residual_offset_arcsec": 168.487,
+    "is_match": true
+  },
   "pmra_masyr": -801.6, "pmdec_masyr": 10362.4, // only for named targets
-  "versions": ["..."], "generated": "...",
+  "propagated_to": 2026.87,                   // decimal year to which target position was propagated
+  "versions": ["7.0.5"], "generated": "...",
   "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team"
 }
 ```
 
-All paths in `outputs` and `spectrum` are relative to `base_url`.
+All paths in `outputs`, `spectrum`, and `lightcurve` are relative to `base_url`.
 
 Images: PNG, north up, east left, red crosshair at centre, same stretch for all epochs of a band.
 `diff_*.png`: last epoch minus first, grey = no change, white = brighter now, black = fainter now.
+Clean PNG frames are provided without hardcoded overlays; the viewer renders dynamic overlays (e.g. Gaia circle, crosshair toggle) client-side on Canvas using `pixel_coords`.
 
 ## `spectrum.csv`
 `mjd, epoch, detector, wavelength_um, flux_mjy_sr, err_mjy_sr, flagged_frac`
-One row per SPHEREx image, measured at the centre (3×3 px). Group by `epoch` to compare epochs (variable stars).
+One row per SPHEREx image, measured at the target's physical position at that epoch (3×3 px). Group by `epoch` to compare epochs (variable stars).
+
+## `lightcurve.csv`
+`epoch, date, mjd, band, flux_mjy_sr, err_mjy_sr`
+Multi-epoch time-series photometric measurements grouped strictly by detector band (D1–D6). Avoids band-mixing artifacts across epochs with partial detector coverage.
+
+## FITS files (`outputs[band].fits`)
+Raw scientific calibrated float32 FITS images (`epoch{e}_{band}.fits`, `epoch{e}_ALL.fits`) registered to the tangent plane with standard WCS headers. Available via `/api/files/{job}/epoch{e}_{band}.fits`.
 
 ## Rules
 - Science (`science/`) may add new keys to `meta.json`, but must not rename or remove existing keys.
