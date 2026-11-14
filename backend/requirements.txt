@@ -1,12 +1,4 @@
-fastapi>=0.111.0
-uvicorn[standard]>=0.30.0
-numpy>=2.0.0
-scipy>=1.14.0
-astropy>=6.0.0
-astroquery>=0.4.7
-photutils>=2.0.0
-reproject>=0.13.0
-Pillow>=10.0.0
-matplotlib>=3.8.0
-requests>=2.31.0
-pydantic>=2.7.0
+-r ../science/requirements.txt
+fastapi>=0.110
+uvicorn[standard]>=0.29
+pydantic>=2.7
