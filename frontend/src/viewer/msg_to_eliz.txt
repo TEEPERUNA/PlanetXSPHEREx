@@ -1,0 +1,59 @@
+Frontend testaa API:a kolmella tavalla, helpoimmasta alkaen:
+
+1. Selaimessa ilman koodia (2 min)
+
+https://planetx-api-38053485414.us-east4.run.app/docs avaa Swagger-sivun, jossa jokaista endpointia voi kokeilla napista (Try it out → Execute) ja nähdä vastauksen.
+.../api/sky?target=barnard palauttaa meta.json:in ja base_url:in.
+.../api/files/barnard/frames/ALL/epoch0.png näyttää kuvan suoraan selaimessa.
+
+2. Koodista: CORS on auki (allow_origins=["*"]), joten selain voi kutsua API:a suoraan mistä tahansa, myös localhost:5173:sta. Tämän voi lähettää Elizille ja Juholle sellaisenaan:
+
+ts
+// api.ts – SPHEREx Sky API client
+export const API = "https://planetx-api-38053485414.us-east4.run.app";
+
+export type SkyResult = { status: string; job: string; base_url?: string; meta?: any;
+  preview?: { base_url: string; meta: any } | null; done?: number; total?: number;
+  stage?: string; error?: string };
+
+// Start a search (target OR ra/dec) and wait until done. onUpdate gets progress + preview.
+export async function getSky(
+  params: { target?: string; ra?: string; dec?: string; fov?: number },
+  onUpdate?: (s: SkyResult) => void
+): Promise<SkyResult> {
+  const q = new URLSearchParams(Object.entries(params)
+    .filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)]));
+  const res = await fetch(`${API}/api/sky?${q}`);
+  if (!res.ok) throw new Error((await res.json()).detail ?? res.statusText);
+  let s: SkyResult = await res.json();
+  while (s.status !== "done") {
+    if (s.status === "error") throw new Error(s.error ?? "failed");
+    onUpdate?.(s);                          // show progress / s.preview right away
+    await new Promise(r => setTimeout(r, 2000));
+    s = await (await fetch(`${API}/api/status/${s.job}`)).json();
+  }
+  onUpdate?.(s);
+  return s;
+}
+
+// Absolute URL for any path in meta.json (frames, gif, diff, spectrum.csv)
+export const fileUrl = (s: { base_url: string }, path: string) => API + s.base_url + path;
+
+Käyttö:
+
+ts
+const s = await getSky({ ra: "133.795", dec: "-7.245", fov: 3 }, u => {
+  if (u.preview) showFrames(u.preview);               // quick preview
+  setProgress(u.done ?? 0, u.total ?? 0, u.stage);    // "23 / 54 downloading"
+});
+const frames = s.meta.outputs.ALL.frames.map((f: string) => fileUrl(s as any, f));
+
+3. Tarkistuslista, joka frontendin pitää testata:
+
+[ ] Kaikki 5 testikohdetta aukeavat heti (?target=barnard, epsindib, wise0855, rwaur, rdra)
+[ ] Vapaa koordinaatti, esim. ra=10.68&dec=41.27: latausnäkymä, esikatselu ja lopuksi täysi tulos
+[ ] Virheellinen syöte, esim. ra=abc: näytetään virheviesti eikä tyhjää ruutua
+[ ] Kaistan vaihto D1–D6/ALL: kaikilla epookeilla ei ole kaikkia kaistoja, joten valitsin rakennetaan meta.outputs-avaimista
+[ ] Kuvat haetaan aina base_url:in kautta, ei kovakoodatulla polulla
+
+Jos he saavat CORS- tai 404-virheen, pyydä heitä lähettämään selaimen konsolin (F12) virhe sinulle, niin selvitetään se.
