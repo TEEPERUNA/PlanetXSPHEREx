@@ -10,15 +10,14 @@
 ## 1. Tavoite
 Käyttäjä näkee valitsemansa taivaan kohdan SPHEREx-kuvat peräkkäin animaationa epookista toiseen. Liikkuva kohde, kuten lähitähti tai ruskea kääpiö, erottuu silloin silmällä.
 
-Kohteen voi valita kolmella tavalla:
-- klikkaamalla Aladin Lite -karttaa
+Kohteen voi valita kahdella tavalla:
 - syöttämällä koordinaatit
 - valitsemalla valmiin kohteen
 
-Kaikki kolme päätyvät samaan `setTarget(ra, dec, fov)`-kutsuun. Kartta ja syöttökenttä ovat Juhon osuutta, joten viewerin ei tarvitse tietää, mistä koordinaatit tulivat.
+Molemmat päätyvät samaan `setTarget(ra, dec, fov)`-kutsuun. Syöttökenttä ja kohdelista ovat Juhon osuutta, joten viewerin ei tarvitse tietää, mistä koordinaatit tulivat. Aladin Lite -karttaa ei käytetä.
 
 ```
-Aladin-kartta / syöttö (Juho)  →  RA/Dec
+Syöttö / kohdelista (Juho)  →  RA/Dec
    →  setTarget(ra, dec, fov)    (state.ts)
    →  /api/sky + pollaus         (api/)
    →  Viewer näyttää kuvat       (Elias)
@@ -60,7 +59,7 @@ Aladin-kartta / syöttö (Juho)  →  RA/Dec
 
 ### Tilat
 - **Tyhjä:** kohdetta ei ole vielä valittu.
-- **Lataus:** vaihe (`stage`) ja edistyminen `done/total`. Tämä on tärkeä, koska kartan klikkaus osuu yleensä kohtaan, jota ei ole välimuistissa.
+- **Lataus:** vaihe (`stage`) ja edistyminen `done/total`. Tämä on tärkeä, koska omat koordinaatit osuvat yleensä kohtaan, jota ei ole välimuistissa.
 - **Virhe:** selkeä viesti, esimerkiksi "No SPHEREx images cover this position".
 - **Uusi kohde kesken latauksen:** viewer siirtyy suoraan uuteen kohteeseen, eikä edellisen kohteen kuvia saa jäädä näkyviin.
 
@@ -168,24 +167,48 @@ import { Viewer, type ViewerStatus } from "../viewer";
 
 ## 6. Työjärjestys
 
-**Tilanne:** rakenne on valmis. Kuvapino, ohjaimet, epookin tiedot, koordinaatit, tilat ja CSV:n lukeminen on kirjoitettu. Spektrikaavio puuttuu, koska kirjastoa ei ole vielä valittu. Koodia ei ole vielä ajettu, koska Vite + React -pohja puuttuu.
+**Tilanne:** rakenne on valmis. Kuvapino, ohjaimet, epookin tiedot, koordinaatit, tilat ja CSV:n lukeminen on kirjoitettu. Spektrikaavio puuttuu, koska kirjastoa ei ole vielä valittu. Vite + React -pohja puuttuu yhä.
+
+**Testaus ennen pohjaa:** viewerin lähdekoodia voi ajaa sellaisenaan esikatselusivulla (React CDN:stä, TypeScript käännetään selaimessa) Emilin Barnard-datalla. Sivulla on napit tiloille done, loading, empty ja error. Sivu on väliaikainen eikä kuulu repoon.
 
 | # | Työ | Valmis kun |
 |---|---|---|
 | 1 | Blink, kaistan valinta, play/pause ja epookin tiedot mock-datalla | Barnardin tähti näkyy liikkuvan noin 1,7 px pohjoiseen |
 | 2 | Erotuskuva, nopeus, askellus, kirkkaus ja kontrasti sekä koordinaatit hiiren kohdalla | kaikki ohjaimet toimivat ja Barnardin tähden kohdalla näkyy sen koordinaatit |
-| 3 | Tyhjä-, lataus- ja virhetila sekä kytkentä Juhon appiin | kartan klikkaus näyttää kuvat oikealta backendiltä |
+| 3 | Tyhjä-, lataus- ja virhetila sekä kytkentä Juhon appiin | syötetyt koordinaatit näyttävät kuvat oikealta backendiltä |
 | 4 | Spektrikaavio | kaavio näkyy virhepalkkeineen |
 | 5 | Gaia-ympyrät (jos aikaa jää) | ympyrät osuvat tähteen joka epookissa |
 
 Jokaisen vaiheen jälkeen tehdään commit (`feat(viewer): …`) ja merge mainiin. Mainin pitää aina buildata.
 
-## 7. Avoimet asiat
+## 7. Yhteensopivuus Emilin datan kanssa
+
+Tarkistettu `fetch_spherex.py`:n tuottamaa `meta.json`:ia vasten (14.11.2026).
+
+**Täsmää:**
+- Kaikki viewerin lukemat avaimet ovat olemassa.
+- Tiedostonimet ovat muotoa `frames/{band}/epoch{e}.png`.
+- Kuvat ovat aina neliöitä ja koko pariton (31, tai 99 suurimmalla 10′ kentällä), joten keskipikseli on olemassa.
+- Otsikkoteksti piirretään kuvan päälle, joten pikselien paikat eivät siirry.
+- Kaistat, joilla on yksi kuva, eivät saa erotuskuvaa eivätkä GIFiä. Viewer poistaa silloin toiston ja diff-napin käytöstä.
+- Uudet avaimet (`lightcurve`, `gaia_validation`, `outputs[band].fits`) ohitetaan.
+- Gaia-merkkiä ei polteta kuviin oletuksena, vaan viewer piirtää sen SVG-kerrokseen (Emilin koodin kommentti).
+
+**Huomioitavaa:**
+- `base_url` on suhteellinen polku (`/api/files/<job>/`). `api/`-kansion pitää lisätä API:n osoite eteen ennen kuin `baseUrl` annetaan viewerille.
+- WISE 0855:n kuvat ovat negatiivina, eikä `meta.json` kerro sitä. Erotuskuva ei ole käännetty.
+- Gaia-sijainti tulee avaimesta `gaia_validation.pixel_coords` (`canvas_x`, `canvas_y`). Se on vain viimeiselle epookille, ja SVG:ssä siihen lisätään 0,5, jotta ympyrä osuu pikselin keskelle.
+- Otsikkopalkki (16 px) peittää kuvan yläreunan: noin 1,3 pikseliriviä 31 px kuvassa, noin 4 riviä 10′ kentällä.
+- Donitsit (mustat kyllästyneet ytimet) ovat science-puolen ongelma, jota korjataan.
+
+## 8. Avoimet asiat
 - [ ] Varmistuuko React?
 - [ ] Kuka tekee Vite-pohjan ja kopioi mock-datan (`examples/barnard/` → `public/mock/barnard/`)?
 - [ ] Propsien muoto pitää sopia Juhon kanssa.
-- [ ] Missä viewer näkyy suhteessa isoon Aladin-karttaan (vieressä, päällä ikkunana vai alla) ja miten se toimii mobiilissa?
-- [ ] Klikatun kohdan merkki kartalle (Juho).
+- [ ] Viewerin paikka sivulla ja toiminta mobiilissa (Juho).
 - [ ] Spektrikaavion kirjasto: Chart.js (`react-chartjs-2` ja error bar -plugin) vai uPlot.
 - [ ] Gaia-sijainnit: Emililtä uutena `meta.json`-avaimena (katso `science/gaia_validation.py`) vai suoraan Gaiasta?
-- [ ] CORS backendissä, jos frontend ja backend ovat eri osoitteissa (Erik).
+- [x] CORS backendissä (Erik): kaikki osoitteet sallittu.
+- [ ] `api/` tekee `baseUrl`:sta täydellisen osoitteen (Juho).
+- [ ] Avain `"inverted": true` käännetyille kuville, jotta viewer voi kertoa sen käyttäjälle (Emil).
+- [ ] Valokäyrä (`lightcurve.csv`) samaan kaavioon kuin spektri? Hyödyllinen muuttuville tähdille (RW Aur, R Dra).
