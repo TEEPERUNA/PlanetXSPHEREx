@@ -10,3 +10,4 @@ dist/
 backend/cache/*.fits
 backend/cache/*.json
 .pytest_cache/
+.vscode/
