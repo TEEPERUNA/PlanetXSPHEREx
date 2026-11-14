@@ -160,7 +160,8 @@ def propagate_gaia_to_epoch(
 def validate_gaia(
     coord: SkyCoord,
     target_key: Optional[str] = None,
-    target_epoch: float = 2026.0
+    target_epoch: float = 2026.0,
+    timeout: float = 10.0
 ) -> Dict[str, Any]:
     """
     Validates observation against Gaia DR3.
@@ -221,13 +222,36 @@ def validate_gaia(
         }
         return sanitize_for_json(res)
 
-    # 2. General coordinate lookup via astroquery
-    try:
+    # 2. General coordinate lookup via astroquery with timeout
+    def _do_cone_search():
         from astroquery.gaia import Gaia
         Gaia.ROW_LIMIT = 5
         job = Gaia.cone_search_async(coord, radius=15.0 * u.arcsec)
-        tab = job.get_results()
-        if len(tab) > 0:
+        return job.get_results()
+
+    try:
+        with cf.ThreadPoolExecutor(max_workers=1) as executor:
+            fut = executor.submit(_do_cone_search)
+            try:
+                tab = fut.result(timeout=timeout)
+            except cf.TimeoutError:
+                res = {
+                    "status": "QUERY_TIMEOUT",
+                    "gaia_dr3_source_id": None,
+                    "message": f"Gaia DR3 live query timed out (> {timeout:.1f} s).",
+                    "reference_epoch": "J2016.0",
+                    "target_epoch": round(target_epoch, 2),
+                    "predicted_ra": None,
+                    "predicted_dec": None,
+                    "pmra_masyr": None,
+                    "pmdec_masyr": None,
+                    "accumulated_shift_arcsec": None,
+                    "residual_offset_arcsec": None,
+                    "is_match": False
+                }
+                return sanitize_for_json(res)
+
+        if tab is not None and len(tab) > 0:
             best = tab[0]
 
             def _get_float(key: str) -> Optional[float]:

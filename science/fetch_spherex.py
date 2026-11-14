@@ -561,9 +561,18 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
     gaia_meta = None
     gaia_pix = None
     target_year = float(Time(epochs_meta[-1]["mjd_mean"], format="mjd").decimalyear)
-    if validate_gaia:
+    skip_gaia = bool(getattr(args, "skip_gaia", False))
+    gaia_timeout = float(getattr(args, "gaia_timeout", 10.0) or 10.0)
+
+    if skip_gaia:
+        gaia_meta = {
+            "status": "SKIPPED",
+            "message": "Gaia DR3 validation skipped.",
+            "is_match": False
+        }
+    elif validate_gaia:
         try:
-            gaia_meta = validate_gaia(coord, target_key=matched_target, target_epoch=target_year)
+            gaia_meta = validate_gaia(coord, target_key=matched_target, target_epoch=target_year, timeout=gaia_timeout)
             pred_ra = gaia_meta.get("predicted_ra") if gaia_meta else None
             pred_dec = gaia_meta.get("predicted_dec") if gaia_meta else None
             if (pred_ra is not None and pred_dec is not None and
@@ -792,6 +801,10 @@ def main():
     p.add_argument("--invert", action="store_true", help="Invert colors (negative contrast)")
     p.add_argument("--show-gaia", action="store_true", default=False,
                    help="Bake Gaia DR3 position marker into PNG frames (default: False, viewer renders dynamic overlay)")
+    p.add_argument("--skip-gaia", action="store_true", default=False,
+                   help="Skip Gaia DR3 astrometric validation (e.g. for quick preview)")
+    p.add_argument("--gaia-timeout", type=float, default=10.0,
+                   help="Timeout in seconds for Gaia DR3 query (default: 10.0)")
     p.add_argument("--out", default="output")
     args = p.parse_args()
 
