@@ -46,7 +46,6 @@ PlanetXSPHEREx/
 │   └── epochN_<band>.fits ......... raw float data  │  (not listed in meta.json yet)
 │                                                    │
 ├── frontend/                                        │
-│   ├── public/mock/barnard/ . copy of examples/barnard, so the viewer works without the backend
 │   └── src/                                         │
 │       ├── app/  (Juho)                             │
 │       │     App, SearchForm (RA/Dec, targets, FOV), GifView (GIF per band)
