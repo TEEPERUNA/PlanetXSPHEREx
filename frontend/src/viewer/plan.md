@@ -80,21 +80,72 @@ Aladin-kartta / syöttö (Juho)  →  RA/Dec
 - `flagged_frac` on 1.0 kaikkialla.
 - Spektri mitataan kuvan keskeltä, joten varhaisissa epookeissa liikkuvan tähden vuo jää liian pieneksi.
 
-## 4. Komponentit
+## 4. Rakenne
 
-| Tiedosto | Tehtävä |
-|---|---|
-| `Viewer.tsx` | julkinen komponentti, joka kokoaa osat ja pitää tilan (kaista, epookki, toisto, diff, filtterit) |
-| `BlinkImage.tsx` | kuva ja SVG-kerros |
-| `PlaybackControls.tsx` | kaikki ohjaimet |
-| `EpochInfo.tsx` | epookin päivämäärä ja kuvien määrä |
-| `CursorInfo.tsx` | pikseli, RA ja Dec hiiren kohdalla |
-| `skyCoords.ts` | pikselin muunnos RA/Dec-koordinaateiksi |
-| `SpectrumChart.tsx` | spektrikaavio |
-| `StatusView.tsx` | tyhjä-, lataus- ja virhetila |
-| `useBlink.ts` | toiston ajastus (hook) |
-| `parseSpectrum.ts` | CSV:n lukeminen |
-| `types.ts` | `Meta`-tyyppi CONTRACTin mukaan |
+### Näkymä
+
+```
+┌──────────────────────────────────────────────┐
+│  Barnard's Star                              │  ← otsikko
+│            ┌──────────────────┐              │
+│            │  kuva + SVG      │              │  ← BlinkImage
+│            └──────────────────┘              │
+│  Epoch 3/5 · 2026-02-08 · 10 images          │  ← EpochInfo
+│  Pixel (15,12) · RA 269.4461° · Dec 4.7707°  │  ← CursorInfo
+├──────────────────────────────────────────────┤
+│  [ALL] [D1] … [D6]                           │  ← PlaybackControls
+│  ◀  Pause  ▶   speed ──●──   [Difference]    │
+│  brightness ──●──   contrast ──●──           │
+├──────────────────────────────────────────────┤
+│  Spectrum                                    │  ← SpectrumChart
+│  Data: NASA/IPAC IRSA, SPHEREx Team          │  ← credit
+└──────────────────────────────────────────────┘
+```
+
+Tyhjä-, lataus- ja virhetilassa koko alue korvataan `StatusView`-näkymällä. Käyttöliittymän tekstit ovat englanniksi.
+
+### Tiedostot
+
+```
+viewer/
+├── index.ts              # ainoa tiedosto, jota muu sovellus importtaa
+├── Viewer.tsx            # julkinen komponentti ja viewerin tila
+├── types.ts              # Meta, Epoch, Frame, ViewerStatus
+├── viewer.css
+├── components/
+│   ├── BlinkImage.tsx    # kuvapino, SVG-kerros, hiiren pikseli
+│   ├── EpochInfo.tsx     # päivämäärä ja kuvien määrä
+│   ├── CursorInfo.tsx    # pikseli, RA ja Dec
+│   ├── PlaybackControls.tsx  # kaista, toisto, nopeus, diff, kirkkaus, kontrasti
+│   ├── SpectrumChart.tsx # lataa CSV:n; kaavio puuttuu vielä
+│   └── StatusView.tsx    # tyhjä, lataus, virhe
+├── hooks/
+│   └── useBlink.ts       # toiston ajastus
+└── lib/
+    ├── frames.ts         # kuvat kaistalle, epookin numero tiedostonimestä
+    ├── skyCoords.ts      # pikseli → RA/Dec
+    └── parseSpectrum.ts  # spectrum.csv → rivit
+```
+
+### Periaatteet
+- **Komponentit vain näyttävät.** Laskenta on kansiossa `lib/`, jossa on pelkkiä funktioita. Ne voi testata ilman Reactia.
+- **Muu sovellus näkee vain `index.ts`:n**, joten sisäistä rakennetta voi muuttaa vapaasti.
+- **Tila on yhdessä paikassa**, `Viewer.tsx`:ssä. Se kulkee alas propseina, ja muutokset tulevat ylös callbackeina.
+- **Uusi kohde nollaa kaiken.** Ladattu viewer saa `key={baseUrl}`, joten React luo sen alusta, kun kohde vaihtuu.
+- **Kaikki kaistan kuvat ovat sivulla koko ajan**, ja vain yksi näkyy. Blink ei siksi odota latausta.
+- **Kosketusnäytöllä** viimeisin napautus jää näkyviin `CursorInfo`:on.
+
+### Viewerin tila
+
+| Tila | Alkuarvo | Huomio |
+|---|---|---|
+| `band` | ensimmäinen kaista, jolla on kuvia (yleensä `ALL`) | vaihto nollaa `frameIdx`:n |
+| `frameIdx` | `0` | indeksi kaistan kuvalistaan, **ei** epookin numero |
+| `playing` | `true` | askellus pysäyttää toiston |
+| `fps` | `2` | 0,5–10 |
+| `showDiff` | `false` | erotuskuvan aikana toisto on pois päältä |
+| `brightness`, `contrast` | `1`, `1` | CSS `filter`, 0,2–3 |
+| `hoverPx` | `null` | hiiren tai napautuksen pikseli |
 
 `viewer/` ja `app/` eivät importtaa toisiaan. Ne kommunikoivat vain `state.ts`:n ja `api/`:n kautta.
 
@@ -109,7 +160,15 @@ Aladin-kartta / syöttö (Juho)  →  RA/Dec
 
 Viewer ei kutsu API:a itse. App tai `api/` hoitaa pollauksen ja sen keskeyttämisen, ja viewer vain näyttää tilan.
 
+Käyttö appissa:
+
+```tsx
+import { Viewer, type ViewerStatus } from "../viewer";
+```
+
 ## 6. Työjärjestys
+
+**Tilanne:** rakenne on valmis. Kuvapino, ohjaimet, epookin tiedot, koordinaatit, tilat ja CSV:n lukeminen on kirjoitettu. Spektrikaavio puuttuu, koska kirjastoa ei ole vielä valittu. Koodia ei ole vielä ajettu, koska Vite + React -pohja puuttuu.
 
 | # | Työ | Valmis kun |
 |---|---|---|
