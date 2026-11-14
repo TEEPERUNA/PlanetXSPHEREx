@@ -1,5 +1,5 @@
 # PlanetXSPHEREx: Kansalaistieteen työkalu taivaankappaleiden liikkeen ja muuttuvuuden havaitsemiseen
-## Python-pohjainen projektisuunnitelma ja tekninen arkkitehtuuri (4 hengen tiimi)
+## Fullstack-projektisuunnitelma (TypeScript Frontend + Python Backend) – 4 hengen tiimi
 
 ---
 
@@ -7,10 +7,10 @@
 
 NASAn **SPHEREx**-missio (Spectro-Photometer for the History of the Universe, Epoch of Reionization, and Ices Explorer) kartoittaa koko taivaan kerran kuudessa kuukaudessa **102 lähi-infrapunan aallonpituuskaistalla** (0,75–5,0 µm).
 
-**Haaste:** Rakentaa julkinen, helppokäyttöinen **Python-pohjainen verkkosovellus**, jolla kansalaistutkijat ja tähtitieteilijät voivat:
+**Haaste:** Rakentaa moderni ja suorituskykyinen julkinen verkkotyökalu (**TypeScript/React-frontend + Python/FastAPI-backend**), jolla kansalaistutkijat ja tähtitieteilijät voivat:
 1. Syöttää taivaankoordinaatit (rektaskensio RA ja deklinaatio Dec joko asteina tai aikamuodossa `hh:mm:ss` / `dd:mm:ss`) tai etsiä kohteita suoraan nimellä.
-2. Tarkastella kyseisen taivaankohdan kuvia eri havaintojaksoilta (epookeilta) animaationa / vilkkukomparaattorina ("blink comparator").
-3. Havaita nopeasti liikkuvia kohteita (suuren ominaisliikkeen tähdet, ruskeat kääpiöt, asteroidit, komeetat, mahdollinen Planeetta Yhdeksän / Planet X) sekä kirkkauttaan muuttavia kohteita (muuttuvat tähdet, supernovat).
+2. Tarkastella kyseisen taivaankohdan kuvia eri havaintojaksoilta (epookeilta) reaaliaikaisena vilkkukomparaattorina ("blink comparator").
+3. Havaita nopeasti liikkuvia kohteita (suuren ominaisliikkeen tähdet, ruskeat kääpiöt, asteroidit, komeetat, mahdollinen Planet X) sekä kirkkauttaan muuttavia kohteita (muuttuvat tähdet, supernovat).
 4. Testata ja validoida työkalun toimivuus viidellä pakollisella vertailukohteella:
    - **Barnardin tähti** (suurin tunnettu ominaisliike: $\sim 10,3''/\text{vuosi}$)
    - **Epsilon Indi B** (läheinen ruskeiden kääpiöiden kaksoisjärjestelmä)
@@ -20,143 +20,157 @@ NASAn **SPHEREx**-missio (Spectro-Photometer for the History of the Universe, Ep
 
 ---
 
-### 2. Järjestelmäarkkitehtuuri ja Python-teknologiapino
+### 2. Järjestelmäarkkitehtuuri
 
-Sovelluksen käyttöliittymä toteutetaan puhtaasti Pythonilla (ensisijaisena suosituksena **Streamlit**, joka mahdollistaa nopean kehityksen, helpon jakamisen ja ilmaisen pilvijulkaisun suoraan GitHubista, tai vaihtoehtoisesti **FastAPI + kevyt HTML5/JS-näkymä**).
+Yhdistetään moderni **TypeScript-frontend** (sulava 60 fps Canvas-animaatio, responsiivinen UI) ja **Python-backend** (tähtitieteen standardikirjastot Astropy ja Astroquery).
 
 ```mermaid
 flowchart TD
-    User["Kansalaistutkija / Käyttäjä"] --> UI["Streamlit / Python Web-käyttöliittymä"]
+    User["Kansalaistutkija / Käyttäjä"] --> UI["Frontend (TypeScript + React + Tailwind CSS)"]
     
-    subgraph UIComponents["Käyttöliittymäkomponentit (Python)"]
-        Search["Koordinaatti- ja nimihakukentät (SkyCoord / Sesame)"]
-        Presets["Pikanäppäimet 5 testikohteelle"]
-        Viewer["Animoitu vilkkusoitin / GIF-toistin"]
-        DiffViewer["Erotuskuvanäytin (Difference Image)"]
-        Sliders["Säätimet: FPS, ZScale/kontrasti, käänteiset värit"]
-        Report["Löytöjen kirjaus (CSV / SQLite)"]
+    subgraph Frontend["TypeScript Frontend (Vite / React)"]
+        Search["Koordinaatti- ja nimihaku + Pikanäppäimet 5 kohteelle"]
+        CanvasPlayer["Vilkkukomparaattori (HTML5 Canvas / 60 fps)"]
+        Filters["Säätimet: FPS, ZScale/kontrasti, negatiivi, zoom/pan"]
+        ReportModal["Löytöjen merkintä ja raportointi (RA/Dec)"]
     end
     
-    subgraph AstroBackend["Python-astrofysiikkamoottori"]
-        AstroCoord["astropy.coordinates (SkyCoord)"]
-        AstroQuery["astroquery (CDS Sesame & IRSA Cutouts)"]
-        FITSProc["astropy.io.fits & WCS (kuvaleikkaukset)"]
-        ImgProc["numpy + Pillow / imageio / OpenCV (erotuskuvat & animaatiot)"]
+    subgraph Backend["Python Backend (FastAPI + Astropy)"]
+        API["FastAPI REST API"]
+        CoordResolver["astropy.coordinates.SkyCoord & CDS Sesame"]
+        DataPipeline["astroquery.ipac.irsa (SPHEREx / unWISE moniepookki)"]
+        DiffEngine["NumPy erotuskuvalaskenta (Frame B - Frame A)"]
+        FitsEngine["astropy.io.fits & astropy.visualization (ZScale)"]
     end
 
-    UI --> UIComponents
-    UIComponents --> AstroBackend
-    AstroBackend --> Viewer
+    UI --> Search
+    UI --> CanvasPlayer
+    Search -->|REST API: /api/resolve & /api/cutouts| API
+    API --> CoordResolver
+    API --> DataPipeline
+    API --> FitsEngine
+    API --> DiffEngine
+    API -->|JSON + kuva-arrayt / PNG-epookit| CanvasPlayer
 ```
 
-#### Keskeiset Python-kirjastot:
-- **`streamlit`**: Nopea, moderni ja interaktiivinen web-käyttöliittymä liukusäätimillä, välilehdillä ja painikkeilla.
-- **`astropy`**: 
-  - `astropy.coordinates.SkyCoord`: joustava koordinaattien tulkinta (asteet, sexagesimaali, J2000).
-  - `astropy.io.fits`: tieteellisten FITS-kuvien lukeminen ja WCS-koordinaattimuunnokset.
-  - `astropy.visualization.ZScaleInterval` / `AsinhStretch`: tähtitieteellinen optimaalinen kontrastin venytys.
-- **`astroquery`**:
-  - `astroquery.simbad` & `astroquery.ipac.irsa`: kohteiden nouto nimen perusteella ja kuvaleikkausten haku.
-- **`numpy`**: erittäin nopea matriisilaskenta erotuskuville ($\Delta I = I_2 - I_1$).
-- **`Pillow`** / **`imageio`**: animoitujen GIFien ja videoiden luominen reaaliajassa vilkuttamista ja lataamista varten.
-
 ---
 
-### 3. Tiimin roolit ja työnjako (4 hengen Python-tiimi)
+### 3. Tiimin roolit ja työnjako (4 hengen tiimi)
 
-| Rooli | Päävastuut | Keskeiset tuotokset |
+| Rooli | Päävastuut | Keskeiset teknologiat ja tuotokset |
 | :--- | :--- | :--- |
-| **Henkilö 1: Käyttöliittymä & UI/UX (Python/Streamlit)** | Pääsivun asettelu, sivupalkki, toistosäätimet (nopeus, loop/bounce), esiasetuspainikkeet 5 testikohteelle, tumma avaruusteema. | - `app.py` (Streamlit-pääsovellus)<br>- Interaktiiviset ohjaimet ja tilanhallinta<br>- Responsiivinen layout ja visuaalinen ilme |
-| **Henkilö 2: Astrofysiikka & Koordinaatit (`astropy`)** | Koordinaattien jäsennys (RA/Dec), automaattinen nimenhaku (Sesame/SIMBAD), WCS-muunnokset (pikselit $\leftrightarrow$ taivaankoordinaatit). | - `astro_utils.py` (SkyCoord-jäsennin)<br>- Nimipalvelun integrointi<br>- Tähtäinristikon ja mittakaavan ($10''$) laskenta |
-| **Henkilö 3: Dataputki, Kuvankäsittely & Vienti (`numpy`, `fits`)** | FITS-kuvien lataus (IRSA/SPHEREx), erotuskuvalaskenta ($\Delta I$), kontrastin venytys (ZScale/MinMax/Log) ja animoitujen GIFien generointi. | - `data_fetcher.py` (kuvaleikkausten nouto)<br>- `image_processing.py` (erotuskuvat & ZScale)<br>- GIF- ja MP4-animaatioiden luontifunktiot |
-| **Henkilö 4: Tieteellinen QA, Testikohteet & Pitchaus** | 5 pakollisen testikohteen ajaminen ja kuvien validointi, kansalaistutkijan kenttäoppaan kirjoitus sovellukseen, esitysmateriaalit ja demo-video. | - Valmiiksi testatut koordinaatit ja esimerkit<br>- "Field Guide" -ohjesivu sovellukseen<br>- 3 minuutin esittelyvideo ja esityskalvot<br>- Space Apps -dokumentaatio ja `README.md` |
+| **Henkilö 1: Frontend & Visualisointi (TypeScript Lead)** | HTML5 Canvas -vilkkukomparaattori, toistonopeuden säätö (1–15 fps), loop- ja bounce-toistotilat, zoom/pan-toiminnot, tumma NASA-teema, GIF-vienti. | - `BlinkViewer.tsx` (Canvas-moottori)<br>- `PlaybackControls.tsx`<br>- `client-side GIF/WebM-export` |
+| **Henkilö 2: Frontend & Käyttäjäkokemus (TypeScript UI Lead)** | Hakukenttä (koordinaattien validointi + nimenhaku), 5 testikohteen pikavalikko, löytöjen merkintätyökalu suoraan kuvalle, kansalaistutkijan kenttäopas (Field Guide). | - `CoordinateSearch.tsx`<br>- `TargetDrawer.tsx` (5 testikohdetta)<br>- `FieldGuideModal.tsx`<br>- `CandidateReportForm.tsx` |
+| **Henkilö 3: Backend & Astrofysiikka (Python Lead)** | FastAPI-palvelin, koordinaattimuunnokset (`astropy.coordinates.SkyCoord`), CDS Sesame -nimipalvelu, IRSA/SPHEREx-leikkausten nouto ja välimuisti. | - `main.py` (FastAPI endpoints: `/api/resolve`, `/api/cutouts`)<br>- `astro_service.py` (`SkyCoord`, Sesame)<br>- `data_fetcher.py` (IRSA / unWISE) |
+| **Henkilö 4: Backend-kuvankäsittely, QA & Pitchaus (Python & Science Lead)** | Reaaliaikainen erotuskuvalaskenta NumPyssä ($\Delta I$), ZScale-kontrastisäädöt (`astropy.visualization`), 5 testikohteen validointi, esittelyvideo ja pitchaus-materiaali. | - `image_service.py` (erotuskuvat, ZScale)<br>- Testiaineistot 5 pakolliselle kohteelle<br>- 3 min esittelyvideo ja esityskalvot<br>- Space Apps -dokumentaatio |
 
 ---
 
-### 4. Vaiheittainen etenemissuunnitelma (48 h hackathon)
+### 4. API-rajapintasopimus (Frontend $\leftrightarrow$ Backend)
+
+1. **`GET /api/targets`**
+   - Palauttaa 5 esitallennetun testikohteen tiedot ja koordinaatit (Barnardin tähti, WISE 0855, Epsilon Indi B, RW Aurigae, R Draconis).
+2. **`GET /api/resolve?query={name_or_coords}`**
+   - Tunnistaa annetun nimen (esim. `"Barnard's Star"`) tai raakakoordinaatit (`08h55m10.831s -07d14m42.53s`).
+   - Palauttaa normalisoidun JSONin: `{ ra_deg: 133.795, dec_deg: -7.245, display_name: "WISE 0855" }`.
+3. **`GET /api/cutouts?ra={deg}&dec={deg}&fov_arcmin={fov}`**
+   - Hakee useamman epookin kuvat (esim. SPHEREx ja unWISE moniepookki).
+   - Palauttaa kuvaepookit aikajärjestyksessä sekä valmiiksi lasketun erotuskuvan (difference image).
+4. **`POST /api/report`**
+   - Tallentaa kansalaistutkijan tekemän löydön koordinaatteineen ja luokituksineen.
+
+---
+
+### 5. Vaiheittainen etenemissuunnitelma (48 h hackathon)
 
 ```mermaid
 flowchart LR
-    P1["Vaihe 1: Python-pohja (0-8h)"] --> P2["Vaihe 2: Kuvat ja vilkutus (8-20h)"]
+    P1["Vaihe 1: Ympäristöt ja alustus (0-8h)"] --> P2["Vaihe 2: API ja vilkkumoottori (8-20h)"]
     P2 --> P3["Vaihe 3: Erotuskuvat ja työkalut (20-32h)"]
     P3 --> P4["Vaihe 4: 5 testikohdetta (32-40h)"]
     P4 --> P5["Vaihe 5: Viimeistely ja video (40-48h)"]
 ```
 
-#### Vaihe 1: Python-ympäristö ja perusrunko (Tunnit 0–8)
-- [ ] Luodaan virtuaaliympäristö (`python3 -m venv venv`) ja `requirements.txt`.
-- [ ] Pystytetään perus-Streamlit-sovellus (`streamlit run app.py`).
-- [ ] Kirjoitetaan koordinaattimuunnin `SkyCoord`-kirjastolla:
-  - Tunnistaa automaattisesti syötteet: `133.795, -7.245` tai `08h55m10.831s -07d14m42.53s`.
-- [ ] Integroidaan kohteen nimenhaku (esim. kirjoittamalla `"Barnard's Star"` kenttä täyttää oikeat koordinaatit automaattisesti).
-- [ ] Lisätään sivupalkkiin 5 testikohteen pikanäppäimet.
+#### Vaihe 1: Alustus ja perusrakenteet (Tunnit 0–8)
+- [ ] Luodaan kansiot `frontend/` (Vite + React + TypeScript + Tailwind) ja `backend/` (FastAPI + Python).
+- [ ] Backend: `SkyCoord`-tulkki ja Sesame-nimipalvelin.
+- [ ] Frontend: Sivupohja tummalla avaruusteemalla, hakupalkki ja 5 testikohteen napit.
+- [ ] Varmistetaan kommunikaatio selaimen ja Python-rajapinnan välillä (CORS ja `/api/health`).
 
-#### Vaihe 2: Kuvien nouto ja vilkkukomparaattori (Tunnit 8–20)
-- [ ] Luodaan kuvahaun moduuli (`data_fetcher.py`):
-  - Haetaan useamman epookin infrapunaleikkaukset (esim. WISE/unWISE- tai SPHEREx-arkistosta) annetuilla koordinaateilla.
-- [ ] Luodaan vilkkukomparaattori:
-  - Generoidaan moniepookkisista kuvista sulava animoitu GIF tai HTML5-videosilmukka suoraan Pythonissa (`imageio`/`Pillow`).
-  - Lisätään toistonopeuden säädin (1–15 fps) ja kuva kerrallaan tarkastelu.
+#### Vaihe 2: Kuvatiedonsiirto ja Canvas-vilkutus (Tunnit 8–20)
+- [ ] Backend: Moniepookkisen kuvahaun toteutus (SPHEREx-mock ja unWISE IRSA -arkistot).
+- [ ] Frontend: HTML5 Canvas -vilkkukomparaattori:
+  - Toisto/pausaus, nopeudensäädin (1–15 fps), kuva kerrallaan siirtyminen.
+  - Toistotilat: Jatkuva silmukka ja edestakainen bounce-animaatio.
+- [ ] Tähtäinristikko ja kaarisekuntien mittakaavajana kuvan kulmassa.
 
 #### Vaihe 3: Kuvankäsittely ja kansalaistutkijan työkalut (Tunnit 20–32)
-- [ ] **Erotuskuvat (Difference Imaging):**
-  - Lasketaan NumPyssä $\text{Epookki}_2 - \text{Epookki}_1$.
-  - Liikkuva kohde tai muuttuva tähti näkyy selvänä mustavalkoisena dipolina!
-- [ ] **Tähtitieteellinen kontrastin venytys:**
-  - `astropy.visualization.ZScaleInterval` ja `MinMaxInterval`.
-  - Negatiivitila (värien kääntö).
-- [ ] **Löydön kirjaus ja raportointi:**
-  - Käyttäjä voi klikata tai syöttää huomaamansa kohteen koordinaatit, valita tyypin (*Liikkuva kohde*, *Muuttuva tähti*, *Häiriö*) ja ladata raportin (CSV + GIF).
+- [ ] **Erotuskuvat (Difference Imaging):** Laskenta backendissä NumPyllä ($\Delta I = I_2 - I_1$) ja esitys suoraan frontendin soittimessa.
+- [ ] **Kontrastisäädöt:** ZScale-venytys, logaritminen skaalaus ja negatiivitila (värien kääntö).
+- [ ] **Löytöjen merkintä:** Käyttäjä klikkaa kuvaa $\rightarrow$ lasketaan pikselistä tarkat $(RA, Dec)$ -koordinaatit ja avataan raportointilomake.
+- [ ] **Animaation vienti:** Selaimessa ladattava animoitu GIF.
 
 #### Vaihe 4: Viiden pakollisen testikohteen validointi (Tunnit 32–40)
-- [ ] **Barnardin tähti:** Todennetaan raju ominaisliike ($>10''/\text{vuosi}$).
-- [ ] **WISE 0855:** Todennetaan erittäin himmeän ja kylmän ruskean kääpiön liike.
-- [ ] **Epsilon Indi B:** Havaitaan päätähden ohella liikkuva ruskea kääpiöpari.
-- [ ] **RW Aurigae:** Todennetaan dramaattinen kirkkauden himmeneminen.
-- [ ] **R Draconis:** Todennetaan Mira-tähden valtava sykkimisjakso.
+- [ ] **Barnardin tähti:** Todennetaan $>10''/\text{vuosi}$ siirtymä.
+- [ ] **WISE 0855:** Todennetaan kylmän ruskean kääpiön liike taustataivaan halki.
+- [ ] **Epsilon Indi B:** Erotetaan päätähden mukana liikkuva ruskea kääpiöpari.
+- [ ] **RW Aurigae:** Todennetaan suuret kirkkauden pudotukset (pölypilvet).
+- [ ] **R Draconis:** Todennetaan Mira-tähden sykkiminen (mag 6,7 $\leftrightarrow$ 13,2).
 
 #### Vaihe 5: Viimeistely, ohjeet ja pitchaus (Tunnit 40–48)
-- [ ] Lisätään sovellukseen interaktiivinen **"Kenttäopas" (Field Guide)** esimerkkikuvineen.
-- [ ] Varmistetaan sovelluksen suorituskyky ja välimuistitus (`@st.cache_data`).
-- [ ] Nauhoitetaan 3 minuutin esittelyvideo.
-- [ ] Viimeistellään `README.md` ja julkaistaan sovellus ilmaiseksi (esim. Streamlit Community Cloud tai Hugging Face Spaces).
+- [ ] Interaktiivinen **"Kenttäopas / Field Guide"** -ohjemodaali käyttöliittymään.
+- [ ] 3 minuutin esittelyvideon käsikirjoitus ja nauhoitus.
+- [ ] `README.md`-tiedoston ja NASA Space Apps -projektisivun viimeistely.
+- [ ] Julkaisu: Frontend Vercelille/GitHub Pagesille ja Python-backend esim. Render / Railway / Fly.io.
 
 ---
 
-### 5. Testikohteiden kalibrointitaulukko
-
-| Kohde | RA (J2000) | Dec (J2000) | Tyyppi / Ilmiö | Mitä vilkutuksessa näkyy |
-| :--- | :--- | :--- | :--- | :--- |
-| **Barnardin tähti** | `17h 57m 48.5s` | `+04° 41′ 36″` | Suuren ominaisliikkeen punainen kääpiö | Tähti hyppää selvästi eteenpäin taustatähtien pysyessä paikallaan |
-| **WISE 0855-0714** | `08h 55m 10.83s` | `-07° 14′ 42.5″` | Kylmin tunnettu aliruskea kääpiö | Pieni himmeä piste liikkuu taustataivaan halki |
-| **Epsilon Indi B** | `22h 04m 10.5s` | `-56° 46′ 58″` | Ruskea kääpiöpari ($T1 + T6$) | Päätähden mukana kulkeva erillinen himmeä seuralainen |
-| **RW Aurigae** | `05h 07m 49.5s` | `+30° 24′ 05″` | Purkautuva T Tauri -muuttuja | Tähden kirkkaus romahtaa ja palaa takaisin pölypilvien takia |
-| **R Draconis** | `16h 32m 40.2s` | `+66° 45′ 18″` | Mira-tyypin sykkivä jättiläinen | Tähti kasvaa ja himmenee valtavasti (mag 6,7 $\leftrightarrow$ 13,2) |
-
----
-
-### 6. Aloitus: Suositeltu tiedostorakenne ja `requirements.txt`
+### 6. Projektin suositeltu kansiorakenne
 
 ```text
 PlanetXSPHEREx/
-├── app.py                 # Streamlit-pääsovellus ja käyttöliittymä
-├── astro_utils.py         # Koordinaattimuunnokset ja nimihaku (Astropy, Sesame)
-├── data_fetcher.py        # Kuvaleikkausten nouto ja välimuisti
-├── image_processing.py    # Erotuskuvat, ZScale-venytys, animoidun GIFin teko
-├── targets.py             # Esitallennetut testikohteet koordinaatteineen
-├── PLAN.md                # Tämä projektisuunnitelma
-├── requirements.txt       # Python-riippuvuudet
-└── README.md              # Projektin esittely ja ohjeet
+├── PLAN.md                     # Tämä projektisuunnitelma
+├── README.md                   # Projektin yleiskuvaus ja käynnistysohjeet
+│
+├── frontend/                   # TypeScript + React + Vite + Tailwind
+│   ├── package.json
+│   ├── vite.config.ts
+│   ├── tsconfig.json
+│   └── src/
+│       ├── App.tsx
+│       ├── components/
+│       │   ├── BlinkViewer.tsx        # Canvas-vilkkumoottori
+│       │   ├── CoordinateSearch.tsx   # Haku ja validointi
+│       │   ├── PlaybackControls.tsx   # FPS, play/pause, bounce
+│       │   ├── TargetDrawer.tsx       # 5 pakollista testikohdetta
+│       │   ├── FieldGuideModal.tsx    # Ohje kansalaistutkijoille
+│       │   └── CandidateModal.tsx     # Löytöjen merkintälomake
+│       ├── services/api.ts            # Kutsut Python-backendiin
+│       └── types.ts                   # TypeScript-rajapinnat
+│
+└── backend/                    # Python + FastAPI + Astropy
+    ├── requirements.txt
+    ├── main.py                 # FastAPI REST API -reitit
+    ├── config.py
+    └── services/
+        ├── astro_service.py    # SkyCoord & Sesame -nimipalvelu
+        ├── data_fetcher.py     # IRSA/unWISE & SPHEREx -kuvaleikkaukset
+        ├── image_service.py    # Erotuskuvat (NumPy) & ZScale-venytys
+        └── targets.py          # 5 pakollisen testikohteen data
 ```
 
-**Alustava `requirements.txt`:**
-```text
-streamlit>=1.35.0
-astropy>=6.0.0
-astroquery>=0.4.7
-numpy>=1.24.0
-Pillow>=10.0.0
-imageio>=2.30.0
-matplotlib>=3.8.0
-requests>=2.31.0
-```
+#### Alustavat riippuvuudet:
+- **`backend/requirements.txt`**:
+  ```text
+  fastapi>=0.111.0
+  uvicorn[standard]>=0.30.0
+  astropy>=6.0.0
+  astroquery>=0.4.7
+  numpy>=1.24.0
+  Pillow>=10.0.0
+  requests>=2.31.0
+  pydantic>=2.7.0
+  python-multipart>=0.0.9
+  ```
+- **`frontend/package.json`** keskeiset paketit:
+  `react`, `react-dom`, `lucide-react`, `tailwindcss`, `axios`, `gifshot`
