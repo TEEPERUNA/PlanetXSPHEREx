@@ -329,12 +329,32 @@ def robust_norm(img: np.ndarray) -> np.ndarray:
     return (img - med) / (mad if mad > 0 else 1.0)
 
 
+def inpaint_nans(img: np.ndarray) -> np.ndarray:
+    """
+    Korjaa näyttökuvia (PNG) varten eristetyt NaN-pikselit (saturaatio tai vialliset pikselit tähden ytimessä).
+    Estää tähden keskelle syntyvän mustan reiän (black hole), kun saturoitunut pikseli muutetaan kuvaksi.
+    """
+    if not np.isnan(img).any():
+        return img
+    try:
+        from astropy.convolution import interpolate_replace_nans, Gaussian2DKernel
+        if np.isnan(img).sum() < img.size * 0.9:
+            kernel = Gaussian2DKernel(x_stddev=1)
+            clean = interpolate_replace_nans(img, kernel)
+            med = float(np.nanmedian(clean)) if np.isfinite(np.nanmedian(clean)) else 0.0
+            return np.nan_to_num(clean, nan=med)
+    except Exception:
+        pass
+    med = float(np.nanmedian(img)) if np.isfinite(np.nanmedian(img)) else 0.0
+    return np.nan_to_num(img, nan=med)
+
+
 def stretch(img: np.ndarray, lo: float, hi: float, invert: bool = False, use_zscale: bool = False) -> np.ndarray:
     """
     Tähtitieteellinen kontrastivenytys (asinh/ZScale) ja valinnainen negatiivi-tila.
-    Negatiivi (invert=True) tekee heikoista ruskeista kääpiöistä (WISE 0855) huomattavasti selkeämpiä.
+    Käyttää inpaint_nans-interpolointia, jotta saturoituneet pikselit eivät näy mustina reikinä tähden keskellä.
     """
-    clean = np.nan_to_num(img, nan=0.0)
+    clean = inpaint_nans(img)
     if use_zscale:
         try:
             from astropy.visualization import ZScaleInterval
