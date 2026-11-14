@@ -38,6 +38,10 @@ from astropy.io import fits
 from astropy.time import Time
 from astropy.utils.data import conf as data_conf
 from astropy.wcs import WCS, FITSFixedWarning
+from astropy import log
+
+# Vaimennetaan SIP- ja WCS-infologit
+log.setLevel("WARNING")
 
 # Import Gaia validation and target identification
 try:
@@ -211,7 +215,8 @@ class Cutout:
 
 def fetch_cutout(row, coord: SkyCoord) -> Cutout | None:
     c = Cutout(mjd=float(row["mjd"]), band=str(row["band"]).replace("SPHEREx-", ""), url=str(row["uri"]))
-    for attempt in range(3):
+    max_attempts = 6
+    for attempt in range(max_attempts):
         try:
             with fits.open(c.url, cache=False, memmap=False) as h:
                 img = h["IMAGE"].data.astype(np.float32)
@@ -239,10 +244,12 @@ def fetch_cutout(row, coord: SkyCoord) -> Cutout | None:
             return c
         except (TimeoutError, urllib.error.URLError, http.client.IncompleteRead,
                 http.client.RemoteDisconnected, OSError) as e:
-            if attempt == 2:
-                print(f"  ohitettu: {e}")
+            if attempt == max_attempts - 1:
+                print(f"  ohitettu ({c.band}): {e}")
                 return None
-            time.sleep(2 * (attempt + 1))
+            # Eksponentiaalinen odotus (n. 1.5s, 3s, 5.5s, 10s, 18s) satunnaisella jitterillä
+            sleep_sec = min(30.0, (1.8 ** attempt) + np.random.uniform(0.5, 1.5))
+            time.sleep(sleep_sec)
     return None
 
 
@@ -399,7 +406,8 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
     if progress:
         progress(0, total, "downloading")
     cutouts = []
-    with cf.ThreadPoolExecutor(max_workers=args.workers) as ex:
+    n_workers = min(int(getattr(args, "workers", 6) or 6), 6)
+    with cf.ThreadPoolExecutor(max_workers=n_workers) as ex:
         futs = [ex.submit(fetch_cutout, r, coord) for r in tab]
         for i, f in enumerate(cf.as_completed(futs), 1):
             c = f.result()
@@ -664,7 +672,7 @@ def main():
     p.add_argument("--max", type=int, default=0, help="max kuvia per kohde (0 = kaikki)")
     p.add_argument("--per-group", type=int, default=0,
                    help="max kuvia per epookki+ilmaisin (esim. 3 = nopea blink, 0 = kaikki)")
-    p.add_argument("--workers", type=int, default=10)
+    p.add_argument("--workers", type=int, default=6, help="rinnakkaisten latausten määrä (oletus 6 ruuhkan välttämiseksi)")
     p.add_argument("--mask-flags", action="store_true", help="maskaa kaikki liputetut pikselit")
     p.add_argument("--lo", type=float, default=1.0, help="venytyksen alapersentiili")
     p.add_argument("--hi", type=float, default=99.7, help="venytyksen yläpersentiili")
