@@ -49,10 +49,10 @@ PlanetXSPHEREx/
 │   ├── public/mock/barnard/ . copy of examples/barnard, so the viewer works without the backend
 │   └── src/                                         │
 │       ├── app/  (Juho)                             │
-│       │     coordinate input, target list, URL     │
-│       │     → state.ts  setTarget(ra, dec, fov)    │
-│       ├── state.ts ......... shared (not created yet)
-│       ├── main.ts .......... shared (not created yet)
+│       │     App, SearchForm (RA/Dec, targets, FOV), GifView (GIF per band)
+│       │     → state.ts  setTarget(search)          │
+│       ├── state.ts ......... shared: current search, URL sync, polling (useSky)
+│       ├── main.tsx ......... shared: mounts app/App
 │       ├── api/  (shared)                           │
 │       │     → backend /api/sky, /api/status        │
 │       │     → Viewer as the `status` prop          │

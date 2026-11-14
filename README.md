@@ -33,6 +33,12 @@ uvicorn backend.main:app --reload --port 8000
 On startup it fetches the 5 challenge targets into `output/` (set `WARMUP=0` to skip).
 Try: http://localhost:8000/api/targets and http://localhost:8000/docs
 
+## Run the frontend
+```bash
+cd frontend && npm install && npm run dev
+```
+Backend address: `VITE_API_BASE_URL` (default `http://localhost:8000`, see `frontend/.env.example`).
+
 ## Docker (deploy)
 ```bash
 docker build -t spherex-sky .
