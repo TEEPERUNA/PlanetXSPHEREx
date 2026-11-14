@@ -74,8 +74,6 @@ PlanetXSPHEREx/
 │           │   ├── skyCoords.ts   pixel → RA/Dec
 │           │   └── parseSpectrum.ts
 │           └── plan.md
-│
-└── preview 2.html ......... science dashboard preview (single HTML file)
 ```
 
 ## Rules
