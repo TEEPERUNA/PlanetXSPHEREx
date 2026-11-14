@@ -38,10 +38,19 @@ Poll every ~2 s until `status` is `done` or `error`.
 {"job": "...", "status": "done", "base_url": "/api/files/<job>/", "meta": { ... }}
 {"job": "...", "status": "error", "error": "No SPHEREx images cover this position"}
 ```
-`stage` is one of `queued`, `downloading`, `processing`, `done`.
+`stage` is one of `queued`, `preview_downloading`, `preview_processing`, `downloading`, `processing`, `done`.
 
-### `GET /api/files/{job}/{path}`
+**Quick preview:** for new coordinates the backend first does a fast run (1 image per epoch+detector).
+When it's ready, status includes a `preview` object. Show it right away, then swap to the full result when `status` is `done`:
+```json
+{"job": "...", "status": "processing", "stage": "downloading", "done": 5, "total": 54,
+ "preview": {"base_url": "/api/files/<job>__preview/", "meta": { ... }}}
+```
+`preview` is `null` until the quick run is finished.
+
+### `GET /api/files/{job}/{path}` and `GET /api/examples/{job}/{path}`
 Static files listed in `meta.json`, e.g. `/api/files/barnard/frames/ALL/epoch0.png`.
+**Always use the `base_url` the API returns**: results precomputed in the repo's `examples/` folder are served from `/api/examples/`.
 
 ## `meta.json`
 
