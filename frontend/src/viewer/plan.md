@@ -44,6 +44,15 @@ Aladin-kartta / syöttö (Juho)  →  RA/Dec
 - epookin päivämäärä (`epochs[i].date`)
 - kuvien määrä (`detectors[band].n_images`, ALL-kaistalla `n_images`)
 
+### Koordinaatit hiiren kohdalla
+- Kun hiiri on kuvan päällä, kuvan alla näkyy pikseli sekä RA ja Dec, esimerkiksi `Pikseli (15, 12)  RA 269.4461°  Dec 4.7707°`.
+- Lasketaan hiiren paikasta, kuvan keskipisteestä (`ra_deg`, `dec_deg`) ja pikselikoosta (`pixel_scale_arcsec`). Canvasia ei tarvita.
+- Keskipikseli on (15, 15). Pohjoinen on ylhäällä ja itä vasemmalla, joten:
+  - `dec = dec_deg - (y - 15) * scale / 3600`
+  - `ra = ra_deg - (x - 15) * scale / 3600 / cos(dec_deg)`
+- Mobiilissa sama tieto näytetään napautuksesta.
+- Vuota (MJy/sr) hiiren kohdalla ei näytetä, koska PNG:istä saa vain harmaasävyn 0–255. Se vaatisi raakadataa Emililtä.
+
 ### Spektrikaavio (`spectrum.csv`)
 - x on `wavelength_um`, y on `flux_mjy_sr`
 - virhepalkit kentästä `err_mjy_sr`
@@ -79,6 +88,8 @@ Aladin-kartta / syöttö (Juho)  →  RA/Dec
 | `BlinkImage.tsx` | kuva ja SVG-kerros |
 | `PlaybackControls.tsx` | kaikki ohjaimet |
 | `EpochInfo.tsx` | epookin päivämäärä ja kuvien määrä |
+| `CursorInfo.tsx` | pikseli, RA ja Dec hiiren kohdalla |
+| `skyCoords.ts` | pikselin muunnos RA/Dec-koordinaateiksi |
 | `SpectrumChart.tsx` | spektrikaavio |
 | `StatusView.tsx` | tyhjä-, lataus- ja virhetila |
 | `useBlink.ts` | toiston ajastus (hook) |
@@ -103,7 +114,7 @@ Viewer ei kutsu API:a itse. App tai `api/` hoitaa pollauksen ja sen keskeyttämi
 | # | Työ | Valmis kun |
 |---|---|---|
 | 1 | Blink, kaistan valinta, play/pause ja epookin tiedot mock-datalla | Barnardin tähti näkyy liikkuvan noin 1,7 px pohjoiseen |
-| 2 | Erotuskuva, nopeus, askellus, kirkkaus ja kontrasti | kaikki ohjaimet toimivat |
+| 2 | Erotuskuva, nopeus, askellus, kirkkaus ja kontrasti sekä koordinaatit hiiren kohdalla | kaikki ohjaimet toimivat ja Barnardin tähden kohdalla näkyy sen koordinaatit |
 | 3 | Tyhjä-, lataus- ja virhetila sekä kytkentä Juhon appiin | kartan klikkaus näyttää kuvat oikealta backendiltä |
 | 4 | Spektrikaavio | kaavio näkyy virhepalkkeineen |
 | 5 | Gaia-ympyrät (jos aikaa jää) | ympyrät osuvat tähteen joka epookissa |
