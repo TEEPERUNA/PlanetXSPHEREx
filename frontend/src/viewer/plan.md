@@ -167,7 +167,9 @@ import { Viewer, type ViewerStatus } from "../viewer";
 
 ## 6. Työjärjestys
 
-**Tilanne:** rakenne on valmis. Kuvapino, ohjaimet, epookin tiedot, koordinaatit, tilat ja CSV:n lukeminen on kirjoitettu. Spektrikaavio puuttuu, koska kirjastoa ei ole vielä valittu. Koodia ei ole vielä ajettu, koska Vite + React -pohja puuttuu.
+**Tilanne:** rakenne on valmis. Kuvapino, ohjaimet, epookin tiedot, koordinaatit, tilat ja CSV:n lukeminen on kirjoitettu. Spektrikaavio puuttuu, koska kirjastoa ei ole vielä valittu. Vite + React -pohja puuttuu yhä.
+
+**Testaus ennen pohjaa:** viewerin lähdekoodia voi ajaa sellaisenaan esikatselusivulla (React CDN:stä, TypeScript käännetään selaimessa) Emilin Barnard-datalla. Sivulla on napit tiloille done, loading, empty ja error. Sivu on väliaikainen eikä kuulu repoon.
 
 | # | Työ | Valmis kun |
 |---|---|---|
@@ -179,7 +181,27 @@ import { Viewer, type ViewerStatus } from "../viewer";
 
 Jokaisen vaiheen jälkeen tehdään commit (`feat(viewer): …`) ja merge mainiin. Mainin pitää aina buildata.
 
-## 7. Avoimet asiat
+## 7. Yhteensopivuus Emilin datan kanssa
+
+Tarkistettu `fetch_spherex.py`:n tuottamaa `meta.json`:ia vasten (14.11.2026).
+
+**Täsmää:**
+- Kaikki viewerin lukemat avaimet ovat olemassa.
+- Tiedostonimet ovat muotoa `frames/{band}/epoch{e}.png`.
+- Kuvat ovat aina neliöitä ja koko pariton (31, tai 99 suurimmalla 10′ kentällä), joten keskipikseli on olemassa.
+- Otsikkoteksti piirretään kuvan päälle, joten pikselien paikat eivät siirry.
+- Kaistat, joilla on yksi kuva, eivät saa erotuskuvaa eivätkä GIFiä. Viewer poistaa silloin toiston ja diff-napin käytöstä.
+- Uudet avaimet (`lightcurve`, `gaia_validation`, `outputs[band].fits`) ohitetaan.
+- Gaia-merkkiä ei polteta kuviin oletuksena, vaan viewer piirtää sen SVG-kerrokseen (Emilin koodin kommentti).
+
+**Huomioitavaa:**
+- `base_url` on suhteellinen polku (`/api/files/<job>/`). `api/`-kansion pitää lisätä API:n osoite eteen ennen kuin `baseUrl` annetaan viewerille.
+- WISE 0855:n kuvat ovat negatiivina, eikä `meta.json` kerro sitä. Erotuskuva ei ole käännetty.
+- Gaia-sijainti tulee avaimesta `gaia_validation.pixel_coords` (`canvas_x`, `canvas_y`). Se on vain viimeiselle epookille, ja SVG:ssä siihen lisätään 0,5, jotta ympyrä osuu pikselin keskelle.
+- Otsikkopalkki (16 px) peittää kuvan yläreunan: noin 1,3 pikseliriviä 31 px kuvassa, noin 4 riviä 10′ kentällä.
+- Donitsit (mustat kyllästyneet ytimet) ovat science-puolen ongelma, jota korjataan.
+
+## 8. Avoimet asiat
 - [ ] Varmistuuko React?
 - [ ] Kuka tekee Vite-pohjan ja kopioi mock-datan (`examples/barnard/` → `public/mock/barnard/`)?
 - [ ] Propsien muoto pitää sopia Juhon kanssa.
@@ -187,3 +209,6 @@ Jokaisen vaiheen jälkeen tehdään commit (`feat(viewer): …`) ja merge mainii
 - [ ] Spektrikaavion kirjasto: Chart.js (`react-chartjs-2` ja error bar -plugin) vai uPlot.
 - [ ] Gaia-sijainnit: Emililtä uutena `meta.json`-avaimena (katso `science/gaia_validation.py`) vai suoraan Gaiasta?
 - [x] CORS backendissä (Erik): kaikki osoitteet sallittu.
+- [ ] `api/` tekee `baseUrl`:sta täydellisen osoitteen (Juho).
+- [ ] Avain `"inverted": true` käännetyille kuville, jotta viewer voi kertoa sen käyttäjälle (Emil).
+- [ ] Valokäyrä (`lightcurve.csv`) samaan kaavioon kuin spektri? Hyödyllinen muuttuville tähdille (RW Aur, R Dra).
