@@ -1,6 +1,7 @@
 """
 gaia_validation.py - Gaia DR3 Astrometric Validation for SPHEREx Sky
 Part of science/ module (Emil).
+AI usage: Written and developed with the assistance of an AI assistant (Claude / Antigravity).
 
 Validates celestial targets against Gaia DR3:
 1. Propagates Gaia DR3 astrometric positions from J2016.0 to SPHEREx observation epochs.

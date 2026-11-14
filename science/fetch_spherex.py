@@ -15,6 +15,7 @@ Data: NASA/IPAC IRSA, SPHEREx (TAP-taulut spherex.artifact + spherex.plane, cuto
 Kehitetty NASA Space Apps 2026 -haasteeseen (Planet X and SPHEREx).
 Tieteellinen kuvankäsittely ja validointi: Emil.
 Pohjana IRSA:n SPHEREx-tutoriaalit (BSD-3-Clause, Caltech-IPAC).
+AI usage: Written and developed with the assistance of an AI assistant (Claude / Antigravity).
 """
 from __future__ import annotations
 
