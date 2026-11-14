@@ -1,0 +1,255 @@
+{
+  "target": "Barnard's Star",
+  "ra_deg": 269.4460802884482,
+  "dec_deg": 4.770706413947762,
+  "fov_arcmin": 3.0,
+  "pixel_scale_arcsec": 6.15,
+  "shape": [
+    31,
+    31
+  ],
+  "bands": [
+    "D1",
+    "D2",
+    "D3",
+    "D4",
+    "D5",
+    "D6"
+  ],
+  "detector_ranges_um": {
+    "D1": [
+      0.75,
+      1.09
+    ],
+    "D2": [
+      1.1,
+      1.62
+    ],
+    "D3": [
+      1.63,
+      2.41
+    ],
+    "D4": [
+      2.42,
+      3.82
+    ],
+    "D5": [
+      3.83,
+      4.41
+    ],
+    "D6": [
+      4.42,
+      5.0
+    ]
+  },
+  "epochs": [
+    {
+      "index": 0,
+      "mjd_mean": 60912.099682666674,
+      "n_images": 12,
+      "detectors": {
+        "D1": {
+          "n_images": 1,
+          "flagged_frac": 1.0
+        },
+        "D2": {
+          "n_images": 2,
+          "flagged_frac": 1.0
+        },
+        "D3": {
+          "n_images": 3,
+          "flagged_frac": 1.0
+        },
+        "D4": {
+          "n_images": 2,
+          "flagged_frac": 1.0
+        },
+        "D5": {
+          "n_images": 1,
+          "flagged_frac": 1.0
+        },
+        "D6": {
+          "n_images": 3,
+          "flagged_frac": 1.0
+        }
+      },
+      "date": "2025-08-25"
+    },
+    {
+      "index": 1,
+      "mjd_mean": 60949.265914,
+      "n_images": 2,
+      "detectors": {
+        "D1": {
+          "n_images": 1,
+          "flagged_frac": 1.0
+        },
+        "D4": {
+          "n_images": 1,
+          "flagged_frac": 1.0
+        }
+      },
+      "date": "2025-10-01"
+    },
+    {
+      "index": 2,
+      "mjd_mean": 61115.212303600005,
+      "n_images": 10,
+      "detectors": {
+        "D1": {
+          "n_images": 3,
+          "flagged_frac": 1.0
+        },
+        "D2": {
+          "n_images": 1,
+          "flagged_frac": 1.0
+        },
+        "D3": {
+          "n_images": 1,
+          "flagged_frac": 1.0
+        },
+        "D4": {
+          "n_images": 1,
+          "flagged_frac": 1.0
+        },
+        "D5": {
+          "n_images": 2,
+          "flagged_frac": 1.0
+        },
+        "D6": {
+          "n_images": 2,
+          "flagged_frac": 1.0
+        }
+      },
+      "date": "2026-03-16"
+    },
+    {
+      "index": 3,
+      "mjd_mean": 61165.082972,
+      "n_images": 2,
+      "detectors": {
+        "D3": {
+          "n_images": 1,
+          "flagged_frac": 1.0
+        },
+        "D6": {
+          "n_images": 1,
+          "flagged_frac": 1.0
+        }
+      },
+      "date": "2026-05-05"
+    },
+    {
+      "index": 4,
+      "mjd_mean": 61278.15189005883,
+      "n_images": 17,
+      "detectors": {
+        "D1": {
+          "n_images": 3,
+          "flagged_frac": 1.0
+        },
+        "D2": {
+          "n_images": 3,
+          "flagged_frac": 1.0
+        },
+        "D3": {
+          "n_images": 3,
+          "flagged_frac": 1.0
+        },
+        "D4": {
+          "n_images": 3,
+          "flagged_frac": 1.0
+        },
+        "D5": {
+          "n_images": 3,
+          "flagged_frac": 1.0
+        },
+        "D6": {
+          "n_images": 2,
+          "flagged_frac": 1.0
+        }
+      },
+      "date": "2026-08-26"
+    }
+  ],
+  "outputs": {
+    "D1": {
+      "frames": [
+        "frames/D1/epoch0.png",
+        "frames/D1/epoch1.png",
+        "frames/D1/epoch2.png",
+        "frames/D1/epoch4.png"
+      ],
+      "gif": "blink_D1.gif",
+      "diff": "diff_D1.png"
+    },
+    "D2": {
+      "frames": [
+        "frames/D2/epoch0.png",
+        "frames/D2/epoch2.png",
+        "frames/D2/epoch4.png"
+      ],
+      "gif": "blink_D2.gif",
+      "diff": "diff_D2.png"
+    },
+    "D3": {
+      "frames": [
+        "frames/D3/epoch0.png",
+        "frames/D3/epoch2.png",
+        "frames/D3/epoch3.png",
+        "frames/D3/epoch4.png"
+      ],
+      "gif": "blink_D3.gif",
+      "diff": "diff_D3.png"
+    },
+    "D4": {
+      "frames": [
+        "frames/D4/epoch0.png",
+        "frames/D4/epoch1.png",
+        "frames/D4/epoch2.png",
+        "frames/D4/epoch4.png"
+      ],
+      "gif": "blink_D4.gif",
+      "diff": "diff_D4.png"
+    },
+    "D5": {
+      "frames": [
+        "frames/D5/epoch0.png",
+        "frames/D5/epoch2.png",
+        "frames/D5/epoch4.png"
+      ],
+      "gif": "blink_D5.gif",
+      "diff": "diff_D5.png"
+    },
+    "D6": {
+      "frames": [
+        "frames/D6/epoch0.png",
+        "frames/D6/epoch2.png",
+        "frames/D6/epoch3.png",
+        "frames/D6/epoch4.png"
+      ],
+      "gif": "blink_D6.gif",
+      "diff": "diff_D6.png"
+    },
+    "ALL": {
+      "frames": [
+        "frames/ALL/epoch0.png",
+        "frames/ALL/epoch1.png",
+        "frames/ALL/epoch2.png",
+        "frames/ALL/epoch3.png",
+        "frames/ALL/epoch4.png"
+      ],
+      "gif": "blink_ALL.gif",
+      "diff": "diff_ALL.png"
+    }
+  },
+  "spectrum": "spectrum.csv",
+  "versions": [
+    "7.0.5"
+  ],
+  "generated": "2026-11-14 09:08:45.709",
+  "pmra_masyr": -801.551,
+  "pmdec_masyr": 10362.394,
+  "propagated_to": 2026.87,
+  "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team"
+}
