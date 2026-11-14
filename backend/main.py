@@ -22,7 +22,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query
+import math
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -67,6 +69,17 @@ def slug_for(ra: float, dec: float, fov: float) -> str:
 EXAMPLES_DIR = ROOT / "examples"
 
 
+def clean_json(o):
+    """NaN/Infinity are not valid JSON -> FastAPI would crash with HTTP 500. Replace them with null."""
+    if isinstance(o, float):
+        return o if math.isfinite(o) else None
+    if isinstance(o, dict):
+        return {k: clean_json(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [clean_json(v) for v in o]
+    return o
+
+
 def find_cached(slug: str):
     """Returns (meta, base_url) for a finished result, or None.
     Looks in OUTPUT_DIR first, then the precomputed examples/ folder in the repo."""
@@ -74,7 +87,7 @@ def find_cached(slug: str):
         p = folder / slug / "meta.json"
         if p.exists():
             try:
-                return json.loads(p.read_text()), f"{prefix}/{slug}/"
+                return clean_json(json.loads(p.read_text())), f"{prefix}/{slug}/"
             except Exception:  # noqa: BLE001  half-written file
                 return None
     return None
@@ -246,6 +259,15 @@ def coord_job(c, fov: float):
 
 # --------------------------------------------------------------------------- endpoints
 
+@app.exception_handler(Exception)
+async def unhandled_error(request: Request, exc: Exception):
+    """Return the real error as JSON *with* CORS headers, so the browser shows the message
+    instead of a bare 'Failed to fetch'."""
+    traceback.print_exception(exc)
+    return JSONResponse(status_code=500, content={"detail": f"{type(exc).__name__}: {exc}"},
+                        headers={"Access-Control-Allow-Origin": "*"})
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
@@ -294,7 +316,7 @@ def status(job: str):
     j = jobs.get(job)
     if not j:
         raise HTTPException(404, "unknown job")
-    return {"job": job, **j}
+    return clean_json({"job": job, **j})
 
 
 @app.on_event("startup")
