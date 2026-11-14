@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 fetch_spherex.py - hakee SPHEREx-cutoutit annetulle taivaan kohdalle ja tekee niistä
-aikasarjan (epookit), blink-GIFin, erotuskuvan ja spektrin.
+aikasarjan (epookit), blink-GIFin, erotuskuvan, spektrin, valokäyrän ja Gaia DR3 -validoinnin.
 
 Esimerkit:
     python fetch_spherex.py --target wise0855
@@ -11,7 +11,8 @@ Esimerkit:
     python fetch_spherex.py --name "RW Aur"
 
 Data: NASA/IPAC IRSA, SPHEREx (TAP-taulut spherex.artifact + spherex.plane, cutout-palvelu).
-AI-assisted: written with Claude (Anthropic).
+Kehitetty NASA Space Apps 2026 -haasteeseen (Planet X and SPHEREx).
+Tieteellinen kuvankäsittely ja validointi: Emil.
 Pohjana IRSA:n SPHEREx-tutoriaalit (BSD-3-Clause, Caltech-IPAC).
 """
 from __future__ import annotations
@@ -21,6 +22,7 @@ import concurrent.futures as cf
 import csv
 import http.client
 import json
+import os
 import sys
 import time
 import urllib.error
@@ -35,6 +37,15 @@ from astropy.io import fits
 from astropy.time import Time
 from astropy.utils.data import conf as data_conf
 from astropy.wcs import WCS, FITSFixedWarning
+
+# Import Gaia validation service
+try:
+    from gaia_validation import validate_gaia
+except ImportError:
+    try:
+        from science.gaia_validation import validate_gaia
+    except ImportError:
+        validate_gaia = None
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 data_conf.remote_timeout = 90
@@ -240,6 +251,17 @@ def reproject_one(c: Cutout, w: WCS, shape, mask_flags: bool) -> np.ndarray:
     return out
 
 
+def suppress_stellar_glare(img: np.ndarray, sigma: float = 3.5) -> np.ndarray:
+    """
+    Korkeapääsuodatus / unsharp masking tähden diffraktiohalon poistamiseksi.
+    Tärkeä Epsilon Indi B:n ruskean kääpiön erottamiseen kirkkaan päätähden halosta.
+    """
+    from scipy.ndimage import gaussian_filter
+    clean = np.nan_to_num(img, nan=float(np.nanmedian(img)))
+    smoothed = gaussian_filter(clean, sigma=sigma)
+    return img - smoothed
+
+
 def robust_norm(img: np.ndarray) -> np.ndarray:
     """Taustan poisto + jako kohinalla (MAD), jotta ilmaisimet voi summata."""
     med = np.nanmedian(img)
@@ -247,32 +269,58 @@ def robust_norm(img: np.ndarray) -> np.ndarray:
     return (img - med) / (mad if mad > 0 else 1.0)
 
 
-def stretch(img: np.ndarray, lo: float, hi: float) -> np.ndarray:
-    x = np.clip((img - lo) / (hi - lo + 1e-12), 0, 1)
+def stretch(img: np.ndarray, lo: float, hi: float, invert: bool = False, use_zscale: bool = False) -> np.ndarray:
+    """
+    Tähtitieteellinen kontrastivenytys (asinh/ZScale) ja valinnainen negatiivi-tila.
+    Negatiivi (invert=True) tekee heikoista ruskeista kääpiöistä (WISE 0855) huomattavasti selkeämpiä.
+    """
+    clean = np.nan_to_num(img, nan=0.0)
+    if use_zscale:
+        try:
+            from astropy.visualization import ZScaleInterval
+            lo, hi = ZScaleInterval().get_limits(clean)
+        except Exception:
+            pass
+    x = np.clip((clean - lo) / (hi - lo + 1e-12), 0, 1)
     x = np.arcsinh(10 * x) / np.arcsinh(10)
     x = np.nan_to_num(x, nan=0.0)
-    return (x * 255).astype(np.uint8)
+    arr = (x * 255).astype(np.uint8)
+    if invert:
+        arr = 255 - arr
+    return arr
 
 
-def to_png(arr8: np.ndarray, path: Path, scale: int, text: str | None = None):
+def to_png(arr8: np.ndarray, path: Path, scale: int, text: str | None = None,
+           gaia_pix: tuple[float, float] | None = None):
+    """Tallentaa 8-bittisen kuvan PNG-tiedostoksi keskiristikolla ja valinnaisella Gaia-markkerilla."""
     from PIL import Image, ImageDraw
     im = Image.fromarray(np.flipud(arr8), mode="L")  # pohjoinen ylös
     im = im.resize((arr8.shape[1] * scale, arr8.shape[0] * scale), Image.NEAREST).convert("RGB")
+    d = ImageDraw.Draw(im)
     if text:
-        d = ImageDraw.Draw(im)
         d.rectangle([0, 0, im.width, 16], fill=(0, 0, 0))
         d.text((4, 2), text, fill=(255, 255, 255))
-    # keskiristikko
-    d = ImageDraw.Draw(im)
+    
+    # keskiristikko (punainen)
     cx, cy, g = im.width // 2, im.height // 2, 6 * scale
     for a, b in (((cx - 2 * g, cy), (cx - g, cy)), ((cx + g, cy), (cx + 2 * g, cy)),
                  ((cx, cy - 2 * g), (cx, cy - g)), ((cx, cy + g), (cx, cy + 2 * g))):
         d.line([a, b], fill=(255, 60, 60), width=1)
+    
+    # Gaia DR3 ennustettu sijainti (vihreä ympyrä / risti)
+    if gaia_pix:
+        gx, gy = gaia_pix
+        gx_img = int(gx * scale)
+        gy_img = int(im.height - gy * scale)
+        r = 6
+        d.ellipse([gx_img - r, gy_img - r, gx_img + r, gy_img + r], outline=(50, 230, 50), width=1)
+
     im.save(path)
     return im
 
 
 def diff_png(a: np.ndarray, b: np.ndarray, path: Path, scale: int, text: str):
+    """Laskee ja tallentaa erotuskuvan (Delta I = b - a)."""
     d = b - a
     lim = np.nanpercentile(np.abs(d), 99.5) or 1.0
     arr = np.nan_to_num(np.clip((d / lim + 1) / 2, 0, 1) * 255, nan=127).astype(np.uint8)
@@ -350,12 +398,18 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
             imgs = [reproject_one(c, w, shape, args.mask_flags) for c in sel if c.band == b]
             if not imgs:
                 continue
+            
+            # Epsilon Indi B: Häivytä päätähden halo
+            if slug == "epsindib":
+                imgs = [suppress_stellar_glare(im) for im in imgs]
+
             st = np.nanmedian(np.stack(imgs), axis=0)
             stacks[(e, b)] = st
             em["detectors"][b] = {"n_images": len(imgs),
                                   "flagged_frac": float(np.mean([c.flagged_frac for c in sel if c.band == b]))}
             fits.PrimaryHDU(st.astype(np.float32), header=w.to_header()).writeto(
                 out / f"epoch{e}_{b}.fits", overwrite=True)
+        
         # kaikki ilmaisimet yhteen (S/N-painotettu)
         per = [robust_norm(stacks[(e, b)]) for b in args.bands if (e, b) in stacks]
         if per:
@@ -364,9 +418,26 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
                 out / f"epoch{e}_ALL.fits", overwrite=True)
         epochs_meta.append(em)
 
+    # Validoi Gaia DR3 -sijainti ja laske pikselikoordinaatit
+    gaia_meta = None
+    gaia_pix = None
+    target_year = float(Time(epochs_meta[-1]["mjd_mean"], format="mjd").decimalyear)
+    if validate_gaia:
+        try:
+            gaia_meta = validate_gaia(coord, target_key=slug, target_epoch=target_year)
+            if gaia_meta.get("predicted_ra") and gaia_meta.get("predicted_dec"):
+                c_gaia_pred = SkyCoord(gaia_meta["predicted_ra"] * u.deg, gaia_meta["predicted_dec"] * u.deg, frame="icrs")
+                gx, gy = w.world_to_pixel(c_gaia_pred)
+                if 0 <= gx < shape[1] and 0 <= gy < shape[0]:
+                    gaia_pix = (float(gx), float(gy))
+        except Exception as e:
+            print(f"  Gaia-validointi ohitettu: {e}")
+
     # PNG-framet, GIF ja erotuskuva per ilmaisin, yhteinen venytys kaikille epookeille
     scale = max(1, 400 // shape[0])
     outputs = {}
+    use_invert = getattr(args, "invert", False) or (slug == "wise0855")
+
     for b in list(args.bands) + ["ALL"]:
         ims = [(e, stacks[(e, b)]) for e in range(n_ep) if (e, b) in stacks]
         if not ims:
@@ -377,8 +448,10 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
         pil = []
         for e, img in ims:
             p = out / "frames" / b / f"epoch{e}.png"
-            pil.append(to_png(stretch(img, lo, hi), p, scale,
-                              f"{label} {b}  {epochs_meta[e]['date']}"))
+            # Piirretään Gaia-sijainti vain viimeiseen epookkiin tai kaikkiin
+            cur_gaia_pix = gaia_pix if (e == ims[-1][0] and getattr(args, "show_gaia", True)) else None
+            pil.append(to_png(stretch(img, lo, hi, invert=use_invert), p, scale,
+                              f"{label} {b}  {epochs_meta[e]['date']}", gaia_pix=cur_gaia_pix))
         files = {"frames": [f"frames/{b}/epoch{e}.png" for e, _ in ims]}
         if len(pil) > 1:
             pil[0].save(out / f"blink_{b}.gif", save_all=True, append_images=pil[1:],
@@ -389,7 +462,7 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
             files["diff"] = f"diff_{b}.png"
         outputs[b] = files
 
-    # Spektri / valokäyrä kohteen kohdalta
+    # Spektri kohteen kohdalta
     with open(out / "spectrum.csv", "w", newline="") as f:
         wr = csv.writer(f)
         wr.writerow(["mjd", "epoch", "detector", "wavelength_um", "flux_mjy_sr", "err_mjy_sr", "flagged_frac"])
@@ -398,11 +471,23 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
                          f"{c.center_flux:.5g}", f"{c.center_err:.3g}", f"{c.flagged_frac:.3f}"])
     plot_spectrum(cutouts, ep_labels, epochs_meta, out / "spectrum.png", label)
 
+    # Valokäyrä ja muuttuvuusanalyysi kohteen kohdalta
+    lightcurve_info = plot_lightcurve(cutouts, ep_labels, epochs_meta, out / "lightcurve.png", label)
+    with open(out / "lightcurve.csv", "w", newline="") as f:
+        wr = csv.writer(f)
+        wr.writerow(["epoch", "mjd", "flux_mjy_sr", "err_mjy_sr"])
+        for pt in lightcurve_info.get("epochs", []):
+            wr.writerow([pt["epoch"], pt["mjd"], pt["flux"], pt["err"]])
+
     meta = {
         "target": label, "ra_deg": coord.ra.deg, "dec_deg": coord.dec.deg,
         "fov_arcmin": args.size, "pixel_scale_arcsec": PIXEL_SCALE_ARCSEC,
         "shape": list(shape), "bands": args.bands, "detector_ranges_um": DETECTORS,
         "epochs": epochs_meta, "outputs": outputs, "spectrum": "spectrum.csv",
+        "lightcurve": "lightcurve.csv",
+        "lightcurve_png": "lightcurve.png",
+        "light_curve": lightcurve_info,
+        "gaia_validation": gaia_meta,
         "versions": sorted({c.version for c in cutouts if c.version}),
         "generated": Time.now().iso, **extra,
         "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team",
@@ -432,6 +517,58 @@ def plot_spectrum(cutouts, ep_labels, epochs_meta, path: Path, label: str):
     plt.close(fig)
 
 
+def plot_lightcurve(cutouts, ep_labels, epochs_meta, path: Path, label: str) -> dict:
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    mjds = []
+    fluxes = []
+    errs = []
+    for e, em in enumerate(epochs_meta):
+        pts = [c.center_flux for c, l in zip(cutouts, ep_labels) if l == e and np.isfinite(c.center_flux)]
+        errors = [c.center_err for c, l in zip(cutouts, ep_labels) if l == e and np.isfinite(c.center_err)]
+        if pts:
+            mjds.append(em["mjd_mean"])
+            fluxes.append(float(np.mean(pts)))
+            errs.append(float(np.sqrt(np.sum(np.array(errors)**2)) / len(errors)) if errors else 0.0)
+
+    if not mjds:
+        return {"is_variable": False, "amplitude_flux": 0.0, "epochs": []}
+
+    mjds = np.array(mjds)
+    fluxes = np.array(fluxes)
+    errs = np.array(errs)
+
+    mean_f = np.mean(fluxes)
+    std_f = np.std(fluxes)
+    amplitude = float(np.max(fluxes) - np.min(fluxes))
+    is_variable = bool((std_f / max(1e-4, mean_f) > 0.15) or (amplitude > 3 * np.mean(errs)))
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ax.errorbar(mjds, fluxes, yerr=errs, fmt="o-", color="#4ade80", ecolor="#22c55e",
+                capsize=4, lw=1.5, ms=6, label=f"Valokäyrä ({'Muuttuva' if is_variable else 'Vakaa'})")
+    ax.set_xlabel("MJD (Modified Julian Date)")
+    ax.set_ylabel("Vuotiheys (MJy/sr)")
+    ax.set_title(f"{label} – Moniepookkinen valokäyrä")
+    ax.legend(fontsize=8)
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+
+    return {
+        "is_variable": is_variable,
+        "mean_flux": round(float(mean_f), 3),
+        "std_flux": round(float(std_f), 3),
+        "amplitude_flux": round(amplitude, 3),
+        "epochs": [
+            {"epoch": i, "mjd": round(float(m), 2), "flux": round(float(f), 3), "err": round(float(e), 3)}
+            for i, (m, f, e) in enumerate(zip(mjds, fluxes, errs))
+        ]
+    }
+
+
 def main():
     p = argparse.ArgumentParser(description="SPHEREx-aikasarja annetulle taivaan kohdalle")
     g = p.add_mutually_exclusive_group(required=True)
@@ -450,6 +587,8 @@ def main():
     p.add_argument("--lo", type=float, default=1.0, help="venytyksen alapersentiili")
     p.add_argument("--hi", type=float, default=99.7, help="venytyksen yläpersentiili")
     p.add_argument("--frame-ms", type=int, default=600, help="GIF-framen kesto")
+    p.add_argument("--invert", action="store_true", help="käänteiset värit (negatiivi-kontrasti)")
+    p.add_argument("--show-gaia", action="store_true", default=True, help="piirrä Gaia DR3 -sijainti kuviin")
     p.add_argument("--out", default="output")
     args = p.parse_args()
 

@@ -1,6 +1,7 @@
 """
 SPHEREx Sky API (FastAPI)
-AI-assisted: written with Claude (Anthropic).
+Project architecture: TypeScript Frontend + FastAPI Backend + Science Engine
+Follows CONTRACT.md specifications.
 
 Run locally (from repo root):
     pip install -r backend/requirements.txt
@@ -18,6 +19,7 @@ import traceback
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -54,7 +56,19 @@ def slug_for(ra: float, dec: float, fov: float) -> str:
 
 def cached_meta(slug: str):
     p = OUTPUT_DIR / slug / "meta.json"
-    return json.loads(p.read_text()) if p.exists() else None
+    if p.exists():
+        try:
+            return json.loads(p.read_text())
+        except Exception:
+            return None
+    # Check if precomputed in examples/
+    ex_p = ROOT / "examples" / slug / "meta.json"
+    if ex_p.exists():
+        try:
+            return json.loads(ex_p.read_text())
+        except Exception:
+            return None
+    return None
 
 
 def done_response(slug: str, meta: dict) -> dict:
