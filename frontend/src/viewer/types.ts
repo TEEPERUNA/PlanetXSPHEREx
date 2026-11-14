@@ -1,0 +1,53 @@
+// Types for meta.json (see CONTRACT.md) and the viewer status.
+// Only the keys the viewer uses are listed. Other keys are ignored.
+
+export type Detector = "D1" | "D2" | "D3" | "D4" | "D5" | "D6";
+export type Band = "ALL" | Detector;
+
+// Fixed display order for the band buttons.
+export const BANDS: Band[] = ["ALL", "D1", "D2", "D3", "D4", "D5", "D6"];
+
+export interface Epoch {
+  index: number;
+  date: string; // "2025-08-25"
+  mjd_mean: number;
+  n_images: number; // all detectors together
+  detectors: Partial<Record<Detector, { n_images: number }>>;
+}
+
+export interface BandOutput {
+  frames: string[]; // "frames/D2/epoch4.png", relative to baseUrl
+  gif?: string;
+  diff?: string;
+}
+
+export interface Meta {
+  target: string;
+  ra_deg: number; // image centre
+  dec_deg: number;
+  pixel_scale_arcsec: number;
+  shape: [number, number]; // [height, width] in SPHEREx pixels
+  epochs: Epoch[];
+  outputs: Partial<Record<Band, BandOutput>>;
+  spectrum?: string;
+  credit?: string;
+}
+
+// What the app tells the viewer to show.
+export type ViewerStatus =
+  | { kind: "empty" }
+  | { kind: "loading"; stage: string; done: number; total: number }
+  | { kind: "done"; meta: Meta; baseUrl: string }
+  | { kind: "error"; message: string };
+
+// One image in the blink, with the epoch it belongs to.
+export interface Frame {
+  src: string;
+  epoch: Epoch;
+}
+
+// A SPHEREx pixel, (0, 0) = top left.
+export interface Pixel {
+  x: number;
+  y: number;
+}
