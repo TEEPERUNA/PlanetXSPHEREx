@@ -213,7 +213,7 @@ class Cutout:
     version: str = ""
 
 
-def fetch_cutout(row, coord: SkyCoord) -> Cutout | None:
+def fetch_cutout(row, coord: SkyCoord, pm_info: dict | None = None) -> Cutout | None:
     c = Cutout(mjd=float(row["mjd"]), band=str(row["band"]).replace("SPHEREx-", ""), url=str(row["uri"]))
     max_attempts = 6
     for attempt in range(max_attempts):
@@ -227,7 +227,20 @@ def fetch_cutout(row, coord: SkyCoord) -> Cutout | None:
                 hdr = h["IMAGE"].header
                 c.wcs = WCS(hdr)
                 c.version = str(h[0].header.get("VERSION", ""))
-                x, y = c.wcs.world_to_pixel(coord)
+
+                # Ominaisliikkeen huomiointi fotometriassa ja spektrissä:
+                # Jos kohteella on suuri ominaisliike (esim. Barnard, WISE 0855),
+                # siirretään 3x3 mittausapertuuri tähden todelliseen sijaintiin
+                # juuri kyseisen kuvan havaintohetkellä (c.mjd).
+                target_pos = coord
+                if pm_info and (pm_info.get("pmra_masyr") or pm_info.get("pmdec_masyr")):
+                    pmra = float(pm_info.get("pmra_masyr", 0.0))
+                    pmdec = float(pm_info.get("pmdec_masyr", 0.0))
+                    prop_from = float(pm_info.get("propagated_to", Time.now().decimalyear))
+                    cutout_yr = float(Time(c.mjd, format="mjd").decimalyear)
+                    target_pos = propagate(coord.ra.deg, coord.dec.deg, pmra, pmdec, prop_from, cutout_yr)
+
+                x, y = c.wcs.world_to_pixel(target_pos)
                 swcs = WCS(hdr, fobj=h, key="W")
                 swcs.sip = None
                 wl, _bw = swcs.pixel_to_world(x, y)
@@ -391,6 +404,18 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
     is_epsindib = (matched_target == "epsindib") or getattr(args, "glare_suppress", False)
     is_wise0855 = (matched_target == "wise0855")
 
+    # Varmistetaan ominaisliiketiedot apertuuriseurantaa varten
+    pm_info = dict(extra) if extra else {}
+    if ("pmra_masyr" not in pm_info or not pm_info.get("pmra_masyr")) and matched_target in TARGETS:
+        t = TARGETS[matched_target]
+        fb_pmra = t["fallback"][2]
+        fb_pmdec = t["fallback"][3]
+        if fb_pmra or fb_pmdec:
+            pm_info["pmra_masyr"] = fb_pmra
+            pm_info["pmdec_masyr"] = fb_pmdec
+            pm_info["propagated_to"] = round(Time.now().decimalyear, 3)
+    extra = {**pm_info, **extra}
+
     tab = query_images(coord, size_deg, args.bands)
     if len(tab) == 0:
         print("  Ei SPHEREx-kuvia tälle kohdalle.")
@@ -408,7 +433,7 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
     cutouts = []
     n_workers = min(int(getattr(args, "workers", 6) or 6), 6)
     with cf.ThreadPoolExecutor(max_workers=n_workers) as ex:
-        futs = [ex.submit(fetch_cutout, r, coord) for r in tab]
+        futs = [ex.submit(fetch_cutout, r, coord, pm_info) for r in tab]
         for i, f in enumerate(cf.as_completed(futs), 1):
             c = f.result()
             if c is not None:

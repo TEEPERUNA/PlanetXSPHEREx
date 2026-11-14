@@ -119,9 +119,30 @@ def test_per_band_lightcurve_variable_scenario():
     assert "D1" in lc_info["variable_bands"]
     print("  ✓ Genuine variable star correctly detected as VARIABLE (is_variable=True, variable_bands=['D1'])!")
 
+def test_proper_motion_aperture_tracking():
+    print("Testing Proper Motion Aperture Tracking...")
+    # Barnard's star moves ~10.4"/yr (pmdec = +10362.4 mas/yr, pmra = -801.5 mas/yr)
+    pm_info = {
+        "pmra_masyr": -801.551,
+        "pmdec_masyr": 10362.394,
+        "propagated_to": 2026.87
+    }
+    c_2026 = SkyCoord(269.452083 * u.deg, 4.693364 * u.deg, frame="icrs")
+    
+    # In Epoch 0 (MJD 60912 = August 2025 = year ~2025.64):
+    cutout_yr = fs.Time(60912.0, format="mjd").decimalyear
+    c_epoch0 = fs.propagate(c_2026.ra.deg, c_2026.dec.deg, pm_info["pmra_masyr"], pm_info["pmdec_masyr"],
+                            pm_info["propagated_to"], cutout_yr)
+    
+    sep_arcsec = c_2026.separation(c_epoch0).arcsec
+    # dt ~ 1.23 years -> shift ~ 12.8 arcsec (~2 pixels in SPHEREx 6.2"/pix)
+    assert 12.0 < sep_arcsec < 14.0, f"Expected ~12.8 arcsec separation, got {sep_arcsec:.2f}"
+    print(f"  ✓ Aperture correctly tracks Barnard's Star motion ({sep_arcsec:.2f}\" shift over ~1.2 years)!")
+
 if __name__ == "__main__":
     test_slug_and_target_identification()
     test_gaia_validation_with_slug_variants()
     test_per_band_lightcurve_barnard_scenario()
     test_per_band_lightcurve_variable_scenario()
+    test_proper_motion_aperture_tracking()
     print("\nALL EXPANDED SCIENCE TESTS PASSED!")

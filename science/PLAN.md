@@ -50,6 +50,10 @@ science/
   - Mapped pixel coordinates $(X, Y)$ to physical wavelengths ($\mu\text{m}$) using the `WCS-WAVE` spectral table.
   - Performed 3×3 aperture photometry with error propagation (`center_flux`, `center_err`).
   - Exported standardized `spectrum.csv` and multi-epoch overlay plot `spectrum.png`.
+- [x] **Proper Motion Aperture Tracking:**
+  - Fixed aperture drifting on high proper motion targets (Barnard's Star, WISE 0855, $\epsilon$ Indi B).
+  - Propagates target coordinates dynamically to each cutout frame's specific observation MJD before computing pixel coordinates $(X, Y)$.
+  - Eliminates artificial brightness jumps caused by stars drifting across the 6.2"/pixel grid between 2025 and 2026.
 - [x] **Per-Band Multi-Epoch Light Curves:**
   - **Fixed band-mixing bug:** Restructured `plot_lightcurve()` to group measurements strictly per detector band (D1 through D6).
   - Evaluates photometric variability *only within the same band* across epochs.
