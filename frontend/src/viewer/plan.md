@@ -123,7 +123,8 @@ viewer/
 └── lib/
     ├── frames.ts         # kuvat kaistalle, epookin numero tiedostonimestä
     ├── skyCoords.ts      # pikseli → RA/Dec
-    └── parseSpectrum.ts  # spectrum.csv → rivit
+    ├── parseSpectrum.ts  # spectrum.csv → rivit
+    └── stage.ts          # backendin vaiheen nimi → teksti käyttäjälle
 ```
 
 ### Periaatteet
@@ -153,9 +154,14 @@ viewer/
 ```tsx
 <Viewer status={{ kind: "empty" }} />
 <Viewer status={{ kind: "loading", stage, done, total }} />
+<Viewer status={{ kind: "loading", stage, done, total, preview: { meta, baseUrl } }} />
 <Viewer status={{ kind: "done", meta, baseUrl }} />
 <Viewer status={{ kind: "error", message }} />
 ```
+
+- `baseUrl` on täydellinen osoite: `API + base_url` (Erikin `fileUrl`-mallin mukaan).
+- `preview` on valinnainen. Kun backendin `/api/status` palauttaa `preview`-kentän, app välittää sen sellaisenaan. Viewer näyttää silloin esikatselukuvat, ja niiden yläpuolella on edistymispalkki. Kun täysi tulos tulee, kaista, kuva ja säädöt säilyvät, koska kohde on sama.
+- `stage` välitetään sellaisenaan, myös `preview_`-etuliitteellä. Viewer muuttaa sen luettavaksi tekstiksi.
 
 Viewer ei kutsu API:a itse. App tai `api/` hoitaa pollauksen ja sen keskeyttämisen, ja viewer vain näyttää tilan.
 
@@ -169,7 +175,9 @@ import { Viewer, type ViewerStatus } from "../viewer";
 
 **Tilanne:** rakenne on valmis. Kuvapino, ohjaimet, epookin tiedot, koordinaatit, tilat ja CSV:n lukeminen on kirjoitettu. Spektrikaavio puuttuu, koska kirjastoa ei ole vielä valittu. Vite + React -pohja puuttuu yhä.
 
-**Testaus ennen pohjaa:** viewerin lähdekoodia voi ajaa sellaisenaan esikatselusivulla (React CDN:stä, TypeScript käännetään selaimessa) Emilin Barnard-datalla. Sivulla on napit tiloille done, loading, empty ja error. Sivu on väliaikainen eikä kuulu repoon.
+**Testaus ennen pohjaa:** Node on asennettu. Erillinen Vite + React -testiympäristö (repon ulkopuolella) ajaa viewerin lähdekoodia Erikin julkaistua API:a vasten: `https://planetx-api-38053485414.us-east4.run.app`. Testatut tapaukset: 5 haastekohdetta, vapaa koordinaatti (M31), virheellinen syöte ja simuloitu esikatseluajo. TypeScriptin tiukka tarkistus menee läpi.
+
+**Havaintoja oikeasta API:sta (14.11.2026):** uusi koordinaatti kesti noin 7,5 minuuttia. Esikatselu tuli noin 3,5 minuutissa, ja `processing 36/36` kesti noin 3 minuuttia. Siksi täysi palkki näytetään vain, kun laskuri liikkuu; muuten palkki on epämääräinen.
 
 | # | Työ | Valmis kun |
 |---|---|---|
@@ -209,6 +217,8 @@ Tarkistettu `fetch_spherex.py`:n tuottamaa `meta.json`:ia vasten (14.11.2026).
 - [ ] Spektrikaavion kirjasto: Chart.js (`react-chartjs-2` ja error bar -plugin) vai uPlot.
 - [ ] Gaia-sijainnit: Emililtä uutena `meta.json`-avaimena (katso `science/gaia_validation.py`) vai suoraan Gaiasta?
 - [x] CORS backendissä (Erik): kaikki osoitteet sallittu.
-- [ ] `api/` tekee `baseUrl`:sta täydellisen osoitteen (Juho).
+- [ ] `api/` tekee `baseUrl`:sta täydellisen osoitteen ja välittää `preview`-kentän (Juho).
+- [ ] Pollaus yrittää uudelleen, jos yksittäinen `/api/status` epäonnistuu. Palvelin oli testissä noin minuutin vastaamatta, vaikka haku jatkui (Juho/Erik).
+- [ ] Vapaan koordinaatin Gaia-haku palauttaa `QUERY_ERROR` (Emil).
 - [ ] Avain `"inverted": true` käännetyille kuville, jotta viewer voi kertoa sen käyttäjälle (Emil).
 - [ ] Valokäyrä (`lightcurve.csv`) samaan kaavioon kuin spektri? Hyödyllinen muuttuville tähdille (RW Aur, R Dra).

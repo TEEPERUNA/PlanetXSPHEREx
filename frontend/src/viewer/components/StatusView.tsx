@@ -1,4 +1,27 @@
+import { describeStage, hasCount } from "../lib/stage";
 import type { ViewerStatus } from "../types";
+
+interface ProgressProps {
+  stage: string;
+  done: number;
+  total: number;
+}
+
+// Stage text + progress bar. Also used above the quick preview.
+export function LoadingProgress({ stage, done, total }: ProgressProps) {
+  const { label } = describeStage(stage);
+  const counting = hasCount(done, total);
+  return (
+    <div className="progress" role="status" aria-live="polite">
+      <p className="progress__label">
+        {label}
+        {counting ? ` ${done}/${total}` : "…"}
+      </p>
+      {/* No value = indeterminate bar */}
+      {counting ? <progress value={done} max={total} /> : <progress />}
+    </div>
+  );
+}
 
 interface Props {
   status: Exclude<ViewerStatus, { kind: "done" }>;
@@ -15,18 +38,16 @@ export function StatusView({ status }: Props) {
   }
 
   if (status.kind === "loading") {
-    const hasProgress = status.total > 0;
+    const { isPreview } = describeStage(status.stage);
     return (
-      <div className="status" role="status" aria-live="polite">
-        <p>Loading SPHEREx images: {status.stage}</p>
-        {hasProgress && (
-          <>
-            <progress value={status.done} max={status.total} />
-            <p className="status__count">
-              {status.done}/{status.total}
-            </p>
-          </>
-        )}
+      <div className="status">
+        <p>Loading SPHEREx images</p>
+        <LoadingProgress stage={status.stage} done={status.done} total={status.total} />
+        <p className="status__hint">
+          {isPreview
+            ? "A quick preview comes first, then the full data."
+            : "A new position can take a few minutes."}
+        </p>
       </div>
     );
   }
