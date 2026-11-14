@@ -242,6 +242,50 @@ def test_json_null_sanitization():
         assert parsed["pmdec_masyr"] is None
         print("  ✓ Free coordinate meta.json successfully sanitized (all NaNs written as null)!")
 
+def test_gaia_timeout_and_skip_flag():
+    print("Testing Gaia timeout and skip_gaia flag...")
+    from types import SimpleNamespace
+    import tempfile
+    import json
+    import time
+
+    # 1. Test skip_gaia flag in run()
+    coord = SkyCoord(10.68 * u.deg, 41.27 * u.deg, frame="icrs")
+    w, shape = fs.target_wcs(coord, 3.0 / 60.0)
+    cutouts = [
+        fs.Cutout(
+            mjd=60912.0, band="D1", url="mock1.fits",
+            image=np.ones(shape, dtype=np.float32) * 5.0,
+            flags=np.zeros(shape, dtype=np.int32),
+            variance=np.ones(shape, dtype=np.float32) * 0.01,
+            wcs=w, wavelength_um=0.95, center_flux=5.0, center_err=0.01,
+            flagged_frac=0.0, version="7.0.5"
+        )
+    ]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        args = SimpleNamespace(
+            size=3.0, bands=["D1"], max=0, per_group=0, workers=2,
+            mask_flags=False, lo=1.0, hi=99.7, frame_ms=600, out=tmpdir,
+            show_gaia=False, invert=False, skip_gaia=True
+        )
+        t0 = time.time()
+        out_dir = fs.run(coord, "Preview Star", "preview_star", args, {}, cutouts=cutouts)
+        elapsed = time.time() - t0
+        meta = json.loads((out_dir / "meta.json").read_text())
+        assert meta["gaia_validation"]["status"] == "SKIPPED"
+        assert meta["gaia_validation"]["is_match"] is False
+        assert elapsed < 1.0
+        print(f"  ✓ skip_gaia=True bypassed Gaia query in {elapsed:.3f} s (status=SKIPPED)")
+
+    # 2. Test timeout handling in validate_gaia
+    t0 = time.time()
+    res = validate_gaia(coord, target_key=None, target_epoch=2026.0, timeout=0.001)
+    elapsed = time.time() - t0
+    assert res["status"] in ("QUERY_TIMEOUT", "QUERY_ERROR")
+    assert res["is_match"] is False
+    assert elapsed < 1.0
+    print(f"  ✓ validate_gaia with ultra-short timeout aborted gracefully in {elapsed:.3f} s (status={res['status']})")
+
 if __name__ == "__main__":
     test_slug_and_target_identification()
     test_gaia_validation_with_slug_variants()
@@ -250,4 +294,5 @@ if __name__ == "__main__":
     test_proper_motion_aperture_tracking()
     test_run_with_preloaded_cutouts()
     test_json_null_sanitization()
+    test_gaia_timeout_and_skip_flag()
     print("\nALL EXPANDED SCIENCE TESTS PASSED!")
