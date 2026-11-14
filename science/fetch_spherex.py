@@ -213,52 +213,65 @@ class Cutout:
     version: str = ""
 
 
+def parse_cutout_hdul(h, mjd: float, band: str, coord: SkyCoord,
+                      pm_info: dict | None = None, url: str = "") -> Cutout:
+    """Parsii avatun FITS HDUListin Cutout-objektiksi ja laskee fotometrian ja aallonpituuden."""
+    c = Cutout(mjd=float(mjd), band=str(band).replace("SPHEREx-", ""), url=url)
+    img = h["IMAGE"].data.astype(np.float32)
+    zodi = h["ZODI"].data.astype(np.float32) if "ZODI" in h else 0.0
+    c.image = img - zodi
+    c.flags = h["FLAGS"].data
+    c.variance = h["VARIANCE"].data.astype(np.float32)
+    hdr = h["IMAGE"].header
+    c.wcs = WCS(hdr)
+    c.version = str(h[0].header.get("VERSION", ""))
+
+    # Ominaisliikkeen huomiointi fotometriassa ja spektrissä:
+    # Jos kohteella on suuri ominaisliike (esim. Barnard, WISE 0855),
+    # siirretään 3x3 mittausapertuuri tähden todelliseen sijaintiin
+    # juuri kyseisen kuvan havaintohetkellä (c.mjd).
+    target_pos = coord
+    if pm_info and (pm_info.get("pmra_masyr") or pm_info.get("pmdec_masyr")):
+        pmra = float(pm_info.get("pmra_masyr", 0.0))
+        pmdec = float(pm_info.get("pmdec_masyr", 0.0))
+        prop_from = float(pm_info.get("propagated_to", Time.now().decimalyear))
+        cutout_yr = float(Time(c.mjd, format="mjd").decimalyear)
+        target_pos = propagate(coord.ra.deg, coord.dec.deg, pmra, pmdec, prop_from, cutout_yr)
+
+    x, y = c.wcs.world_to_pixel(target_pos)
+    try:
+        swcs = WCS(hdr, fobj=h, key="W")
+        swcs.sip = None
+        wl, _bw = swcs.pixel_to_world(x, y)
+        c.wavelength_um = float(u.Quantity(wl).to(u.um).value)
+    except Exception:
+        c.wavelength_um = np.nan
+
+    # 3x3 apertuuri kohteen kohdalla -> spektripiste
+    xi, yi = int(round(float(x))), int(round(float(y)))
+    ny, nx = c.image.shape
+    if 1 <= xi < nx - 1 and 1 <= yi < ny - 1:
+        ap = c.image[yi - 1:yi + 2, xi - 1:xi + 2]
+        var = c.variance[yi - 1:yi + 2, xi - 1:xi + 2]
+        c.center_flux = float(np.nanmean(ap))
+        c.center_err = float(np.sqrt(np.nansum(var)) / 9)
+    c.flagged_frac = float(np.mean(c.flags != 0))
+    return c
+
+
 def fetch_cutout(row, coord: SkyCoord, pm_info: dict | None = None) -> Cutout | None:
-    c = Cutout(mjd=float(row["mjd"]), band=str(row["band"]).replace("SPHEREx-", ""), url=str(row["uri"]))
+    mjd = float(row["mjd"])
+    band = str(row["band"]).replace("SPHEREx-", "")
+    url = str(row["uri"])
     max_attempts = 6
     for attempt in range(max_attempts):
         try:
-            with fits.open(c.url, cache=False, memmap=False) as h:
-                img = h["IMAGE"].data.astype(np.float32)
-                zodi = h["ZODI"].data.astype(np.float32) if "ZODI" in h else 0.0
-                c.image = img - zodi
-                c.flags = h["FLAGS"].data
-                c.variance = h["VARIANCE"].data.astype(np.float32)
-                hdr = h["IMAGE"].header
-                c.wcs = WCS(hdr)
-                c.version = str(h[0].header.get("VERSION", ""))
-
-                # Ominaisliikkeen huomiointi fotometriassa ja spektrissä:
-                # Jos kohteella on suuri ominaisliike (esim. Barnard, WISE 0855),
-                # siirretään 3x3 mittausapertuuri tähden todelliseen sijaintiin
-                # juuri kyseisen kuvan havaintohetkellä (c.mjd).
-                target_pos = coord
-                if pm_info and (pm_info.get("pmra_masyr") or pm_info.get("pmdec_masyr")):
-                    pmra = float(pm_info.get("pmra_masyr", 0.0))
-                    pmdec = float(pm_info.get("pmdec_masyr", 0.0))
-                    prop_from = float(pm_info.get("propagated_to", Time.now().decimalyear))
-                    cutout_yr = float(Time(c.mjd, format="mjd").decimalyear)
-                    target_pos = propagate(coord.ra.deg, coord.dec.deg, pmra, pmdec, prop_from, cutout_yr)
-
-                x, y = c.wcs.world_to_pixel(target_pos)
-                swcs = WCS(hdr, fobj=h, key="W")
-                swcs.sip = None
-                wl, _bw = swcs.pixel_to_world(x, y)
-                c.wavelength_um = float(u.Quantity(wl).to(u.um).value)
-            # 3x3 apertuuri kohteen kohdalla -> spektripiste
-            xi, yi = int(round(float(x))), int(round(float(y)))
-            ny, nx = c.image.shape
-            if 1 <= xi < nx - 1 and 1 <= yi < ny - 1:
-                ap = c.image[yi - 1:yi + 2, xi - 1:xi + 2]
-                var = c.variance[yi - 1:yi + 2, xi - 1:xi + 2]
-                c.center_flux = float(np.nanmean(ap))
-                c.center_err = float(np.sqrt(np.nansum(var)) / 9)
-            c.flagged_frac = float(np.mean(c.flags != 0))
-            return c
+            with fits.open(url, cache=False, memmap=False) as h:
+                return parse_cutout_hdul(h, mjd, band, coord, pm_info, url)
         except (TimeoutError, urllib.error.URLError, http.client.IncompleteRead,
                 http.client.RemoteDisconnected, OSError) as e:
             if attempt == max_attempts - 1:
-                print(f"  ohitettu ({c.band}): {e}")
+                print(f"  ohitettu ({band}): {e}")
                 return None
             # Eksponentiaalinen odotus (n. 1.5s, 3s, 5.5s, 10s, 18s) satunnaisella jitterillä
             sleep_sec = min(30.0, (1.8 ** attempt) + np.random.uniform(0.5, 1.5))
@@ -392,8 +405,13 @@ def select_per_group(tab, n: int):
     return tab[sorted(set(int(i) for i in keep))]
 
 
-def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None):
-    """progress(done, total, stage) kutsutaan latauksen aikana (backend käyttää tätä)."""
+def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
+        progress=None, cutouts: list[Cutout] | None = None):
+    """
+    progress(done, total, stage) kutsutaan latauksen aikana (backend käyttää tätä).
+    Jos cutouts=None, kuvat haetaan ja ladataan IRSA TAP:sta.
+    Jos cutouts=[...], ohitetaan query_images + fetch_cutout ja aloitetaan suoraan niistä (esim. AWS S3 -lataus).
+    """
     print(f"\n== {label}  RA={coord.ra.deg:.6f}  Dec={coord.dec.deg:.6f}")
     out = Path(args.out) / slug
     (out / "frames").mkdir(parents=True, exist_ok=True)
@@ -416,35 +434,39 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
             pm_info["propagated_to"] = round(Time.now().decimalyear, 3)
     extra = {**pm_info, **extra}
 
-    tab = query_images(coord, size_deg, args.bands)
-    if len(tab) == 0:
-        print("  Ei SPHEREx-kuvia tälle kohdalle.")
-        raise LookupError("No SPHEREx images cover this position")
-    tab = select_per_group(tab, getattr(args, "per_group", 0))
-    if args.max and len(tab) > args.max:
-        idx = np.linspace(0, len(tab) - 1, args.max).astype(int)
-        tab = tab[idx]
-        print(f"  Rajattu {args.max} kuvaan (--max)")
+    if cutouts is None:
+        tab = query_images(coord, size_deg, args.bands)
+        if len(tab) == 0:
+            print("  Ei SPHEREx-kuvia tälle kohdalle.")
+            raise LookupError("No SPHEREx images cover this position")
+        tab = select_per_group(tab, getattr(args, "per_group", 0))
+        if args.max and len(tab) > args.max:
+            idx = np.linspace(0, len(tab) - 1, args.max).astype(int)
+            tab = tab[idx]
+            print(f"  Rajattu {args.max} kuvaan (--max)")
 
-    t0 = time.time()
-    total = len(tab)
-    if progress:
-        progress(0, total, "downloading")
-    cutouts = []
-    n_workers = min(int(getattr(args, "workers", 6) or 6), 6)
-    with cf.ThreadPoolExecutor(max_workers=n_workers) as ex:
-        futs = [ex.submit(fetch_cutout, r, coord, pm_info) for r in tab]
-        for i, f in enumerate(cf.as_completed(futs), 1):
-            c = f.result()
-            if c is not None:
-                cutouts.append(c)
-            if progress:
-                progress(i, total, "downloading")
-    print(f"  Ladattu {len(cutouts)}/{len(tab)} cutoutia ({time.time() - t0:.0f} s)")
+        t0 = time.time()
+        total = len(tab)
+        if progress:
+            progress(0, total, "downloading")
+        cutouts = []
+        n_workers = min(int(getattr(args, "workers", 6) or 6), 6)
+        with cf.ThreadPoolExecutor(max_workers=n_workers) as ex:
+            futs = [ex.submit(fetch_cutout, r, coord, pm_info) for r in tab]
+            for i, f in enumerate(cf.as_completed(futs), 1):
+                c = f.result()
+                if c is not None:
+                    cutouts.append(c)
+                if progress:
+                    progress(i, total, "downloading")
+        print(f"  Ladattu {len(cutouts)}/{len(tab)} cutoutia ({time.time() - t0:.0f} s)")
+    else:
+        print(f"  Käytetään suoraan välitettyjä {len(cutouts)} cutoutia (esim. S3-lataus)")
+
     if not cutouts:
-        raise RuntimeError("All cutout downloads failed")
+        raise RuntimeError("No cutouts provided or all cutout downloads failed")
     if progress:
-        progress(total, total, "processing")
+        progress(len(cutouts), len(cutouts), "processing")
 
     mjds = np.array([c.mjd for c in cutouts])
     ep_labels = group_epochs(mjds)

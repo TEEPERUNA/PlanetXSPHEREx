@@ -139,10 +139,54 @@ def test_proper_motion_aperture_tracking():
     assert 12.0 < sep_arcsec < 14.0, f"Expected ~12.8 arcsec separation, got {sep_arcsec:.2f}"
     print(f"  ✓ Aperture correctly tracks Barnard's Star motion ({sep_arcsec:.2f}\" shift over ~1.2 years)!")
 
+def test_run_with_preloaded_cutouts():
+    print("Testing run() with preloaded cutouts (bypassing TAP/network)...")
+    from types import SimpleNamespace
+    import tempfile
+    
+    coord = SkyCoord(269.452 * u.deg, 4.693 * u.deg, frame="icrs")
+    w, shape = fs.target_wcs(coord, 3.0 / 60.0)
+    
+    # Create 2 epochs of mock cutouts
+    cutouts = [
+        fs.Cutout(
+            mjd=60912.0, band="D1", url="mock1.fits",
+            image=np.ones(shape, dtype=np.float32) * 5.0,
+            flags=np.zeros(shape, dtype=np.int32),
+            variance=np.ones(shape, dtype=np.float32) * 0.01,
+            wcs=w, wavelength_um=0.95, center_flux=5.0, center_err=0.01,
+            flagged_frac=0.0, version="7.0.5"
+        ),
+        fs.Cutout(
+            mjd=61279.0, band="D1", url="mock2.fits",
+            image=np.ones(shape, dtype=np.float32) * 8.0,
+            flags=np.zeros(shape, dtype=np.int32),
+            variance=np.ones(shape, dtype=np.float32) * 0.01,
+            wcs=w, wavelength_um=0.95, center_flux=8.0, center_err=0.01,
+            flagged_frac=0.0, version="7.0.5"
+        )
+    ]
+    
+    with tempfile.TemporaryDirectory() as tmpdir:
+        args = SimpleNamespace(
+            size=3.0, bands=["D1"], max=0, per_group=0, workers=2,
+            mask_flags=False, lo=1.0, hi=99.7, frame_ms=600, out=tmpdir,
+            show_gaia=False, invert=False
+        )
+        out_dir = fs.run(coord, "Test Star", "test_star", args, {}, cutouts=cutouts)
+        assert (out_dir / "meta.json").exists()
+        assert (out_dir / "spectrum.csv").exists()
+        assert (out_dir / "lightcurve.csv").exists()
+        assert (out_dir / "frames" / "D1" / "epoch0.png").exists()
+        assert (out_dir / "frames" / "D1" / "epoch1.png").exists()
+        assert (out_dir / "epoch0_D1.fits").exists()
+    print("  ✓ run(..., cutouts=...) executed smoothly without any network calls!")
+
 if __name__ == "__main__":
     test_slug_and_target_identification()
     test_gaia_validation_with_slug_variants()
     test_per_band_lightcurve_barnard_scenario()
     test_per_band_lightcurve_variable_scenario()
     test_proper_motion_aperture_tracking()
+    test_run_with_preloaded_cutouts()
     print("\nALL EXPANDED SCIENCE TESTS PASSED!")
