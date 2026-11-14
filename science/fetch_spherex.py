@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 fetch_spherex.py - hakee SPHEREx-cutoutit annetulle taivaan kohdalle ja tekee niistä
-aikasarjan (epookit), blink-GIFin, erotuskuvan, spektrin, valokäyrän ja Gaia DR3 -validoinnin.
+aikasarjan (epookit), blink-GIFin, erotuskuvan, spektrin, kaistakohtaisen valokäyrän
+ja Gaia DR3 -validoinnin.
 
 Esimerkit:
     python fetch_spherex.py --target wise0855
@@ -38,14 +39,15 @@ from astropy.time import Time
 from astropy.utils.data import conf as data_conf
 from astropy.wcs import WCS, FITSFixedWarning
 
-# Import Gaia validation service
+# Import Gaia validation and target identification
 try:
-    from gaia_validation import validate_gaia
+    from gaia_validation import validate_gaia, identify_benchmark_target
 except ImportError:
     try:
-        from science.gaia_validation import validate_gaia
+        from science.gaia_validation import validate_gaia, identify_benchmark_target
     except ImportError:
         validate_gaia = None
+        identify_benchmark_target = None
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 data_conf.remote_timeout = 90
@@ -60,6 +62,15 @@ DETECTORS = {
     "D4": (2.42, 3.82),
     "D5": (3.83, 4.41),
     "D6": (4.42, 5.00),
+}
+
+BAND_COLORS = {
+    "D1": "#38bdf8",  # Vaaleansininen (0.75-1.09 µm)
+    "D2": "#6366f1",  # Indigo (1.10-1.62 µm)
+    "D3": "#10b981",  # Vihreä (1.63-2.41 µm)
+    "D4": "#f59e0b",  # Keltainen (2.42-3.82 µm)
+    "D5": "#f97316",  # Oranssi (3.83-4.41 µm)
+    "D6": "#ef4444",  # Punainen (4.42-5.00 µm)
 }
 
 # Haasteen testikohteet. Simbad-nimellä haetaan sijainti + ominaisliike (J2000),
@@ -141,6 +152,22 @@ def target_coord(key_or_name: str) -> tuple[SkyCoord, str, dict]:
     c = propagate(ra, dec, pmra, pmdec, epoch0, now)
     info = {"pmra_masyr": pmra, "pmdec_masyr": pmdec, "propagated_to": round(now, 3)}
     return c, label, info
+
+
+def get_target_key(coord: SkyCoord, slug_or_name: str = "") -> str | None:
+    """Tunnistaa testikohteen nimen/slugin tai koordinaattien läheisyyden perusteella."""
+    if identify_benchmark_target:
+        return identify_benchmark_target(coord, slug_or_name)
+    s = slug_or_name.lower().replace("-", "").replace("_", "").replace(" ", "").replace("'", "")
+    for k in TARGETS:
+        if k in s or s.startswith(k):
+            return k
+    for k, t in TARGETS.items():
+        fb_ra, fb_dec = t["fallback"][:2]
+        c_ref = SkyCoord(fb_ra * u.deg, fb_dec * u.deg, frame="icrs")
+        if coord.separation(c_ref).arcmin < 3.0:
+            return k
+    return None
 
 
 # --------------------------------------------------------------------------- haku
@@ -352,6 +379,11 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
     (out / "frames").mkdir(parents=True, exist_ok=True)
     size_deg = args.size / 60.0
 
+    # Tunnista haasteen testikohde luotettavasti (nimen, slugin tai koordinaattien perusteella)
+    matched_target = get_target_key(coord, slug)
+    is_epsindib = (matched_target == "epsindib") or getattr(args, "glare_suppress", False)
+    is_wise0855 = (matched_target == "wise0855")
+
     tab = query_images(coord, size_deg, args.bands)
     if len(tab) == 0:
         print("  Ei SPHEREx-kuvia tälle kohdalle.")
@@ -399,8 +431,8 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
             if not imgs:
                 continue
             
-            # Epsilon Indi B: Häivytä päätähden halo
-            if slug == "epsindib":
+            # Epsilon Indi B erikoiskäsittely: Häivytä päätähden halo
+            if is_epsindib:
                 imgs = [suppress_stellar_glare(im) for im in imgs]
 
             st = np.nanmedian(np.stack(imgs), axis=0)
@@ -424,7 +456,7 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
     target_year = float(Time(epochs_meta[-1]["mjd_mean"], format="mjd").decimalyear)
     if validate_gaia:
         try:
-            gaia_meta = validate_gaia(coord, target_key=slug, target_epoch=target_year)
+            gaia_meta = validate_gaia(coord, target_key=matched_target, target_epoch=target_year)
             if gaia_meta.get("predicted_ra") and gaia_meta.get("predicted_dec"):
                 c_gaia_pred = SkyCoord(gaia_meta["predicted_ra"] * u.deg, gaia_meta["predicted_dec"] * u.deg, frame="icrs")
                 gx, gy = w.world_to_pixel(c_gaia_pred)
@@ -436,7 +468,7 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
     # PNG-framet, GIF ja erotuskuva per ilmaisin, yhteinen venytys kaikille epookeille
     scale = max(1, 400 // shape[0])
     outputs = {}
-    use_invert = getattr(args, "invert", False) or (slug == "wise0855")
+    use_invert = getattr(args, "invert", False) or is_wise0855
 
     for b in list(args.bands) + ["ALL"]:
         ims = [(e, stacks[(e, b)]) for e in range(n_ep) if (e, b) in stacks]
@@ -471,13 +503,13 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict, progress=None
                          f"{c.center_flux:.5g}", f"{c.center_err:.3g}", f"{c.flagged_frac:.3f}"])
     plot_spectrum(cutouts, ep_labels, epochs_meta, out / "spectrum.png", label)
 
-    # Valokäyrä ja muuttuvuusanalyysi kohteen kohdalta
+    # Kaistakohtainen valokäyrä ja muuttuvuusanalyysi kohteen kohdalta
     lightcurve_info = plot_lightcurve(cutouts, ep_labels, epochs_meta, out / "lightcurve.png", label)
     with open(out / "lightcurve.csv", "w", newline="") as f:
         wr = csv.writer(f)
-        wr.writerow(["epoch", "mjd", "flux_mjy_sr", "err_mjy_sr"])
-        for pt in lightcurve_info.get("epochs", []):
-            wr.writerow([pt["epoch"], pt["mjd"], pt["flux"], pt["err"]])
+        wr.writerow(["epoch", "date", "mjd", "band", "flux_mjy_sr", "err_mjy_sr"])
+        for pt in lightcurve_info.get("points", []):
+            wr.writerow([pt["epoch"], pt["date"], pt["mjd"], pt["band"], pt["flux"], pt["err"]])
 
     meta = {
         "target": label, "ra_deg": coord.ra.deg, "dec_deg": coord.dec.deg,
@@ -518,54 +550,104 @@ def plot_spectrum(cutouts, ep_labels, epochs_meta, path: Path, label: str):
 
 
 def plot_lightcurve(cutouts, ep_labels, epochs_meta, path: Path, label: str) -> dict:
+    """
+    Laskee valokäyrän erikseen kullekin ilmaisinkaistalle (D1–D6).
+    Estää kaistojen sekoittumisesta johtuvat väärät kirkkausmuutokset
+    tilanteissa, joissa epookeilla on eri ilmaisinkattavuus.
+    """
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    mjds = []
-    fluxes = []
-    errs = []
-    for e, em in enumerate(epochs_meta):
-        pts = [c.center_flux for c, l in zip(cutouts, ep_labels) if l == e and np.isfinite(c.center_flux)]
-        errors = [c.center_err for c, l in zip(cutouts, ep_labels) if l == e and np.isfinite(c.center_err)]
-        if pts:
-            mjds.append(em["mjd_mean"])
-            fluxes.append(float(np.mean(pts)))
-            errs.append(float(np.sqrt(np.sum(np.array(errors)**2)) / len(errors)) if errors else 0.0)
+    bands_data: dict[str, list[dict]] = {}
+    for b in DETECTORS:
+        band_pts = []
+        for e, em in enumerate(epochs_meta):
+            sel = [c for c, l in zip(cutouts, ep_labels) if l == e and c.band == b and np.isfinite(c.center_flux)]
+            if sel:
+                mjd_b = float(np.mean([c.mjd for c in sel]))
+                flux_b = float(np.mean([c.center_flux for c in sel]))
+                err_b = float(np.sqrt(np.sum([c.center_err**2 for c in sel])) / len(sel))
+                band_pts.append({
+                    "epoch": e,
+                    "date": em["date"],
+                    "mjd": round(mjd_b, 2),
+                    "flux": round(flux_b, 4),
+                    "err": round(err_b, 4)
+                })
+        if band_pts:
+            bands_data[b] = band_pts
 
-    if not mjds:
-        return {"is_variable": False, "amplitude_flux": 0.0, "epochs": []}
+    if not bands_data:
+        return {"is_variable": False, "variable_bands": [], "bands": {}, "points": []}
 
-    mjds = np.array(mjds)
-    fluxes = np.array(fluxes)
-    errs = np.array(errs)
+    # Muuttuvuusanalyysi kaistakohtaisesti
+    bands_summary = {}
+    variable_bands = []
+    for b, pts in bands_data.items():
+        fluxes = np.array([p["flux"] for p in pts])
+        errs = np.array([p["err"] for p in pts])
+        mean_f = float(np.mean(fluxes))
+        std_f = float(np.std(fluxes)) if len(fluxes) > 1 else 0.0
+        amplitude = float(np.max(fluxes) - np.min(fluxes)) if len(fluxes) > 1 else 0.0
+        
+        # Aito muuttuvuus samalla kaistalla
+        is_var = bool(len(fluxes) >= 2 and (std_f / max(1e-4, abs(mean_f)) > 0.15) and (amplitude > 2.5 * np.mean(errs)))
+        if is_var:
+            variable_bands.append(b)
 
-    mean_f = np.mean(fluxes)
-    std_f = np.std(fluxes)
-    amplitude = float(np.max(fluxes) - np.min(fluxes))
-    is_variable = bool((std_f / max(1e-4, mean_f) > 0.15) or (amplitude > 3 * np.mean(errs)))
+        bands_summary[b] = {
+            "is_variable": is_var,
+            "mean_flux": round(mean_f, 3),
+            "std_flux": round(std_f, 3),
+            "amplitude_flux": round(amplitude, 3),
+            "wavelength_range_um": DETECTORS[b],
+            "epochs": pts
+        }
 
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.errorbar(mjds, fluxes, yerr=errs, fmt="o-", color="#4ade80", ecolor="#22c55e",
-                capsize=4, lw=1.5, ms=6, label=f"Valokäyrä ({'Muuttuva' if is_variable else 'Vakaa'})")
+    is_target_variable = len(variable_bands) > 0
+
+    # Piirretään monikaistainen valokäyrä
+    fig, ax = plt.subplots(figsize=(8.5, 4.5))
+    for b, pts in bands_data.items():
+        mjds = [p["mjd"] for p in pts]
+        fluxes = [p["flux"] for p in pts]
+        errs = [p["err"] for p in pts]
+        color = BAND_COLORS.get(b, "#888888")
+        rng = DETECTORS[b]
+        var_tag = " [Muuttuva]" if b in variable_bands else ""
+        lbl = f"{b} ({rng[0]}–{rng[1]} µm){var_tag}"
+        ax.errorbar(mjds, fluxes, yerr=errs, fmt="o-", color=color, ecolor=color,
+                    capsize=3, lw=1.5, ms=5, label=lbl, alpha=0.9)
+
     ax.set_xlabel("MJD (Modified Julian Date)")
     ax.set_ylabel("Vuotiheys (MJy/sr)")
-    ax.set_title(f"{label} – Moniepookkinen valokäyrä")
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
+    status_str = f"MUUTTUVA ({', '.join(variable_bands)})" if is_target_variable else "VAKAA"
+    ax.set_title(f"{label} – Valokäyrä per ilmaisin [{status_str}]")
+    ax.legend(fontsize=7.5, loc="best", ncol=2)
+    ax.grid(True, alpha=0.25)
     fig.tight_layout()
     fig.savefig(path, dpi=120)
     plt.close(fig)
 
+    all_points = []
+    for b, pts in bands_data.items():
+        for p in pts:
+            all_points.append({
+                "epoch": p["epoch"],
+                "date": p["date"],
+                "mjd": p["mjd"],
+                "band": b,
+                "flux": p["flux"],
+                "err": p["err"]
+            })
+    all_points.sort(key=lambda x: (x["epoch"], x["band"]))
+
     return {
-        "is_variable": is_variable,
-        "mean_flux": round(float(mean_f), 3),
-        "std_flux": round(float(std_f), 3),
-        "amplitude_flux": round(amplitude, 3),
-        "epochs": [
-            {"epoch": i, "mjd": round(float(m), 2), "flux": round(float(f), 3), "err": round(float(e), 3)}
-            for i, (m, f, e) in enumerate(zip(mjds, fluxes, errs))
-        ]
+        "is_variable": is_target_variable,
+        "variable_bands": variable_bands,
+        "bands": bands_summary,
+        "points": all_points
     }
 
 
