@@ -46,13 +46,37 @@ log.setLevel("WARNING")
 
 # Import Gaia validation and target identification
 try:
-    from gaia_validation import validate_gaia, identify_benchmark_target
+    from gaia_validation import validate_gaia, identify_benchmark_target, sanitize_for_json
 except ImportError:
     try:
-        from science.gaia_validation import validate_gaia, identify_benchmark_target
+        from science.gaia_validation import validate_gaia, identify_benchmark_target, sanitize_for_json
     except ImportError:
         validate_gaia = None
         identify_benchmark_target = None
+        sanitize_for_json = None
+
+if sanitize_for_json is None:
+    def sanitize_for_json(obj):
+        """
+        Recursively replaces NaN, Infinity, -Infinity with None so that json.dumps
+        writes valid standard JSON with 'null' instead of non-standard 'NaN'.
+        Also converts numpy types (float32, int64, ndarray) into native Python types.
+        """
+        if obj is None:
+            return None
+        if isinstance(obj, (float, np.floating)):
+            return None if not np.isfinite(obj) else float(obj)
+        if isinstance(obj, (bool, np.bool_)):
+            return bool(obj)
+        if isinstance(obj, (int, np.integer)):
+            return int(obj)
+        if isinstance(obj, np.ndarray):
+            return [sanitize_for_json(x) for x in obj.tolist()]
+        if isinstance(obj, dict):
+            return {str(k): sanitize_for_json(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [sanitize_for_json(x) for x in obj]
+        return obj
 
 warnings.filterwarnings("ignore", category=FITSFixedWarning)
 data_conf.remote_timeout = 90
@@ -128,8 +152,10 @@ def resolve_name(name: str):
         if isinstance(ra_v, str):  # legacy astroquery: sexagesimal string
             c = SkyCoord(ra_v, dec_v, unit=(u.hourangle, u.deg))
             ra_v, dec_v = c.ra.deg, c.dec.deg
-        pmra = float(r[cols["pmra"]][0]) if "pmra" in cols and not np.ma.is_masked(r[cols["pmra"]][0]) else 0.0
-        pmdec = float(r[cols["pmdec"]][0]) if "pmdec" in cols and not np.ma.is_masked(r[cols["pmdec"]][0]) else 0.0
+        pmra_raw = r[cols["pmra"]][0] if "pmra" in cols and not np.ma.is_masked(r[cols["pmra"]][0]) else 0.0
+        pmdec_raw = r[cols["pmdec"]][0] if "pmdec" in cols and not np.ma.is_masked(r[cols["pmdec"]][0]) else 0.0
+        pmra = float(pmra_raw) if (pmra_raw is not None and np.isfinite(pmra_raw)) else 0.0
+        pmdec = float(pmdec_raw) if (pmdec_raw is not None and np.isfinite(pmdec_raw)) else 0.0
         return float(ra_v), float(dec_v), pmra, pmdec
     except Exception as e:  # noqa: BLE001
         print(f"  Simbad lookup failed ({name}): {e}")
@@ -155,7 +181,11 @@ def target_coord(key_or_name: str) -> tuple[SkyCoord, str, dict]:
         ra, dec, pmra, pmdec = res
         epoch0, label = 2000.0, key_or_name
     c = propagate(ra, dec, pmra, pmdec, epoch0, now)
-    info = {"pmra_masyr": pmra, "pmdec_masyr": pmdec, "propagated_to": round(now, 3)}
+    info = {
+        "pmra_masyr": round(float(pmra), 3) if (pmra is not None and np.isfinite(pmra)) else None,
+        "pmdec_masyr": round(float(pmdec), 3) if (pmdec is not None and np.isfinite(pmdec)) else None,
+        "propagated_to": round(now, 3)
+    }
     return c, label, info
 
 
@@ -534,10 +564,13 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
     if validate_gaia:
         try:
             gaia_meta = validate_gaia(coord, target_key=matched_target, target_epoch=target_year)
-            if gaia_meta.get("predicted_ra") and gaia_meta.get("predicted_dec"):
-                c_gaia_pred = SkyCoord(gaia_meta["predicted_ra"] * u.deg, gaia_meta["predicted_dec"] * u.deg, frame="icrs")
+            pred_ra = gaia_meta.get("predicted_ra") if gaia_meta else None
+            pred_dec = gaia_meta.get("predicted_dec") if gaia_meta else None
+            if (pred_ra is not None and pred_dec is not None and
+                    np.isfinite(pred_ra) and np.isfinite(pred_dec)):
+                c_gaia_pred = SkyCoord(pred_ra * u.deg, pred_dec * u.deg, frame="icrs")
                 gx, gy = w.world_to_pixel(c_gaia_pred)
-                if 0 <= gx < shape[1] and 0 <= gy < shape[0]:
+                if np.isfinite(gx) and np.isfinite(gy) and 0 <= gx < shape[1] and 0 <= gy < shape[0]:
                     gaia_pix = (float(gx), float(gy))
                     gaia_meta["pixel_coords"] = {
                         "canvas_x": round(float(gx), 2),
@@ -610,7 +643,8 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
         "generated": Time.now().iso, **extra,
         "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team",
     }
-    (out / "meta.json").write_text(json.dumps(meta, indent=2))
+    clean_meta = sanitize_for_json(meta)
+    (out / "meta.json").write_text(json.dumps(clean_meta, indent=2))
     print(f"  {n_ep} epochs -> {out}/")
     return out
 

@@ -182,6 +182,66 @@ def test_run_with_preloaded_cutouts():
         assert (out_dir / "epoch0_D1.fits").exists()
     print("  ✓ run(..., cutouts=...) executed smoothly without any network calls!")
 
+def test_json_null_sanitization():
+    print("Testing JSON sanitization (null instead of NaN for strict compliance)...")
+    import json
+    from types import SimpleNamespace
+    import tempfile
+
+    # 1. Direct unit test of sanitize_for_json
+    dirty = {
+        "pmra_masyr": np.nan,
+        "pmdec_masyr": float("nan"),
+        "inf_val": np.inf,
+        "gaia_validation": {
+            "predicted_ra": np.nan,
+            "predicted_dec": float("nan"),
+            "accumulated_shift_arcsec": np.nan,
+            "residual_offset_arcsec": float("nan"),
+            "valid_val": np.float32(10.68)
+        }
+    }
+    clean = fs.sanitize_for_json(dirty)
+    # Must serialize with allow_nan=False (which throws ValueError if any NaN remains)
+    serialized = json.dumps(clean, allow_nan=False)
+    assert "NaN" not in serialized
+    assert ": null" in serialized
+    loaded = json.loads(serialized)
+    assert loaded["pmra_masyr"] is None
+    assert loaded["gaia_validation"]["predicted_ra"] is None
+
+    # 2. Integration test: free coordinates (RA=10.68, Dec=41.27) with mock cutouts and NaN extra
+    coord = SkyCoord(10.68 * u.deg, 41.27 * u.deg, frame="icrs")
+    w, shape = fs.target_wcs(coord, 3.0 / 60.0)
+    cutouts = [
+        fs.Cutout(
+            mjd=60912.0, band="D1", url="mock1.fits",
+            image=np.ones(shape, dtype=np.float32) * 5.0,
+            flags=np.zeros(shape, dtype=np.int32),
+            variance=np.ones(shape, dtype=np.float32) * 0.01,
+            wcs=w, wavelength_um=0.95, center_flux=5.0, center_err=0.01,
+            flagged_frac=0.0, version="7.0.5"
+        )
+    ]
+    with tempfile.TemporaryDirectory() as tmpdir:
+        args = SimpleNamespace(
+            size=3.0, bands=["D1"], max=0, per_group=0, workers=2,
+            mask_flags=False, lo=1.0, hi=99.7, frame_ms=600, out=tmpdir,
+            show_gaia=False, invert=False
+        )
+        extra_with_nans = {
+            "pmra_masyr": np.nan,
+            "pmdec_masyr": np.nan
+        }
+        out_dir = fs.run(coord, "RA 10.6800 Dec +41.2700", "ra10.6800_dec+41.2700_fov3",
+                         args, extra_with_nans, cutouts=cutouts)
+        meta_text = (out_dir / "meta.json").read_text()
+        assert "NaN" not in meta_text, f"Found unquoted NaN in meta.json:\n{meta_text}"
+        parsed = json.loads(meta_text)
+        assert parsed["pmra_masyr"] is None
+        assert parsed["pmdec_masyr"] is None
+        print("  ✓ Free coordinate meta.json successfully sanitized (all NaNs written as null)!")
+
 if __name__ == "__main__":
     test_slug_and_target_identification()
     test_gaia_validation_with_slug_variants()
@@ -189,4 +249,5 @@ if __name__ == "__main__":
     test_per_band_lightcurve_variable_scenario()
     test_proper_motion_aperture_tracking()
     test_run_with_preloaded_cutouts()
+    test_json_null_sanitization()
     print("\nALL EXPANDED SCIENCE TESTS PASSED!")
