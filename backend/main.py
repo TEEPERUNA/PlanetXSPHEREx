@@ -46,7 +46,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 PER_GROUP = int(os.environ.get("PER_GROUP", "3"))      # images per epoch+detector (speed vs quality)
 PREVIEW_PER_GROUP = int(os.environ.get("PREVIEW_PER_GROUP", "1"))  # quick first result (0 = off)
 DOWNLOAD_WORKERS = int(os.environ.get("DOWNLOAD_WORKERS", "6"))
-MAX_FOV_ARCMIN = float(os.environ.get("MAX_FOV_ARCMIN", "10"))
+MAX_FOV_ARCMIN = float(os.environ.get("MAX_FOV_ARCMIN", "20"))
 WARMUP = os.environ.get("WARMUP", "1") == "1"
 FETCH_MODE = os.environ.get("FETCH_MODE", "s3")             # "s3" (fast) or "irsa" (cutout service)
 CACHE_TTL_HOURS = float(os.environ.get("CACHE_TTL_HOURS", "24"))  # how often to check for new data

@@ -36,8 +36,13 @@
 
 .viewer__cursor {
   display: grid;
+  align-content: start;
   gap: 2px;
-  min-height: 4.5em; /* room for three lines, so the page does not jump */
+  /* Fixed height (room for 6 lines: position, light, instrument, flags + wrapping),
+     so the controls below do not jump when values load or the pointer moves */
+  height: calc(6 * 1.35em + 5 * 2px);
+  overflow-y: auto; /* rare overflow, e.g. many flags in a narrow sidebar */
+  line-height: 1.35;
   margin: 0;
   color: var(--muted, inherit);
 }
@@ -144,6 +149,15 @@
   gap: 6px;
   font-size: 0.85rem;
   overflow-wrap: anywhere;
+}
+
+.cand-form__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.cand-form__actions button {
+  flex: 1;
 }
 
 .cand-form p {
@@ -550,6 +564,17 @@
 
 .info dd {
   margin: 2px 0 0;
+}
+
+/* Flag info: group headings, unreliable flags amber like the cursor readout */
+.info .info__group {
+  margin: 12px 0 0;
+  color: var(--text, inherit);
+  font-weight: 600;
+}
+
+.info dt.is-bad {
+  color: #fbbf24;
 }
 
 @media (prefers-reduced-motion: reduce) {

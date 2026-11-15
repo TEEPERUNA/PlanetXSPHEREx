@@ -58,10 +58,15 @@ export function CursorInfo({ pixel, meta, band, values, loading }: Props) {
       </p>
       {light.length > 0 && <p>{light.join(" · ")}</p>}
       {instrument.length > 0 && <p>{instrument.join(" · ")}</p>}
-      {hasFlags && (
+      {/* Always shown, so a missing FLAGS layer (older results, ALL band) is visible too. */}
+      {!loading && (
         <p className="viewer__flags">
           Flags:{" "}
-          {flags.length === 0
+          {!hasFlags
+            ? band === "ALL"
+              ? "pick D1–D6 to see flags"
+              : "not available for this result"
+            : flags.length === 0
             ? "none"
             : flags.map((f, i) => (
                 <span key={f.name}>

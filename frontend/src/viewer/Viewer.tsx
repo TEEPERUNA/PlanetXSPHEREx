@@ -212,6 +212,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           job={job}
           count={candidates.length}
           onReported={(c) => setCandidates((cs) => [c, ...cs])}
+          onClose={() => setPickPx(null)}
         />
         {(showGaia || !hasGaia) && (
           <GaiaInfo meta={meta} epoch={diffOn ? (frames[frames.length - 1]?.epoch ?? null) : currentEpoch} showDiff={diffOn} />

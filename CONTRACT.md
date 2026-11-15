@@ -19,7 +19,7 @@ Query params, use one of these:
 - `target=<key>` (from `/api/targets`)
 - `ra=<deg or 08h55m10.8s>&dec=<deg or -7d14m42s>`
 
-Optional: `fov=<arcmin>` (default 3, max 10).
+Optional: `fov=<arcmin>` (default 3, max 20).
 
 Responses:
 ```json

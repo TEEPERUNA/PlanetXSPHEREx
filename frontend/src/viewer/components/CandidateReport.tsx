@@ -11,6 +11,7 @@ interface Props {
   job?: string;
   count: number; // reports already in this field
   onReported: (c: Candidate) => void;
+  onClose: () => void; // unpicks the pixel
 }
 
 const KINDS: { value: CandidateKind; label: string }[] = [
@@ -21,7 +22,7 @@ const KINDS: { value: CandidateKind; label: string }[] = [
 ];
 
 // "Report a candidate" form for the picked pixel.
-export function CandidateReport({ pixel, meta, band, epoch, job, count, onReported }: Props) {
+export function CandidateReport({ pixel, meta, band, epoch, job, count, onReported, onClose }: Props) {
   const [kind, setKind] = useState<CandidateKind>("moving");
   const [note, setNote] = useState("");
   const [name, setName] = useState("");
@@ -82,9 +83,14 @@ export function CandidateReport({ pixel, meta, band, epoch, job, count, onReport
       </select>
       <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder="Note (optional)" aria-label="Note" />
       <input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} placeholder="Nickname, shown publicly (optional)" aria-label="Nickname" />
-      <button type="submit" disabled={sending}>
-        {sending ? "Sending…" : "Report"}
-      </button>
+      <div className="cand-form__actions">
+        <button type="submit" disabled={sending}>
+          {sending ? "Sending…" : "Report"}
+        </button>
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
+      </div>
       {result && <p className={result.ok ? "cand-form__ok" : "cand-form__err"}>{result.text}</p>}
     </form>
   );

@@ -108,6 +108,6 @@ output/_checks/<target>.json   last freshness check for a bundled example
 | `DOWNLOAD_WORKERS` | `6` | Parallel downloads on the IRSA fallback route |
 | `CACHE_TTL_HOURS` | `24` | How often results are checked for new data |
 | `NEW_EPOCH_DAYS` | `30` | How much newer IRSA data must be to rebuild a bundled example |
-| `MAX_FOV_ARCMIN` | `10` | Largest allowed field of view |
+| `MAX_FOV_ARCMIN` | `20` | Largest allowed field of view |
 | `WARMUP` | `1` | Compute missing challenge targets on startup |
 | `JOB_WORKERS` | `2` | Jobs running at the same time |

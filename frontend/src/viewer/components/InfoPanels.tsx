@@ -1,7 +1,37 @@
-// What each control does, and what the site is for. Static text, closed by default.
+import { DR1_BAD_FLAGS, DR1_FLAG_BITS, FLAG_TEXT } from "../lib/flags";
+
+// Flags that do not make the value unreliable: warnings and information.
+const OTHER_FLAGS = Object.keys(DR1_FLAG_BITS).filter((name) => !DR1_BAD_FLAGS.includes(name));
+
+function FlagList({ names, bad }: { names: string[]; bad: boolean }) {
+  return (
+    <dl>
+      {names.map((name) => (
+        <div key={name}>
+          <dt className={bad ? "is-bad" : undefined}>{name}</dt>
+          <dd>{FLAG_TEXT[name]}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+// What the flags mean, what each control does, and what the site is for. Static text, closed by default.
 export function InfoPanels() {
   return (
     <>
+      <details className="info">
+        <summary>Flag info</summary>
+        <p>
+          SPHEREx marks every pixel of every image with flags for known problems. Point at the image to see the flags of
+          that pixel. "% flagged" under the date is the share of unreliable pixels in that image.
+        </p>
+        <p className="info__group">Unreliable: the value should not be trusted</p>
+        <FlagList names={DR1_BAD_FLAGS} bad />
+        <p className="info__group">Warnings and information</p>
+        <FlagList names={OTHER_FLAGS} bad={false} />
+      </details>
+
       <details className="info">
         <summary>Controls info</summary>
         <dl>
@@ -22,7 +52,7 @@ export function InfoPanels() {
           <dt>Pointer on image</dt>
           <dd>Shows the sky coordinates and the measured values of that pixel: brightness, background, signal-to-noise and wavelength.</dd>
           <dt>Flags</dt>
-          <dd>SPHEREx marks pixels with known problems. Amber flags (for example OVERFLOW = saturated, TRANSIENT = cosmic ray) mean the value is unreliable; others such as SOURCE are just information. Hover a flag for its meaning. "% flagged" under the date is the share of unreliable pixels in that image.</dd>
+          <dd>Amber flags mean the pixel value is unreliable; others are just information. Hover a flag for its meaning, or see Flag info above.</dd>
           <dt>Spectrum</dt>
           <dd>Brightness against wavelength for the target, one colour per epoch.</dd>
         </dl>

@@ -69,7 +69,7 @@ export function SearchForm({ initial, onSearch }: Props) {
         <label>
           Field of view
           <select value={fov} onChange={(e) => setFov(Number(e.target.value))}>
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+            {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
               <option key={n} value={n}>
                 {n} arcmin
               </option>
