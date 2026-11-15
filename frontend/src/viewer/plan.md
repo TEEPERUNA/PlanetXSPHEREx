@@ -230,6 +230,8 @@ Toive: RA/Dec, surface brightness, zodi, signal-to-noise, aallonpituus ± kaista
 - Tarkistettu: Barnardin D1 epookki 0 keskipikseli on 87,3 MJy/sr, ja spektrin vastaava mittaus 86,4 MJy/sr.
 - Erotuskuvan aikana arvoja ei näytetä, koska kuva ei ole yksi epookki.
 
+**Tilanne 15.11.:** Emil tuottaa pikselitiedostot (`pixels/{band}/epoch{e}.fits`) määrittelyn mukaan, ja viewer lukee ne. Esimerkit on kuitenkin rakennettu vanhoista pinoista ilman alkuperäisiä kuvia (`science/rebuild_examples.py`), joten `ZODI` = 0, `WAVE` ja `BW` ovat vakioita, ja `DETX`/`DETY` ovat keinotekoinen ruudukko (1005 + x). Viewer tunnistaa nämä täytekerroksiksi eikä näytä niitä: vakiokerros tai ilmaisinkerros, joka on tasan `vakio + pikselin indeksi`, jätetään pois. Esimerkeissä näkyvät siis SB ja S/N. Muut kerrokset tulevat näkyviin, kun kohteet ajetaan uudelleen oikeasta datasta (IRSA).
+
 **Pyydetty Emililtä (vaihe 2):** jokaiselle epookille ja kaistalle tiedosto, esimerkiksi `pixels/D3/epoch0.fits`, samalla 31×31-ruudukolla kuin PNG. Kerrokset (EXTNAME): `SB`, `ZODI`, `SNR`, `WAVE`, `BW`, `DETX` ja `DETY`. Lisäksi `meta.json`:iin `outputs[band].pixels: [...]`. Aallonpituus ja ilmaisinpikseli ovat eri jokaisessa yksittäisessä kuvassa, joten ne otetaan yhdestä edustavasta kuvasta. Pinossa niillä ei ole yhtä oikeaa arvoa.
 
 ## 7. Yhteensopivuus Emilin datan kanssa
