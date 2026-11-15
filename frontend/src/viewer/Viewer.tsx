@@ -2,11 +2,14 @@ import { useMemo, useState, type ReactNode } from "react";
 import { BlinkImage } from "./components/BlinkImage";
 import { CursorInfo } from "./components/CursorInfo";
 import { EpochInfo } from "./components/EpochInfo";
+import { GaiaInfo } from "./components/GaiaInfo";
+import { GaiaOverlay } from "./components/GaiaOverlay";
 import { PlaybackControls } from "./components/PlaybackControls";
 import { SpectrumChart } from "./components/SpectrumChart";
 import { LoadingProgress, StatusView } from "./components/StatusView";
 import { useBlink } from "./hooks/useBlink";
 import { availableBands, framesFor, joinUrl } from "./lib/frames";
+import { gaiaPixelAt, mjdToYear, onImage } from "./lib/gaia";
 import type { Band, Meta, Pixel, ViewerStatus } from "./types";
 import "./viewer.css";
 
@@ -69,6 +72,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const [brightness, setBrightness] = useState(1);
   const [contrast, setContrast] = useState(1);
   const [hoverPx, setHoverPx] = useState<Pixel | null>(null);
+  const [showGaia, setShowGaia] = useState(true);
 
   // The full result can have other bands and epochs than the preview.
   const activeBand: Band = bands.includes(band) ? band : (bands[0] ?? "ALL");
@@ -79,6 +83,14 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const diffSrc = diffPath ? joinUrl(baseUrl, diffPath) : null;
   const diffOn = showDiff && diffSrc !== null;
   const canPlay = frames.length > 1 && !diffOn;
+
+  // Gaia button only when the predicted position lands on the image for some epoch.
+  const bandEpochs = frames.map((f) => f.epoch);
+  const hasGaia = bandEpochs.some((e) => {
+    const p = gaiaPixelAt(meta, mjdToYear(e.mjd_mean));
+    return p !== null && onImage(p, meta);
+  });
+  const currentEpoch = diffOn ? null : (frames[idx]?.epoch ?? null);
 
   // Move forward or back, wrapping around.
   function step(delta: number) {
@@ -114,10 +126,16 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         filter={`brightness(${brightness}) contrast(${contrast})`}
         alt={`${meta.target}, ${activeBand}, ${frames[idx]?.epoch.date ?? ""}`}
         onHover={setHoverPx}
+        overlay={
+          hasGaia && showGaia ? <GaiaOverlay meta={meta} epochs={bandEpochs} current={currentEpoch} /> : null
+        }
       />
 
       <EpochInfo frames={frames} frameIdx={idx} band={activeBand} showDiff={diffOn} />
       <CursorInfo pixel={hoverPx} meta={meta} />
+      {(showGaia || !hasGaia) && (
+        <GaiaInfo meta={meta} epoch={diffOn ? (frames[frames.length - 1]?.epoch ?? null) : currentEpoch} showDiff={diffOn} />
+      )}
 
       <PlaybackControls
         bands={bands}
@@ -135,6 +153,9 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         hasDiff={diffSrc !== null}
         showDiff={diffOn}
         onToggleDiff={() => setShowDiff((d) => !d)}
+        hasGaia={hasGaia}
+        showGaia={showGaia}
+        onToggleGaia={() => setShowGaia((s) => !s)}
         brightness={brightness}
         onBrightness={setBrightness}
         contrast={contrast}
