@@ -13,6 +13,7 @@ PlanetXSPHEREx/
 │                            science writes it, backend serves it, frontend reads it
 ├── README.md .............. setup and running
 ├── STRUCTURE.md ........... this file
+├── PROJECT_PLAN.md ........ requirements, UI ideas, FITS flag list
 ├── Dockerfile ............. runs the backend (uvicorn backend.main:app)
 │
 ├── science/  (Emil)
@@ -22,16 +23,19 @@ PlanetXSPHEREx/
 │   │     → gaia_validation.py  Gaia check
 │   │     → output/<job>/       all output files (see examples/barnard)
 │   ├── gaia_validation.py . hard-coded Gaia DR3 values for the 5 targets
-│   ├── test_science.py .... tests for the two files above
+│   ├── PLAN.md
 │   └── requirements.txt
 │
 ├── backend/  (Erik)
 │   ├── main.py ............ FastAPI
 │   │     → import fetch_spherex   runs the script as a job
+│   │     → import fetch           fast image search + cutouts
 │   │     /api/targets, /api/sky, /api/status/{job}
 │   │     /api/files/*     ← output/     (real results)
 │   │     /api/examples/*  ← examples/   (example data)
 │   │     CORS: all origins allowed
+│   ├── fetch.py ........... fast SPHEREx access: find_images, select, fetch_cutouts
+│   ├── PLAN.md, SUBMISSION_backend.md
 │   ├── s3_test.py ......... experiment: IRSA vs. S3 speed (not used by the API)
 │   └── requirements.txt
 │
@@ -41,16 +45,22 @@ PlanetXSPHEREx/
 │   ├── meta.json .......... describes every other file (paths, epochs, bands)
 │   ├── frames/<band>/epochN.png ... blink frames ───┐
 │   ├── diff_<band>.png ............ difference ─────┤
-│   ├── blink_<band>.gif ........... ready-made GIFs │  (not used by the viewer yet)
+│   ├── blink_<band>.gif ........... ready-made GIFs │  → app/GifView
 │   ├── spectrum.csv ............... spectrum ───────┤
 │   └── epochN_<band>.fits ......... raw float data  │  (not listed in meta.json yet)
 │                                                    │
 ├── frontend/                                        │
+│   ├── index.html, vite.config.ts                   │
+│   ├── .env.example ... VITE_API_BASE_URL (backend address)
 │   └── src/                                         │
 │       ├── app/  (Juho)                             │
-│       │     App, SearchForm (RA/Dec, targets, FOV), GifView (GIF per band)
+│       │     App ......... page layout: header, search, GIF result, frame-by-frame toggle
+│       │     SearchForm .. RA/Dec, preset targets (fill RA/Dec), FOV
+│       │     GifView ..... server GIF per band + download link
+│       │     app.css ..... theme (dark, light via prefers-color-scheme), styles viewer buttons too
+│       │     PLAN.md ..... copy of PROJECT_PLAN.md
 │       │     → state.ts  setTarget(search)          │
-│       ├── state.ts ......... shared: current search, URL sync, polling (useSky)
+│       ├── state.ts ......... shared: current search, URL sync, polling (useSky, retries failed polls)
 │       ├── main.tsx ......... shared: mounts app/App
 │       ├── api/  (shared)                           │
 │       │     → backend /api/sky, /api/status        │
@@ -71,8 +81,11 @@ PlanetXSPHEREx/
 │           ├── lib/ ......... pure functions, no React
 │           │   ├── frames.ts      epochN.png → meta.epochs[N]
 │           │   ├── skyCoords.ts   pixel → RA/Dec
-│           │   └── parseSpectrum.ts
-│           └── plan.md
+│           │   ├── parseSpectrum.ts
+│           │   ├── chartScale.ts  axes and scales for SpectrumChart
+│           │   └── stage.ts       backend stage → text for the user
+│           ├── plan.md
+│           └── msg_to_eliz.txt .. how to test the API by hand
 ```
 
 ## Rules
