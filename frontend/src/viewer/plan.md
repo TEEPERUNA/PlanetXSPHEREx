@@ -276,6 +276,8 @@ Tarkistettu `fetch_spherex.py`:n tuottamaa `meta.json`:ia vasten (14.11.2026).
 - [ ] Vapaan koordinaatin Gaia-haku kaatuu (Emil): `gaia_validation.message` on "Gaia lookup could not be executed: name 'cf' is not defined" (esimerkiksi ra=10.68 dec=41.27). Todennäköisesti `import concurrent.futures as cf` puuttuu siitä tiedostosta, jossa uusi 10 s timeout on.
   - Korjauksen jälkeenkin vanhat vapaiden koordinaattien tulokset palautuvat välimuistista ilman Gaiaa, kunnes backend rakentaa ne uudelleen tai Erik tyhjentää välimuistin.
   - M31 on galaksi, joten keskeltä ei välttämättä löydy järkevää Gaia-kohdetta toimivallakaan haulla.
+- [x] Palaute "näkymä hyppää esikatselusta valmiiseen tulokseen (kaista ja frame katoavat)" (15.11.). Viewer muisti kuvan listapaikan, joten täydessä tuloksessa (enemmän epookkeja) näkyi eri päivä. Lisäksi spektri tyhjeni hetkeksi. Korjattu: viewer muistaa päivämäärän (`nearestFrame`), avain on `target|shape`, ja spektri pysyy näkyvissä uuden latautuessa.
+- [ ] Juho: `GifView` saa `key={status.baseUrl}`. Esikatselun osoite on eri (`…__preview/`), joten GIF-näkymän kaistavalinta nollautuu, kun täysi tulos tulee. Ehdotus: `key={status.meta.target}`.
 - [ ] Viewer: kun Gaia-ennustetta ei ole, näytä selittävä rivi, esimerkiksi "No Gaia prediction for this position." tai "Gaia lookup failed for this position.". Nyt rivi vain puuttuu.
 - [ ] Avain `"inverted": true` käännetyille kuville, jotta viewer voi kertoa sen käyttäjälle (Emil).
 - [ ] Valokäyrä (`lightcurve.csv`) samaan kaavioon kuin spektri? Hyödyllinen muuttuville tähdille (RW Aur, R Dra).

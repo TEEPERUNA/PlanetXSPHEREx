@@ -9,7 +9,7 @@ import { SpectrumChart } from "./components/SpectrumChart";
 import { LoadingProgress, StatusView } from "./components/StatusView";
 import { useBlink } from "./hooks/useBlink";
 import { usePixelValues } from "./hooks/usePixelValues";
-import { availableBands, framesFor, joinUrl } from "./lib/frames";
+import { availableBands, framesFor, joinUrl, nearestFrame } from "./lib/frames";
 import { gaiaPixelAt, mjdToYear, onImage } from "./lib/gaia";
 import type { Band, Meta, Pixel, ViewerStatus } from "./types";
 import "./viewer.css";
@@ -18,10 +18,12 @@ interface ViewerProps {
   status: ViewerStatus;
 }
 
-// Same position = same key, so preview -> full result keeps band, frame and filters.
-// A new position gets a new key and starts fresh.
+// Same search = same key, so preview -> full result keeps band, date and filters.
+// A new search gets a new key and starts fresh. The target name is unique per search
+// ("Barnard's Star", "RA 10.6800 Dec +41.2700"), and shape changes with the field of view.
+// Not the exact RA/Dec: a moving star's position can differ slightly between runs.
 function viewKey(meta: Meta): string {
-  return `${meta.ra_deg}|${meta.dec_deg}|${meta.shape.join("x")}`;
+  return `${meta.target}|${meta.shape.join("x")}`;
 }
 
 // Public component. The app passes the status, the viewer shows it.
@@ -66,7 +68,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const bands = useMemo(() => availableBands(meta), [meta]);
 
   const [band, setBand] = useState<Band>(bands[0] ?? "ALL");
-  const [frameIdx, setFrameIdx] = useState(0);
+  const [anchorMjd, setAnchorMjd] = useState<number | null>(null); // date of the frame on screen
   const [playing, setPlaying] = useState(true);
   const [fps, setFps] = useState(2);
   const [showDiff, setShowDiff] = useState(false);
@@ -78,7 +80,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   // The full result can have other bands and epochs than the preview.
   const activeBand: Band = bands.includes(band) ? band : (bands[0] ?? "ALL");
   const frames = useMemo(() => framesFor(meta, activeBand, baseUrl), [meta, activeBand, baseUrl]);
-  const idx = frames.length ? frameIdx % frames.length : 0;
+  const idx = nearestFrame(frames, anchorMjd);
 
   const diffPath = meta.outputs[activeBand]?.diff;
   const diffSrc = diffPath ? joinUrl(baseUrl, diffPath) : null;
@@ -96,14 +98,16 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   // Values of the pixel under the cursor, for the epoch on screen.
   const pixelInfo = usePixelValues(meta, baseUrl, activeBand, currentEpoch?.index ?? null, hoverPx);
 
-  // Move forward or back, wrapping around.
+  // Move forward or back, wrapping around. Stores the date, not the position.
   function step(delta: number) {
-    setFrameIdx((i) => (frames.length ? (i + delta + frames.length) % frames.length : 0));
+    if (frames.length === 0) return;
+    const next = (idx + delta + frames.length) % frames.length;
+    setAnchorMjd(frames[next].epoch.mjd_mean);
   }
 
+  // Keeps the date on screen if the new band has it, otherwise the nearest one.
   function changeBand(next: Band) {
     setBand(next);
-    setFrameIdx(0);
   }
 
   useBlink(playing && canPlay, fps, () => step(1));

@@ -86,9 +86,11 @@ viewer/
 - `useBlink(playing, fps, onTick)` runs a `setInterval`. Stepping by hand pauses playback.
 
 ### Keeping state between results
-`LoadedViewer` gets `key = ra|dec|shape`. The preview and the full result of the same position share the key, so band, frame and sliders survive the switch. A new position gets a new key, and React starts the component fresh.
+`LoadedViewer` gets `key = target|shape` (the target name is unique per search, the shape changes with the field of view). The preview and the full result of the same search share the key, so band, date and sliders survive the switch. A new search gets a new key, and React starts the component fresh. The exact RA/Dec is not part of the key, because a moving star's position can differ slightly between runs.
 
-If the new result lacks the selected band or frame, the viewer falls back to the first one (`activeBand`, `idx % frames.length`).
+The viewer remembers the **date** on screen (`anchorMjd`), not a position in the frame list. The preview usually has fewer epochs than the full result, so a list position would point at another date. `nearestFrame()` picks the frame closest to the remembered date; this also keeps the date when the band changes. If the new result lacks the selected band, the first band is used (`activeBand`).
+
+The spectrum keeps the old chart on screen until the new CSV has loaded, so the page does not jump.
 
 ### Coordinates
 `pixelToSky` and `skyToPixel` use a flat-sky approximation around the image centre. North is up and east is left, so RA grows to the left. Whole numbers are pixel centres; (15, 15) is the centre of a 31 × 31 image. Checked against the FITS WCS headers: centre and orientation match, and the error at the edge is far below a pixel.

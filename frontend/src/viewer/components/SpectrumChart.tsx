@@ -31,9 +31,10 @@ export function SpectrumChart({ url, epochs, ranges, highlightEpoch }: Props) {
   const [mode, setMode] = useState<Mode>("average");
 
   // Load the CSV. Cancel if the target changes before it arrives.
+  // The old chart stays on screen until the new data is in, so the page does not jump
+  // when the full result replaces the preview.
   useEffect(() => {
     const controller = new AbortController();
-    setRows(null);
     setError(null);
     setHover(null);
 
