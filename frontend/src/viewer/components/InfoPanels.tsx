@@ -53,6 +53,8 @@ export function InfoPanels() {
           <dd>Shows the sky coordinates and the measured values of that pixel: brightness, background, signal-to-noise and wavelength.</dd>
           <dt>Flags</dt>
           <dd>Amber flags mean the pixel value is unreliable; others are just information. Hover a flag for its meaning, or see Flag info above.</dd>
+          <dt>Deep image</dt>
+          <dd>All epochs of the band added together into one image. Faint sources that are lost in a single visit show up; a star that moves is smeared along its path. Orange squares then mark faint sources with no Gaia star.</dd>
           <dt>Light curve</dt>
           <dd>Brightness of the target on each date. Relative: 1.0 is the band's average, so a line that rises or falls means the target changed. The vertical line is the date on screen.</dd>
           <dt>Spectrum of a pixel</dt>

@@ -82,6 +82,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const [playing, setPlaying] = useState(true);
   const [fps, setFps] = useState(2);
   const [showDiff, setShowDiff] = useState(false);
+  const [showDeep, setShowDeep] = useState(false);
   const [brightness, setBrightness] = useState(1);
   const [contrast, setContrast] = useState(1);
   const [hoverPx, setHoverPx] = useState<Pixel | null>(null);
@@ -114,17 +115,23 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const diffSrc = diffPath ? joinUrl(baseUrl, diffPath) : null;
   const diffOn = showDiff && diffSrc !== null;
 
+  // Deep image: all epochs of the band added together (more signal, faint sources show up).
+  const deepPath = meta.outputs[activeBand]?.combined;
+  const deepSrc = deepPath ? joinUrl(baseUrl, deepPath) : null;
+  const deepOn = showDeep && deepSrc !== null && !diffOn;
+  const stillOn = diffOn || deepOn; // one fixed image instead of the epochs
+
   // Compare mode: blink only between date A (default first) and date B (default last).
   const ia = nearestFrame(frames, compareA ?? frames[0]?.epoch.mjd_mean ?? null);
   const ib = nearestFrame(frames, compareB ?? frames[frames.length - 1]?.epoch.mjd_mean ?? null);
-  const canCompare = frames.length > 1 && !diffOn;
+  const canCompare = frames.length > 1 && !stillOn;
   const compareActive = compareOn && canCompare;
   const playFrames = compareActive ? [...new Set([ia, ib])].sort((x, y) => x - y).map((i) => frames[i]) : frames;
 
   // Position in the played list, and in the full list (for the image stack and info).
   const playIdx = nearestFrame(playFrames, anchorMjd);
   const idx = Math.max(0, frames.indexOf(playFrames[playIdx]));
-  const canPlay = playFrames.length > 1 && !diffOn;
+  const canPlay = playFrames.length > 1 && !stillOn;
 
   // Gaia button only when the predicted position lands on the image for some epoch.
   const bandEpochs = frames.map((f) => f.epoch);
@@ -132,17 +139,19 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
     const p = gaiaPixelAt(meta, mjdToYear(e.mjd_mean));
     return p !== null && onImage(p, meta);
   });
-  const currentEpoch = diffOn ? null : (frames[idx]?.epoch ?? null);
+  const currentEpoch = stillOn ? null : (frames[idx]?.epoch ?? null);
 
-  // All Gaia stars in the field, moved to the date on screen (last epoch in diff mode),
-  // and the bright sources in that image that Gaia does not list.
+  // All Gaia stars in the field, moved to the date on screen (last epoch in diff mode,
+  // the middle epoch for the deep image), and the bright sources Gaia does not list.
   const gaiaField = useGaiaField(meta);
-  const fieldEpoch = currentEpoch ?? frames[frames.length - 1]?.epoch ?? null;
+  const fieldEpoch =
+    currentEpoch ?? (deepOn ? frames[Math.floor(frames.length / 2)]?.epoch : frames[frames.length - 1]?.epoch) ?? null;
   const fieldStars = useMemo(
     () => (fieldEpoch ? starsOnImage(gaiaField.stars, meta, mjdToYear(fieldEpoch.mjd_mean)) : []),
     [gaiaField.stars, meta, fieldEpoch],
   );
-  const sources = useSources(meta, baseUrl, activeBand, fieldEpoch?.index ?? null);
+  // The deep image is searched in its own FITS stack: deeper, so fainter sources count.
+  const sources = useSources(meta, baseUrl, activeBand, fieldEpoch?.index ?? null, deepOn ? meta.outputs[activeBand]?.combined_fits : undefined);
   // Only when the field came back with stars: an empty or failed query would flag everything.
   const lonely = gaiaField.status === "ok" && fieldStars.length > 0 ? withoutGaia(sources, fieldStars) : [];
   const hoverStar = hoverPx ? nearestStar(fieldStars, hoverPx.x, hoverPx.y) : null;
@@ -191,7 +200,12 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
       <BlinkImage
         srcs={frames.map((f) => f.src)}
         activeIdx={idx}
-        diffSrc={diffOn ? diffSrc : null}
+        diffSrc={diffOn ? diffSrc : deepOn ? deepSrc : null}
+        stillAlt={
+          deepOn
+            ? `${meta.target}, ${activeBand}, deep image of all ${frames.length} epochs`
+            : "Difference image, last epoch minus first"
+        }
         shape={meta.shape}
         filter={`brightness(${brightness}) contrast(${contrast})`}
         alt={`${meta.target}, ${activeBand}, ${frames[idx]?.epoch.date ?? ""}`}
@@ -211,13 +225,20 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
       />
 
       <div className="viewer__side">
-        <EpochInfo
-          frames={frames}
-          frameIdx={idx}
-          band={activeBand}
-          showDiff={diffOn}
-          showFlagged={meta.flag_bits !== undefined}
-        />
+        {deepOn ? (
+          <p className="viewer__info">
+            Deep image · all {frames.length} epochs added together ({frames[0]?.epoch.date} – {frames[frames.length - 1]?.epoch.date}).
+            Faint sources show up; a moving star is smeared along its path.
+          </p>
+        ) : (
+          <EpochInfo
+            frames={frames}
+            frameIdx={idx}
+            band={activeBand}
+            showDiff={diffOn}
+            showFlagged={meta.flag_bits !== undefined}
+          />
+        )}
         {compareActive && (
           <p className="viewer__compare">
             Comparing{" "}
@@ -250,7 +271,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           }}
         />
         {(showGaia || !hasGaia) && (
-          <GaiaInfo meta={meta} epoch={diffOn ? (frames[frames.length - 1]?.epoch ?? null) : currentEpoch} showDiff={diffOn} />
+          <GaiaInfo meta={meta} epoch={stillOn ? fieldEpoch : currentEpoch} showDiff={stillOn} />
         )}
         {showGaia && (
           <GaiaFieldInfo
@@ -277,7 +298,16 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           onFps={setFps}
           hasDiff={diffSrc !== null}
           showDiff={diffOn}
-          onToggleDiff={() => setShowDiff((d) => !d)}
+          onToggleDiff={() => {
+            setShowDiff((d) => !d);
+            setShowDeep(false);
+          }}
+          hasDeep={deepSrc !== null}
+          showDeep={deepOn}
+          onToggleDeep={() => {
+            setShowDeep((d) => !d);
+            setShowDiff(false);
+          }}
           hasGaia={showGaiaButton}
           showGaia={showGaia}
           onToggleGaia={() => setShowGaia((s) => !s)}
@@ -306,7 +336,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
             url={joinUrl(baseUrl, meta.spectrum)}
             epochs={meta.epochs}
             ranges={meta.detector_ranges_um}
-            highlightEpoch={diffOn ? undefined : frames[idx]?.epoch.index}
+            highlightEpoch={stillOn ? undefined : frames[idx]?.epoch.index}
             pixel={
               spectrumPx
                 ? {
@@ -324,7 +354,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           <LightCurveChart
             lightCurve={meta.light_curve}
             epochs={meta.epochs}
-            highlightEpoch={diffOn ? undefined : frames[idx]?.epoch.index}
+            highlightEpoch={stillOn ? undefined : frames[idx]?.epoch.index}
           />
         )}
 

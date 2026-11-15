@@ -4,10 +4,11 @@ import type { Pixel } from "../types";
 interface Props {
   srcs: string[]; // all frames of the band
   activeIdx: number; // frame to show
-  diffSrc: string | null; // shown instead of the frames when set
+  diffSrc: string | null; // one fixed image shown instead of the frames (difference or deep image)
   shape: [number, number]; // [height, width] in SPHEREx pixels
   filter: string; // CSS filter for brightness and contrast
   alt: string;
+  stillAlt?: string; // alt text of the fixed image
   onHover: (pixel: Pixel | null) => void;
   onPick?: (pixel: Pixel) => void; // click or tap: pins the pixel, e.g. for a report
   overlay?: ReactNode; // SVG content drawn on top, in SPHEREx pixel units
@@ -15,7 +16,7 @@ interface Props {
 
 // Image stack + SVG overlay.
 // All frames stay in the DOM and only one is visible, so the blink never waits for loading.
-export function BlinkImage({ srcs, activeIdx, diffSrc, shape, filter, alt, onHover, onPick, overlay }: Props) {
+export function BlinkImage({ srcs, activeIdx, diffSrc, shape, filter, alt, stillAlt, onHover, onPick, overlay }: Props) {
   const [height, width] = shape;
 
   // Screen position -> SPHEREx pixel.
@@ -66,7 +67,7 @@ export function BlinkImage({ srcs, activeIdx, diffSrc, shape, filter, alt, onHov
       {diffSrc && (
         <img
           src={diffSrc}
-          alt="Difference image, last epoch minus first"
+          alt={stillAlt ?? "Difference image, last epoch minus first"}
           className="blink__img is-visible"
           style={{ filter }}
           draggable={false}
