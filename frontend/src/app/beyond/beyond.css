@@ -1,0 +1,248 @@
+/* demo/beyond: an animation-heavy skin on top of app.css and viewer.css.
+   Everything sits under .fx (the FX switch in the top bar) and motion is
+   only added when the user has not asked for reduced motion. */
+
+/* ---------- Base: star field behind everything ---------- */
+.starfield {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+.app { position: relative; z-index: 1; }
+
+/* Animatable angle for the rotating borders */
+@property --fx-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+/* ---------- Static glow (also with reduced motion) ---------- */
+.fx .app__header h1 {
+  font-family: "Orbitron", var(--sans);
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #67e8f9, #ffffff 30%, #a78bfa 55%, #22d3ee 80%, #ffffff);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 12px rgb(34 211 238 / 0.45));
+}
+.fx .app__header { border-bottom-color: rgb(34 211 238 / 0.25); }
+
+.fx .card {
+  position: relative;
+  isolation: isolate;
+  background: rgb(18 20 24 / 0.72);
+  backdrop-filter: blur(10px);
+  border-color: transparent;
+  box-shadow: 0 0 40px rgb(34 211 238 / 0.08), 0 20px 60px rgb(0 0 0 / 0.45);
+}
+/* Glowing border: a conic gradient masked to a 1px ring */
+.fx .card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  padding: 1px;
+  border-radius: inherit;
+  background: conic-gradient(from var(--fx-angle), rgb(34 211 238 / 0.9), rgb(167 139 250 / 0.6), transparent 30%, transparent 60%, rgb(34 211 238 / 0.9));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.fx .app button:hover:not(:disabled) {
+  border-color: var(--accent);
+  box-shadow: 0 0 14px rgb(34 211 238 / 0.45), inset 0 0 10px rgb(34 211 238 / 0.15);
+}
+.fx .app button[aria-pressed="true"] { box-shadow: 0 0 18px rgb(34 211 238 / 0.5); text-shadow: 0 0 8px rgb(34 211 238 / 0.8); }
+.fx .app button.primary {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(90deg, #22d3ee, #a78bfa);
+  border-color: transparent;
+  box-shadow: 0 0 22px rgb(34 211 238 / 0.55);
+  letter-spacing: 0.04em;
+}
+
+/* Image: deep-space frame, scanlines, sweep and a targeting cursor */
+.fx .blink {
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px rgb(34 211 238 / 0.35), 0 0 50px rgb(34 211 238 / 0.25), 0 0 120px rgb(167 139 250 / 0.12);
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cg fill='none' stroke='%2322d3ee' stroke-width='1.5'%3E%3Ccircle cx='16' cy='16' r='9'/%3E%3Cpath d='M16 1v8M16 23v8M1 16h8M23 16h8'/%3E%3C/g%3E%3Ccircle cx='16' cy='16' r='1.5' fill='%2322d3ee'/%3E%3C/svg%3E") 16 16, crosshair;
+}
+.fx .blink::before,
+.fx .blink::after {
+  content: "";
+  grid-area: 1 / 1;
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
+}
+/* CRT scanlines */
+.fx .blink::before {
+  background: repeating-linear-gradient(to bottom, rgb(255 255 255 / 0.04) 0 1px, transparent 1px 3px);
+  mix-blend-mode: screen;
+}
+
+.fx .gaia__ring { filter: drop-shadow(0 0 3px #22c55e); }
+.fx .spectrum__line { filter: drop-shadow(0 0 4px currentColor); }
+.fx .spectrum__chart circle { filter: drop-shadow(0 0 3px currentColor); }
+
+.fx .controls__band.is-active { box-shadow: 0 0 16px rgb(34 211 238 / 0.6); }
+.fx .viewer__title { text-shadow: 0 0 18px rgb(34 211 238 / 0.45); }
+
+/* Loading: a hologram panel */
+.fx .status {
+  background:
+    radial-gradient(circle at 50% 40%, rgb(34 211 238 / 0.12), transparent 60%),
+    repeating-linear-gradient(to bottom, rgb(34 211 238 / 0.05) 0 1px, transparent 1px 4px);
+  text-shadow: 0 0 10px rgb(34 211 238 / 0.6);
+}
+.fx progress {
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  filter: drop-shadow(0 0 6px rgb(34 211 238 / 0.7));
+}
+
+/* Mobile: backdrop-filter would trap the fixed controls drawer inside the card */
+@media (max-width: 899px) {
+  .fx .card { backdrop-filter: none; background: rgb(18 20 24 / 0.9); }
+}
+
+/* FX switch in the top bar */
+.fx-toggle { font-family: var(--mono); letter-spacing: 0.08em; }
+
+/* ---------- Motion (only when allowed) ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* Staggered entrance */
+  .fx > * { animation: fx-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  .fx > *:nth-child(2) { animation-delay: 0.08s; }
+  .fx > *:nth-child(3) { animation-delay: 0.16s; }
+  .fx > *:nth-child(4) { animation-delay: 0.24s; }
+  .fx > *:nth-child(5) { animation-delay: 0.32s; }
+  @keyframes fx-rise {
+    from { opacity: 0; transform: translateY(18px) scale(0.98); filter: blur(4px); }
+    to { opacity: 1; transform: none; filter: none; }
+  }
+
+  /* Shimmering title and an orbiting moon around the logo ring */
+  .fx .app__header h1 { animation: fx-shimmer 6s linear infinite; }
+  @keyframes fx-shimmer { to { background-position: 300% 0; } }
+  .fx .app__mark { position: relative; animation: fx-pulse-mark 2.4s ease-in-out infinite; }
+  .fx .app__mark::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    margin: -2.5px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 8px #fff;
+    animation: fx-orbit 2.2s linear infinite;
+  }
+  @keyframes fx-orbit {
+    from { transform: rotate(0deg) translateX(13px); }
+    to { transform: rotate(360deg) translateX(13px); }
+  }
+  @keyframes fx-pulse-mark {
+    50% { box-shadow: 0 0 22px rgb(34 211 238 / 0.9), inset 0 0 0 2px var(--bg), inset 0 0 0 4px var(--accent); }
+  }
+
+  /* Rotating card border */
+  .fx .card::before { animation: fx-spin 6s linear infinite; }
+  @keyframes fx-spin { to { --fx-angle: 360deg; } }
+
+  /* Light sweep across the primary button */
+  .fx .app button.primary::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.55) 50%, transparent 70%);
+    transform: translateX(-120%);
+    animation: fx-sweep 3.2s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes fx-sweep { 60%, 100% { transform: translateX(120%); } }
+  .fx .app button:active:not(:disabled) { animation: fx-press 0.35s ease-out; }
+  @keyframes fx-press {
+    0% { box-shadow: 0 0 0 0 rgb(34 211 238 / 0.7); }
+    100% { box-shadow: 0 0 0 14px rgb(34 211 238 / 0); }
+  }
+
+  /* Image: scanner sweep when a result appears, glow breathing, flash on each frame */
+  .fx .blink::after {
+    background: linear-gradient(to bottom, transparent, rgb(34 211 238 / 0.55) 48%, rgb(255 255 255 / 0.9) 50%, rgb(34 211 238 / 0.55) 52%, transparent);
+    background-size: 100% 18%;
+    background-repeat: no-repeat;
+    animation: fx-scan 1.6s ease-in-out 0.2s 1 both;
+  }
+  @keyframes fx-scan {
+    from { background-position: 0 -20%; opacity: 1; }
+    90% { opacity: 1; }
+    to { background-position: 0 120%; opacity: 0; }
+  }
+  .fx .blink { animation: fx-breathe 4s ease-in-out infinite; }
+  @keyframes fx-breathe {
+    50% { box-shadow: 0 0 0 1px rgb(34 211 238 / 0.55), 0 0 70px rgb(34 211 238 / 0.4), 0 0 160px rgb(167 139 250 / 0.2); }
+  }
+  .fx .blink__img.is-visible { animation: fx-frame 0.28s ease-out; }
+  @keyframes fx-frame { from { opacity: 0.35; } to { opacity: 1; } }
+
+  /* Gaia ring: radar ping */
+  .fx .gaia__ring {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: fx-ping 1.6s ease-out infinite;
+  }
+  @keyframes fx-ping {
+    0% { transform: scale(0.7); opacity: 1; }
+    70% { transform: scale(1.35); opacity: 0.25; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+  .fx .gaia__dot { animation: fx-twinkle 1.2s ease-in-out infinite alternate; }
+  @keyframes fx-twinkle { to { opacity: 0.25; } }
+
+  /* Spectrum: lines draw themselves, dots pop in */
+  .fx .spectrum__line {
+    stroke-dasharray: 1400;
+    stroke-dashoffset: 1400;
+    animation: fx-draw 1.4s cubic-bezier(0.6, 0, 0.2, 1) 0.2s forwards;
+  }
+  @keyframes fx-draw { to { stroke-dashoffset: 0; } }
+  .fx .spectrum__chart circle {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: fx-pop 0.5s cubic-bezier(0.3, 1.6, 0.5, 1) 0.6s backwards;
+  }
+  @keyframes fx-pop { from { transform: scale(0); opacity: 0; } }
+
+  /* Loading hologram: flicker + moving stripes in the bar */
+  .fx .status { animation: fx-flicker 3s steps(1) infinite; }
+  @keyframes fx-flicker {
+    0%, 100% { opacity: 1; }
+    42% { opacity: 0.86; }
+    43% { opacity: 1; }
+    77% { opacity: 0.9; }
+    78% { opacity: 1; }
+  }
+  .fx .status p:first-child { animation: fx-glitch 2.6s infinite; }
+  @keyframes fx-glitch {
+    0%, 92%, 100% { transform: none; text-shadow: 0 0 10px rgb(34 211 238 / 0.6); }
+    93% { transform: translateX(-2px); text-shadow: 2px 0 #f472b6, -2px 0 #22d3ee; }
+    95% { transform: translateX(2px); text-shadow: -2px 0 #f472b6, 2px 0 #22d3ee; }
+  }
+  .fx .viewer__notice { animation: fx-notice 2s ease-in-out infinite; }
+  @keyframes fx-notice { 50% { border-color: var(--accent); box-shadow: 0 0 18px rgb(34 211 238 / 0.35); } }
+}

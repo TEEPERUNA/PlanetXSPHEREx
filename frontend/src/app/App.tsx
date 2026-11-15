@@ -2,7 +2,9 @@ import { useEffect, useState, type MouseEvent } from "react";
 import { Viewer } from "../viewer";
 import { searchFromUrl, useSky } from "../state";
 import { SearchForm } from "./SearchForm";
+import { Starfield } from "./beyond/Starfield";
 import "./app.css";
+import "./beyond/beyond.css";
 
 const initial = searchFromUrl();
 
@@ -46,13 +48,27 @@ export function App() {
   const gif = result?.meta.outputs.ALL?.gif;
   const fov = result ? Math.round((result.meta.shape[1] * result.meta.pixel_scale_arcsec) / 60) : 3;
 
+  // demo/beyond: effects on/off, light-speed while loading, a burst when a result lands.
+  const [fx, setFx] = useState(true);
+  const warp = fx && status.kind === "loading" && !status.preview;
+  const doneKey = status.kind === "done" ? status.baseUrl : null;
+  const [burst, setBurst] = useState(0);
+  useEffect(() => {
+    if (doneKey) setBurst((b) => b + 1);
+  }, [doneKey]);
+
   return (
-    <main className="app">
+    <>
+    {fx && <Starfield warp={warp} burst={burst} />}
+    <main className={"app" + (fx ? " fx" : "")}>
       <header className="app__header">
         <h1>
           <span className="app__mark" aria-hidden="true" />
           STARx Viewer
         </h1>
+        <button type="button" className="fx-toggle" aria-pressed={fx} onClick={() => setFx(!fx)}>
+          FX {fx ? "on" : "off"}
+        </button>
         {result && gif && (
           <a className="app__download" href={result.baseUrl + gif} download onClick={saveGif}>
             Download GIF
@@ -85,5 +101,6 @@ export function App() {
         </>
       )}
     </main>
+    </>
   );
 }
