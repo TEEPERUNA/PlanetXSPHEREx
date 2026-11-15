@@ -26,10 +26,13 @@ from typing import Optional
 
 import math
 import re
+import uuid
+from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "science"))
@@ -104,21 +107,28 @@ def client_ip(request: Request) -> str:
 def check_capacity(request: Request):
     """Protect the single instance: limit new searches per IP and the total queue length.
     Cached results and challenge targets are never limited."""
-    now = time.time()
     with lock:
         active = sum(1 for j in jobs.values() if j.get("status") in ("queued", "processing"))
         if active >= MAX_ACTIVE_JOBS:
             raise HTTPException(503, "The server is busy with other searches. Please try again in "
                                      "a minute, or pick one of the challenge targets.")
-        ip = client_ip(request)
-        hits = [t for t in _hits.get(ip, []) if now - t < RATE_WINDOW_S]
-        if len(hits) >= RATE_JOBS:
-            raise HTTPException(429, "Too many new searches from your address. Please wait a few "
-                                     "minutes, or pick one of the challenge targets.")
+    rate_limit(request, "search", RATE_JOBS, "Too many new searches from your address. Please wait "
+                                             "a few minutes, or pick one of the challenge targets.")
+
+
+def rate_limit(request: Request, bucket: str, limit: int, message: str):
+    """At most `limit` calls per RATE_WINDOW_S for one client IP in one bucket (memory only,
+    IPs are never written to disk)."""
+    now = time.time()
+    key = f"{bucket}:{client_ip(request)}"
+    with lock:
+        hits = [t for t in _hits.get(key, []) if now - t < RATE_WINDOW_S]
+        if len(hits) >= limit:
+            raise HTTPException(429, message)
         hits.append(now)
         if len(_hits) > 5000:
             _hits.clear()
-        _hits[ip] = hits
+        _hits[key] = hits
 
 
 def prune_jobs():
@@ -603,6 +613,120 @@ def status(job: str):
                                  f"({j.get('error')}). Showing the precomputed result for this "
                                  "target with the default 3 arcmin field of view.")
     return clean_json({"job": job, **j})
+
+
+# --------------------------------------------------------------------------- candidates
+# Community "report a candidate" database. One small JSON file per report in
+# OUTPUT_DIR/_candidates/ (the Cloud Storage bucket), so reports survive deploys and two
+# reports at the same moment can never overwrite each other. Works even when IRSA is down.
+
+CAND_DIR = OUTPUT_DIR / "_candidates"
+CAND_RATE = int(os.environ.get("CANDIDATE_RATE", "10"))          # reports per IP per window
+CAND_ADMIN_TOKEN = os.environ.get("CANDIDATES_ADMIN_TOKEN", "")   # set in Cloud Run to allow delete
+SAME_OBJECT_ARCSEC = 10.0                                         # reports this close = same object
+_cands: dict[str, dict] | None = None
+cand_lock = threading.Lock()
+
+
+class CandidateIn(BaseModel):
+    ra: float = Field(..., ge=0, lt=360, description="RA of the moving object, degrees (ICRS)")
+    dec: float = Field(..., ge=-90, le=90, description="Dec, degrees")
+    job: Optional[str] = Field(None, max_length=80, description="job id of the search it was seen in")
+    band: Optional[str] = Field(None, max_length=10, description="detector/band, e.g. 'D3'")
+    epoch: Optional[int] = Field(None, ge=0, le=1000, description="epoch index where it was clicked")
+    note: Optional[str] = Field(None, max_length=500, description="what the user saw")
+    name: Optional[str] = Field(None, max_length=40, description="optional nickname, shown publicly")
+    kind: Optional[str] = Field("moving", max_length=20, description="moving | faint | spectrum | other")
+
+
+def _load_candidates() -> dict[str, dict]:
+    global _cands
+    if _cands is None:
+        out = {}
+        CAND_DIR.mkdir(parents=True, exist_ok=True)
+        for p in CAND_DIR.glob("*.json"):
+            try:
+                c = json.loads(p.read_text())
+                out[c["id"]] = c
+            except Exception:  # noqa: BLE001  half-written or broken file: skip it
+                pass
+        _cands = out
+    return _cands
+
+
+def _sep_arcsec(ra1, dec1, ra2, dec2) -> float:
+    r = math.radians
+    a = (math.sin(r(dec2 - dec1) / 2) ** 2
+         + math.cos(r(dec1)) * math.cos(r(dec2)) * math.sin(r(ra2 - ra1) / 2) ** 2)
+    return math.degrees(2 * math.asin(min(1.0, math.sqrt(a)))) * 3600
+
+
+def _with_counts(c: dict, all_c: dict[str, dict]) -> dict:
+    """Add how many reports (including this one) point at the same spot on the sky."""
+    same = sum(1 for o in all_c.values()
+               if _sep_arcsec(c["ra"], c["dec"], o["ra"], o["dec"]) <= SAME_OBJECT_ARCSEC)
+    return {**c, "reports_here": same}
+
+
+@app.post("/api/candidates", status_code=201)
+def report_candidate(body: CandidateIn, request: Request):
+    """Report a possible new moving object. Returns the stored report."""
+    rate_limit(request, "candidates", CAND_RATE,
+               "Too many reports from your address. Please wait a few minutes.")
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+    near = matching_target(SkyCoord(body.ra * u.deg, body.dec * u.deg))
+    c = {"id": uuid.uuid4().hex[:12],
+         "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+         **body.model_dump(),
+         "note": (body.note or "").strip() or None,
+         "name": (body.name or "").strip() or None,
+         "near_challenge_target": near}       # e.g. 'barnard' = probably the known star
+    with cand_lock:
+        cands = _load_candidates()
+        write_text_atomic(CAND_DIR / f"{c['id']}.json", json.dumps(c))
+        cands[c["id"]] = c
+        return _with_counts(c, cands)
+
+
+@app.get("/api/candidates")
+def list_candidates(ra: Optional[float] = Query(None, ge=0, lt=360),
+                    dec: Optional[float] = Query(None, ge=-90, le=90),
+                    radius_arcmin: float = Query(10.0, gt=0, le=600),
+                    limit: int = Query(200, ge=1, le=1000)):
+    """All reports, newest first. With ra+dec: only reports within radius_arcmin of that point
+    (e.g. the field the viewer is showing)."""
+    with cand_lock:
+        cands = dict(_load_candidates())
+    items = list(cands.values())
+    if ra is not None and dec is not None:
+        items = [c for c in items
+                 if _sep_arcsec(ra, dec, c["ra"], c["dec"]) <= radius_arcmin * 60]
+    items.sort(key=lambda c: c["created_at"], reverse=True)
+    return {"count": len(items), "candidates": [_with_counts(c, cands) for c in items[:limit]]}
+
+
+@app.get("/api/candidates/{cid}")
+def get_candidate(cid: str):
+    with cand_lock:
+        cands = _load_candidates()
+        c = cands.get(cid)
+        if not c:
+            raise HTTPException(404, "Unknown candidate id.")
+        return _with_counts(c, cands)
+
+
+@app.delete("/api/candidates/{cid}")
+def delete_candidate(cid: str, request: Request):
+    """Moderation (spam). Needs header  X-Admin-Token: <CANDIDATES_ADMIN_TOKEN>."""
+    if not CAND_ADMIN_TOKEN or request.headers.get("x-admin-token") != CAND_ADMIN_TOKEN:
+        raise HTTPException(403, "Not allowed.")
+    with cand_lock:
+        cands = _load_candidates()
+        if cands.pop(cid, None) is None:
+            raise HTTPException(404, "Unknown candidate id.")
+        (CAND_DIR / f"{cid}.json").unlink(missing_ok=True)
+    return {"deleted": cid}
 
 
 def warmup():
