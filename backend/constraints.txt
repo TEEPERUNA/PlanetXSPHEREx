@@ -1,0 +1,19 @@
+# Exact versions used for the Docker image (tested 15.11.2026), so a new upstream release
+# cannot break the deploy during judging. Update deliberately: change, build, test, merge.
+# Applied with: pip install -r backend/requirements.txt -c backend/constraints.txt
+# Science libraries
+astropy==8.0.2
+astroquery==0.4.11
+reproject==0.21.0
+photutils==3.1.1
+scipy==1.18.1
+numpy==2.5.4
+matplotlib==3.11.2
+pillow==13.0.0
+requests==2.34.2
+# Backend
+fastapi==0.162.7
+uvicorn==0.54.0
+pydantic==2.14.3
+s3fs==2026.9.0
+fsspec==2026.9.0

@@ -2,3 +2,7 @@ output/
 frontend/
 .venv/
 .git/
+.idea/
+.vscode/
+**/__pycache__/
+*.pyc

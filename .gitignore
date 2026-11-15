@@ -13,3 +13,4 @@ backend/cache/*.json
 .vscode/
 preview*
 preview/
+.idea/
