@@ -57,6 +57,9 @@
 
 .blink__overlay {
   pointer-events: none;
+  /* Images with a CSS filter get their own layer and would paint over the SVG */
+  position: relative;
+  z-index: 1;
 }
 
 /* Gaia predicted position (green, like the science previews) */

@@ -208,6 +208,8 @@ Juhon frontend on branchissa `front-end`. Viewer kääntyy sen kanssa (React 19,
 - WISE 0855:llä lähde on CatWISE, koska Gaia ei näe kohdetta.
 - Lasku täsmää Emilin `pixel_coords`-arvoihin 0,01 px:n tarkkuudella.
 - Jos ennuste on yli 2 px kuvan keskeltä, selitysrivi varoittaa, että ympyrä voi osoittaa eri kohdetta.
+- Ympyrät näkyvät vain, kun `gaia_validation` sisältää ennusteen. Käytännössä se on nyt vain haastekohteilla, joilla arvot ovat Emilin koodissa valmiina.
+- SVG-kerroksella on `position: relative; z-index: 1`. Ilman sitä CSS-`filter`illä säädetyt kuvat maalautuvat ympyröiden päälle ja piilottavat ne (korjattu 15.11.).
 
 Jokaisen vaiheen jälkeen tehdään commit (`feat(viewer): …`) ja merge mainiin. Mainin pitää aina buildata.
 
@@ -243,6 +245,9 @@ Tarkistettu `fetch_spherex.py`:n tuottamaa `meta.json`:ia vasten (14.11.2026).
 - [x] CORS backendissä (Erik): kaikki osoitteet sallittu.
 - [ ] `api/` tekee `baseUrl`:sta täydellisen osoitteen ja välittää `preview`-kentän (Juho).
 - [ ] Pollaus yrittää uudelleen, jos yksittäinen `/api/status` epäonnistuu. Palvelin oli testissä noin minuutin vastaamatta, vaikka haku jatkui (Juho/Erik).
-- [ ] Vapaan koordinaatin Gaia-haku palauttaa `QUERY_ERROR` (Emil).
+- [ ] Vapaan koordinaatin Gaia-haku kaatuu (Emil): `gaia_validation.message` on "Gaia lookup could not be executed: name 'cf' is not defined" (esimerkiksi ra=10.68 dec=41.27). Todennäköisesti `import concurrent.futures as cf` puuttuu siitä tiedostosta, jossa uusi 10 s timeout on.
+  - Korjauksen jälkeenkin vanhat vapaiden koordinaattien tulokset palautuvat välimuistista ilman Gaiaa, kunnes backend rakentaa ne uudelleen tai Erik tyhjentää välimuistin.
+  - M31 on galaksi, joten keskeltä ei välttämättä löydy järkevää Gaia-kohdetta toimivallakaan haulla.
+- [ ] Viewer: kun Gaia-ennustetta ei ole, näytä selittävä rivi, esimerkiksi "No Gaia prediction for this position." tai "Gaia lookup failed for this position.". Nyt rivi vain puuttuu.
 - [ ] Avain `"inverted": true` käännetyille kuville, jotta viewer voi kertoa sen käyttäjälle (Emil).
 - [ ] Valokäyrä (`lightcurve.csv`) samaan kaavioon kuin spektri? Hyödyllinen muuttuville tähdille (RW Aur, R Dra).
