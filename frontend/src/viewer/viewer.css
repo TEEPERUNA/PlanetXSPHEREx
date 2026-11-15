@@ -18,6 +18,14 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Long readouts wrap instead of widening the sidebar */
+.viewer__info,
+.viewer__cursor,
+.viewer__gaia,
+.spectrum__readout {
+  overflow-wrap: anywhere;
+}
+
 /* Readouts in mono so numbers line up */
 .viewer__info,
 .viewer__cursor,
@@ -175,7 +183,7 @@
 
 .controls__slider {
   flex: 1;
-  min-width: 120px;
+  min-width: 100px;
   color: var(--muted, inherit);
   font-family: var(--mono, inherit);
   font-size: 0.75rem;
@@ -332,6 +340,7 @@
 
 .spectrum__modes {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 

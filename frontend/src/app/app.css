@@ -97,7 +97,9 @@ body {
 .app progress, .app input[type="range"] { accent-color: var(--accent); }
 
 /* Layout: image left, controls and data in .viewer__side (wrapper in viewer/Viewer.tsx). */
-.viewer__side { display: grid; gap: 16px; align-content: start; }
+/* minmax(0, 1fr) + min-width: 0: content shrinks to the panel instead of scrolling sideways */
+.viewer__side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-content: start; }
+.viewer__side > * { min-width: 0; }
 /* Hairlines between the sidebar blocks. */
 .viewer__side > * + * { padding-top: 16px; border-top: 1px solid var(--border); }
 
@@ -112,7 +114,7 @@ body {
   .app .viewer:has(.viewer__side) > :not(.viewer__side) { grid-column: 1; }
   .viewer__side {
     grid-column: 2; grid-row: 1 / -1;
-    position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow: auto;
+    position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow-x: hidden; overflow-y: auto;
   }
   .drawer-toggle, .drawer-backdrop { display: none; }
 }
@@ -121,7 +123,7 @@ body {
 @media (max-width: 899px) {
   .viewer__side {
     position: fixed; inset: 0 0 0 auto; z-index: 20; width: min(360px, 88vw);
-    padding: 16px 16px 80px; overflow: auto;
+    padding: 16px 16px 80px; overflow-x: hidden; overflow-y: auto;
     background: var(--surface); border-left: 1px solid var(--border);
     transform: translateX(100%); visibility: hidden;
     transition: transform 0.25s ease, visibility 0s linear 0.25s;
