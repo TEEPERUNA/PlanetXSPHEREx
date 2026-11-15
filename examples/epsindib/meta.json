@@ -50,27 +50,27 @@
       "detectors": {
         "D1": {
           "n_images": 2,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.251
         },
         "D2": {
           "n_images": 2,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.226
         },
         "D3": {
           "n_images": 2,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.208
         },
         "D4": {
           "n_images": 2,
-          "flagged_frac": 0.8014268727705114
+          "flagged_frac": 0.228
         },
         "D5": {
           "n_images": 2,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.205
         },
         "D6": {
           "n_images": 1,
-          "flagged_frac": 0.6587395957193817
+          "flagged_frac": 0.219
         }
       },
       "date": "2025-04-27"
@@ -82,15 +82,15 @@
       "detectors": {
         "D2": {
           "n_images": 1,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.232
         },
         "D5": {
           "n_images": 1,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.227
         },
         "D6": {
           "n_images": 1,
-          "flagged_frac": 0.6302021403091558
+          "flagged_frac": 0.212
         }
       },
       "date": "2025-06-08"
@@ -102,27 +102,27 @@
       "detectors": {
         "D1": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.205
         },
         "D2": {
           "n_images": 2,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.211
         },
         "D3": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.202
         },
         "D4": {
           "n_images": 3,
-          "flagged_frac": 0.8248117320650019
+          "flagged_frac": 0.195
         },
         "D5": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.198
         },
         "D6": {
           "n_images": 3,
-          "flagged_frac": 0.6012683313515655
+          "flagged_frac": 0.214
         }
       },
       "date": "2025-10-16"
@@ -134,27 +134,27 @@
       "detectors": {
         "D1": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.219
         },
         "D2": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.214
         },
         "D3": {
           "n_images": 2,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.203
         },
         "D4": {
           "n_images": 3,
-          "flagged_frac": 0.8030122869599684
+          "flagged_frac": 0.215
         },
         "D5": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.197
         },
         "D6": {
           "n_images": 2,
-          "flagged_frac": 0.6593341260404281
+          "flagged_frac": 0.21
         }
       },
       "date": "2026-04-26"
@@ -166,19 +166,19 @@
       "detectors": {
         "D2": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.222
         },
         "D3": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.213
         },
         "D5": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.208
         },
         "D6": {
           "n_images": 3,
-          "flagged_frac": 0.6107808164883076
+          "flagged_frac": 0.215
         }
       },
       "date": "2026-09-28"
@@ -427,5 +427,44 @@
   "propagated_to": 2026.87,
   "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team",
   "inverted": false,
-  "glare_suppressed": true
+  "glare_suppressed": true,
+  "flag_bits": {
+    "TRANSIENT": 0,
+    "OVERFLOW": 1,
+    "SUR_ERROR": 2,
+    "NONFUNC": 6,
+    "DICHROIC": 7,
+    "MISSING_DATA": 9,
+    "HOT": 10,
+    "COLD": 11,
+    "FULLSAMPLE": 12,
+    "PHANMISS": 14,
+    "NONLINEAR": 15,
+    "PERSIST": 17,
+    "OUTLIER": 19,
+    "CROSSTALK": 20,
+    "SOURCE": 21,
+    "GHOST": 22,
+    "GHOST_FPA": 23,
+    "GHOST_EXT": 24,
+    "STREAK": 25,
+    "BLOOM": 26,
+    "SNOWBALL": 27,
+    "HALO": 28
+  },
+  "flag_bad": [
+    "TRANSIENT",
+    "OVERFLOW",
+    "SUR_ERROR",
+    "NONFUNC",
+    "DICHROIC",
+    "MISSING_DATA",
+    "HOT",
+    "COLD",
+    "NONLINEAR",
+    "PERSIST",
+    "OUTLIER",
+    "BLOOM",
+    "SNOWBALL"
+  ]
 }

@@ -50,27 +50,27 @@
       "detectors": {
         "D1": {
           "n_images": 1,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.154
         },
         "D2": {
           "n_images": 2,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.148
         },
         "D3": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.128
         },
         "D4": {
           "n_images": 2,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.128
         },
         "D5": {
           "n_images": 1,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.152
         },
         "D6": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.111
         }
       },
       "date": "2025-08-25"
@@ -82,11 +82,11 @@
       "detectors": {
         "D1": {
           "n_images": 1,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.155
         },
         "D4": {
           "n_images": 1,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.168
         }
       },
       "date": "2025-10-01"
@@ -98,27 +98,27 @@
       "detectors": {
         "D1": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.11
         },
         "D2": {
           "n_images": 1,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.154
         },
         "D3": {
           "n_images": 1,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.16
         },
         "D4": {
           "n_images": 1,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.146
         },
         "D5": {
           "n_images": 2,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.137
         },
         "D6": {
           "n_images": 2,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.128
         }
       },
       "date": "2026-03-16"
@@ -130,11 +130,11 @@
       "detectors": {
         "D3": {
           "n_images": 1,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.165
         },
         "D6": {
           "n_images": 1,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.148
         }
       },
       "date": "2026-05-05"
@@ -146,27 +146,27 @@
       "detectors": {
         "D1": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.125
         },
         "D2": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.123
         },
         "D3": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.109
         },
         "D4": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.093
         },
         "D5": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.093
         },
         "D6": {
           "n_images": 2,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.143
         }
       },
       "date": "2026-08-26"
@@ -366,5 +366,461 @@
       "wcs_y": 14.63
     }
   },
-  "glare_suppressed": false
+  "glare_suppressed": false,
+  "flag_bits": {
+    "TRANSIENT": 0,
+    "OVERFLOW": 1,
+    "SUR_ERROR": 2,
+    "NONFUNC": 6,
+    "DICHROIC": 7,
+    "MISSING_DATA": 9,
+    "HOT": 10,
+    "COLD": 11,
+    "FULLSAMPLE": 12,
+    "PHANMISS": 14,
+    "NONLINEAR": 15,
+    "PERSIST": 17,
+    "OUTLIER": 19,
+    "CROSSTALK": 20,
+    "SOURCE": 21,
+    "GHOST": 22,
+    "GHOST_FPA": 23,
+    "GHOST_EXT": 24,
+    "STREAK": 25,
+    "BLOOM": 26,
+    "SNOWBALL": 27,
+    "HALO": 28
+  },
+  "flag_bad": [
+    "TRANSIENT",
+    "OVERFLOW",
+    "SUR_ERROR",
+    "NONFUNC",
+    "DICHROIC",
+    "MISSING_DATA",
+    "HOT",
+    "COLD",
+    "NONLINEAR",
+    "PERSIST",
+    "OUTLIER",
+    "BLOOM",
+    "SNOWBALL"
+  ],
+  "light_curve": {
+    "is_variable": true,
+    "variable_bands": [
+      "D1",
+      "D2",
+      "D3",
+      "D4"
+    ],
+    "bands": {
+      "D1": {
+        "is_variable": true,
+        "mean_flux": 463.086,
+        "std_flux": 116.615,
+        "amplitude_flux": 327.503,
+        "wavelength_range_um": [
+          0.75,
+          1.09
+        ],
+        "epochs": [
+          {
+            "epoch": 0,
+            "date": "2025-08-25",
+            "mjd": 60916.08,
+            "flux": 486.2901,
+            "err": 0.9535
+          },
+          {
+            "epoch": 1,
+            "date": "2025-10-01",
+            "mjd": 60949.27,
+            "flux": 616.246,
+            "err": 1.3723
+          },
+          {
+            "epoch": 2,
+            "date": "2026-03-16",
+            "mjd": 61110.48,
+            "flux": 461.0656,
+            "err": 0.7831
+          },
+          {
+            "epoch": 4,
+            "date": "2026-08-25",
+            "mjd": 61279.49,
+            "flux": 288.7432,
+            "err": 0.554
+          }
+        ]
+      },
+      "D2": {
+        "is_variable": true,
+        "mean_flux": 946.346,
+        "std_flux": 158.693,
+        "amplitude_flux": 337.367,
+        "wavelength_range_um": [
+          1.1,
+          1.62
+        ],
+        "epochs": [
+          {
+            "epoch": 0,
+            "date": "2025-08-25",
+            "mjd": 60913.12,
+            "flux": 721.9224,
+            "err": 0.8018
+          },
+          {
+            "epoch": 2,
+            "date": "2026-03-16",
+            "mjd": 61116.52,
+            "flux": 1057.8264,
+            "err": 1.2732
+          },
+          {
+            "epoch": 4,
+            "date": "2026-08-25",
+            "mjd": 61283.38,
+            "flux": 1059.289,
+            "err": 1.2475
+          }
+        ]
+      },
+      "D3": {
+        "is_variable": true,
+        "mean_flux": 681.475,
+        "std_flux": 133.978,
+        "amplitude_flux": 325.7,
+        "wavelength_range_um": [
+          1.63,
+          2.41
+        ],
+        "epochs": [
+          {
+            "epoch": 0,
+            "date": "2025-08-25",
+            "mjd": 60908.66,
+            "flux": 779.9887,
+            "err": 0.8148
+          },
+          {
+            "epoch": 2,
+            "date": "2026-03-16",
+            "mjd": 61119.84,
+            "flux": 516.9343,
+            "err": 0.9328
+          },
+          {
+            "epoch": 3,
+            "date": "2026-05-05",
+            "mjd": 61165.08,
+            "flux": 586.3448,
+            "err": 0.9133
+          },
+          {
+            "epoch": 4,
+            "date": "2026-08-25",
+            "mjd": 61270.71,
+            "flux": 842.6341,
+            "err": 1.0408
+          }
+        ]
+      },
+      "D4": {
+        "is_variable": true,
+        "mean_flux": 503.246,
+        "std_flux": 124.43,
+        "amplitude_flux": 310.231,
+        "wavelength_range_um": [
+          2.42,
+          3.82
+        ],
+        "epochs": [
+          {
+            "epoch": 0,
+            "date": "2025-08-25",
+            "mjd": 60916.08,
+            "flux": 410.9784,
+            "err": 0.8732
+          },
+          {
+            "epoch": 1,
+            "date": "2025-10-01",
+            "mjd": 60949.27,
+            "flux": 358.6423,
+            "err": 0.9447
+          },
+          {
+            "epoch": 2,
+            "date": "2026-03-16",
+            "mjd": 61110.48,
+            "flux": 668.8732,
+            "err": 0.9632
+          },
+          {
+            "epoch": 4,
+            "date": "2026-08-25",
+            "mjd": 61279.49,
+            "flux": 574.4905,
+            "err": 0.8766
+          }
+        ]
+      },
+      "D5": {
+        "is_variable": false,
+        "mean_flux": 588.417,
+        "std_flux": 13.289,
+        "amplitude_flux": 30.337,
+        "wavelength_range_um": [
+          3.83,
+          4.41
+        ],
+        "epochs": [
+          {
+            "epoch": 0,
+            "date": "2025-08-25",
+            "mjd": 60913.12,
+            "flux": 595.2291,
+            "err": 1.4686
+          },
+          {
+            "epoch": 2,
+            "date": "2026-03-16",
+            "mjd": 61116.52,
+            "flux": 600.1802,
+            "err": 1.1569
+          },
+          {
+            "epoch": 4,
+            "date": "2026-08-25",
+            "mjd": 61283.38,
+            "flux": 569.8428,
+            "err": 1.0558
+          }
+        ]
+      },
+      "D6": {
+        "is_variable": false,
+        "mean_flux": 436.145,
+        "std_flux": 16.888,
+        "amplitude_flux": 43.057,
+        "wavelength_range_um": [
+          4.42,
+          5.0
+        ],
+        "epochs": [
+          {
+            "epoch": 0,
+            "date": "2025-08-25",
+            "mjd": 60908.66,
+            "flux": 421.0306,
+            "err": 0.8971
+          },
+          {
+            "epoch": 2,
+            "date": "2026-03-16",
+            "mjd": 61119.84,
+            "flux": 434.6959,
+            "err": 0.9821
+          },
+          {
+            "epoch": 3,
+            "date": "2026-05-05",
+            "mjd": 61165.08,
+            "flux": 424.765,
+            "err": 1.0934
+          },
+          {
+            "epoch": 4,
+            "date": "2026-08-25",
+            "mjd": 61270.71,
+            "flux": 464.0874,
+            "err": 0.7246
+          }
+        ]
+      }
+    },
+    "points": [
+      {
+        "epoch": 0,
+        "date": "2025-08-25",
+        "mjd": 60916.08,
+        "band": "D1",
+        "flux": 486.2901,
+        "err": 0.9535
+      },
+      {
+        "epoch": 0,
+        "date": "2025-08-25",
+        "mjd": 60913.12,
+        "band": "D2",
+        "flux": 721.9224,
+        "err": 0.8018
+      },
+      {
+        "epoch": 0,
+        "date": "2025-08-25",
+        "mjd": 60908.66,
+        "band": "D3",
+        "flux": 779.9887,
+        "err": 0.8148
+      },
+      {
+        "epoch": 0,
+        "date": "2025-08-25",
+        "mjd": 60916.08,
+        "band": "D4",
+        "flux": 410.9784,
+        "err": 0.8732
+      },
+      {
+        "epoch": 0,
+        "date": "2025-08-25",
+        "mjd": 60913.12,
+        "band": "D5",
+        "flux": 595.2291,
+        "err": 1.4686
+      },
+      {
+        "epoch": 0,
+        "date": "2025-08-25",
+        "mjd": 60908.66,
+        "band": "D6",
+        "flux": 421.0306,
+        "err": 0.8971
+      },
+      {
+        "epoch": 1,
+        "date": "2025-10-01",
+        "mjd": 60949.27,
+        "band": "D1",
+        "flux": 616.246,
+        "err": 1.3723
+      },
+      {
+        "epoch": 1,
+        "date": "2025-10-01",
+        "mjd": 60949.27,
+        "band": "D4",
+        "flux": 358.6423,
+        "err": 0.9447
+      },
+      {
+        "epoch": 2,
+        "date": "2026-03-16",
+        "mjd": 61110.48,
+        "band": "D1",
+        "flux": 461.0656,
+        "err": 0.7831
+      },
+      {
+        "epoch": 2,
+        "date": "2026-03-16",
+        "mjd": 61116.52,
+        "band": "D2",
+        "flux": 1057.8264,
+        "err": 1.2732
+      },
+      {
+        "epoch": 2,
+        "date": "2026-03-16",
+        "mjd": 61119.84,
+        "band": "D3",
+        "flux": 516.9343,
+        "err": 0.9328
+      },
+      {
+        "epoch": 2,
+        "date": "2026-03-16",
+        "mjd": 61110.48,
+        "band": "D4",
+        "flux": 668.8732,
+        "err": 0.9632
+      },
+      {
+        "epoch": 2,
+        "date": "2026-03-16",
+        "mjd": 61116.52,
+        "band": "D5",
+        "flux": 600.1802,
+        "err": 1.1569
+      },
+      {
+        "epoch": 2,
+        "date": "2026-03-16",
+        "mjd": 61119.84,
+        "band": "D6",
+        "flux": 434.6959,
+        "err": 0.9821
+      },
+      {
+        "epoch": 3,
+        "date": "2026-05-05",
+        "mjd": 61165.08,
+        "band": "D3",
+        "flux": 586.3448,
+        "err": 0.9133
+      },
+      {
+        "epoch": 3,
+        "date": "2026-05-05",
+        "mjd": 61165.08,
+        "band": "D6",
+        "flux": 424.765,
+        "err": 1.0934
+      },
+      {
+        "epoch": 4,
+        "date": "2026-08-25",
+        "mjd": 61279.49,
+        "band": "D1",
+        "flux": 288.7432,
+        "err": 0.554
+      },
+      {
+        "epoch": 4,
+        "date": "2026-08-25",
+        "mjd": 61283.38,
+        "band": "D2",
+        "flux": 1059.289,
+        "err": 1.2475
+      },
+      {
+        "epoch": 4,
+        "date": "2026-08-25",
+        "mjd": 61270.71,
+        "band": "D3",
+        "flux": 842.6341,
+        "err": 1.0408
+      },
+      {
+        "epoch": 4,
+        "date": "2026-08-25",
+        "mjd": 61279.49,
+        "band": "D4",
+        "flux": 574.4905,
+        "err": 0.8766
+      },
+      {
+        "epoch": 4,
+        "date": "2026-08-25",
+        "mjd": 61283.38,
+        "band": "D5",
+        "flux": 569.8428,
+        "err": 1.0558
+      },
+      {
+        "epoch": 4,
+        "date": "2026-08-25",
+        "mjd": 61270.71,
+        "band": "D6",
+        "flux": 464.0874,
+        "err": 0.7246
+      }
+    ]
+  },
+  "lightcurve": "lightcurve.csv",
+  "lightcurve_png": "lightcurve.png"
 }

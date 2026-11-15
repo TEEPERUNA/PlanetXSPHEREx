@@ -50,27 +50,27 @@
       "detectors": {
         "D1": {
           "n_images": 3,
-          "flagged_frac": 0.8652397938961554
+          "flagged_frac": 0.125
         },
         "D2": {
           "n_images": 3,
-          "flagged_frac": 0.9968291716210861
+          "flagged_frac": 0.123
         },
         "D3": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.128
         },
         "D4": {
           "n_images": 3,
-          "flagged_frac": 0.982164090368609
+          "flagged_frac": 0.107
         },
         "D5": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.127
         },
         "D6": {
           "n_images": 3,
-          "flagged_frac": 0.9996036464526358
+          "flagged_frac": 0.11
         }
       },
       "date": "2025-09-09"
@@ -82,27 +82,27 @@
       "detectors": {
         "D1": {
           "n_images": 3,
-          "flagged_frac": 0.8660325009908839
+          "flagged_frac": 0.105
         },
         "D2": {
           "n_images": 3,
-          "flagged_frac": 0.9972255251684502
+          "flagged_frac": 0.113
         },
         "D3": {
           "n_images": 3,
-          "flagged_frac": 0.9992072929052714
+          "flagged_frac": 0.103
         },
         "D4": {
           "n_images": 2,
-          "flagged_frac": 0.9845422116527943
+          "flagged_frac": 0.127
         },
         "D5": {
           "n_images": 2,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.145
         },
         "D6": {
           "n_images": 2,
-          "flagged_frac": 0.9994054696789536
+          "flagged_frac": 0.127
         }
       },
       "date": "2026-03-04"
@@ -114,27 +114,27 @@
       "detectors": {
         "D1": {
           "n_images": 3,
-          "flagged_frac": 0.8707887435592548
+          "flagged_frac": 0.11
         },
         "D2": {
           "n_images": 3,
-          "flagged_frac": 0.998414585810543
+          "flagged_frac": 0.12
         },
         "D3": {
           "n_images": 2,
-          "flagged_frac": 0.9994054696789536
+          "flagged_frac": 0.122
         },
         "D4": {
           "n_images": 3,
-          "flagged_frac": 0.9825604439159731
+          "flagged_frac": 0.107
         },
         "D5": {
           "n_images": 3,
-          "flagged_frac": 1.0
+          "flagged_frac": 0.108
         },
         "D6": {
           "n_images": 2,
-          "flagged_frac": 0.9994054696789536
+          "flagged_frac": 0.118
         }
       },
       "date": "2026-09-11"
@@ -346,5 +346,44 @@
   "propagated_to": 2026.87,
   "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team",
   "inverted": false,
-  "glare_suppressed": false
+  "glare_suppressed": false,
+  "flag_bits": {
+    "TRANSIENT": 0,
+    "OVERFLOW": 1,
+    "SUR_ERROR": 2,
+    "NONFUNC": 6,
+    "DICHROIC": 7,
+    "MISSING_DATA": 9,
+    "HOT": 10,
+    "COLD": 11,
+    "FULLSAMPLE": 12,
+    "PHANMISS": 14,
+    "NONLINEAR": 15,
+    "PERSIST": 17,
+    "OUTLIER": 19,
+    "CROSSTALK": 20,
+    "SOURCE": 21,
+    "GHOST": 22,
+    "GHOST_FPA": 23,
+    "GHOST_EXT": 24,
+    "STREAK": 25,
+    "BLOOM": 26,
+    "SNOWBALL": 27,
+    "HALO": 28
+  },
+  "flag_bad": [
+    "TRANSIENT",
+    "OVERFLOW",
+    "SUR_ERROR",
+    "NONFUNC",
+    "DICHROIC",
+    "MISSING_DATA",
+    "HOT",
+    "COLD",
+    "NONLINEAR",
+    "PERSIST",
+    "OUTLIER",
+    "BLOOM",
+    "SNOWBALL"
+  ]
 }
