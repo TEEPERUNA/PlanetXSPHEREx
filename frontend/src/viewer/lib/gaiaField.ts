@@ -11,7 +11,7 @@ const GAIA_EPOCH = 2016.0;
 export function fieldRadiusArcsec(meta: Meta): number {
   const [h, w] = meta.shape;
   const halfDiag = (Math.hypot(h, w) / 2) * meta.pixel_scale_arcsec;
-  return Math.min(600, Math.ceil(halfDiag + 30));
+  return Math.min(900, Math.ceil(halfDiag + 30));
 }
 
 export interface StarPixel {
