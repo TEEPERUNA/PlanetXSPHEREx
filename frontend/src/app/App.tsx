@@ -8,7 +8,7 @@ import "./app.css";
 const initial = searchFromUrl();
 
 export function App() {
-  const { status, isPreview, setTarget } = useSky();
+  const { status, setTarget } = useSky();
   const [frames, setFrames] = useState(false);
 
   // A link with coordinates in the URL runs the search straight away.
@@ -25,7 +25,6 @@ export function App() {
       <SearchForm initial={initial} onSearch={setTarget} />
       {status.kind === "done" ? (
         <section className="result card">
-          {isPreview && <p className="banner">Quick preview, full result is still loading…</p>}
           <h2>{status.meta.target}</h2>
           <GifView key={status.baseUrl} meta={status.meta} baseUrl={status.baseUrl} />
           <button className="toggle" aria-expanded={frames} onClick={() => setFrames(!frames)}>

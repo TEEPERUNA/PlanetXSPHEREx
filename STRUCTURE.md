@@ -51,7 +51,7 @@ PlanetXSPHEREx/
 │                                                    │
 ├── frontend/                                        │
 │   ├── index.html, vite.config.ts                   │
-│   ├── .env.example ... VITE_API_BASE_URL (backend address)
+│   ├── .env.example ... optional VITE_API_BASE_URL; default is the deployed API
 │   └── src/                                         │
 │       ├── app/  (Juho)                             │
 │       │     App ......... page layout: header, search, GIF result, frame-by-frame toggle
@@ -64,7 +64,7 @@ PlanetXSPHEREx/
 │       ├── main.tsx ......... shared: mounts app/App
 │       ├── api/  (shared)                           │
 │       │     → backend /api/sky, /api/status        │
-│       │     → Viewer as the `status` prop          │
+│       │     → Viewer as the `status` prop (preview sent as loading + preview)
 │       └── viewer/  (Elias) ◄───────────────────────┘ /api/files/<job>/…
 │           ├── index.ts ............ only entry point → Viewer.tsx, types.ts
 │           ├── Viewer.tsx .......... state; uses everything below
@@ -74,16 +74,20 @@ PlanetXSPHEREx/
 │           │   ├── BlinkImage.tsx ...... frames/*.png, diff_*.png
 │           │   ├── EpochInfo.tsx ....... → lib/frames (imageCount)
 │           │   ├── CursorInfo.tsx ...... → lib/skyCoords
+│           │   ├── GaiaOverlay.tsx ..... green circle + track dots (SVG) → lib/gaia
+│           │   ├── GaiaInfo.tsx ........ text line that explains the circle
 │           │   ├── PlaybackControls.tsx  no dependencies
 │           │   ├── SpectrumChart.tsx ... spectrum.csv → lib/parseSpectrum
 │           │   └── StatusView.tsx ...... empty / loading / error
 │           ├── hooks/useBlink.ts
 │           ├── lib/ ......... pure functions, no React
 │           │   ├── frames.ts      epochN.png → meta.epochs[N]
-│           │   ├── skyCoords.ts   pixel → RA/Dec
+│           │   ├── skyCoords.ts   pixel ↔ RA/Dec
+│           │   ├── gaia.ts        Gaia prediction moved to each epoch's date
 │           │   ├── parseSpectrum.ts
 │           │   ├── chartScale.ts  axes and scales for SpectrumChart
 │           │   └── stage.ts       backend stage → text for the user
+│           ├── HANDOFF.md ...... technical handoff (English)
 │           ├── plan.md
 │           └── msg_to_eliz.txt .. how to test the API by hand
 ```
