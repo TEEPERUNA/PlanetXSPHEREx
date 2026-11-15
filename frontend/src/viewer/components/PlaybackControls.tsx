@@ -17,7 +17,7 @@ interface Props {
   showDiff: boolean;
   onToggleDiff: () => void;
 
-  hasGaia: boolean; // false when there is no prediction on the image
+  hasGaia: boolean; // false when there is nothing from Gaia to draw on the image
   showGaia: boolean;
   onToggleGaia: () => void;
 
@@ -98,7 +98,7 @@ export function PlaybackControls(p: Props) {
             aria-pressed={p.showGaia}
             className={p.showGaia ? "is-active" : undefined}
           >
-            Gaia position
+            Gaia stars
           </button>
         )}
       </div>

@@ -66,6 +66,8 @@ viewer/
 │   └── StatusView.tsx        empty / loading / error, and LoadingProgress
 ├── hooks/
 │   ├── useBlink.ts           interval timer for the animation
+│   ├── useGaiaField.ts       Gaia stars around the image from /api/gaia
+│   ├── useSources.ts         point sources in the epoch stack on screen
 │   └── usePixelValues.ts     loads the pixel FITS for the cursor info, hides filler layers
 └── lib/                      pure functions, no React, easy to test
     ├── frames.ts             frames of a band; epoch number from the filename
@@ -76,6 +78,7 @@ viewer/
     ├── spectrumStats.ts      averages per detector, noise check
     ├── fits.ts               small FITS reader (pixel values under the cursor)
     ├── flags.ts              SPHEREx flag bits → names, unreliable or not, tooltip text
+    ├── gaiaField.ts          field stars at a date, source detection, "no Gaia match"
     └── stage.ts              backend stage name → user text
 ```
 
@@ -105,6 +108,16 @@ The spectrum keeps the old chart on screen until the new CSV has loaded, so the 
 - In blink mode a circle marks the current date, and dots show the track. In diff mode, dashed = first epoch and solid = last epoch.
 - SVG pixel *i* spans *i* … *i*+1, so circles are drawn at *x* + 0.5.
 - The SVG layer has `position: relative; z-index: 1`. **Do not remove it:** images with a CSS `filter` get their own layer and would otherwise paint over the circles.
+
+### Gaia field stars and sources without a Gaia match
+- `hooks/useGaiaField.ts` asks the backend for every Gaia DR3 star around the image: `getGaia()` in `api/` → `GET /api/gaia?ra&dec&radius` (CONTRACT.md). Radius = half the image diagonal + 30″ for stars that move in (`fieldRadiusArcsec`, max 600″). One request per field; the backend caches it. Positions come at J2016.0.
+- `lib/gaiaField.ts` `starsOnImage()` moves every star with its proper motion to the date on screen (last epoch in diff mode) and keeps the ones on the image. So fast stars move between frames, like the target.
+- `components/GaiaOverlay.tsx` draws the 25 brightest as thin rings (size by G magnitude) and the next 60 as dots, so dense Milky Way fields (Barnard: 214 stars on the image) stay readable. The target itself is left out of the field, the green ring already marks it. On negative images (`meta.inverted`, WISE 0855) the rings are dark.
+- **No Gaia match:** `hooks/useSources.ts` loads the epoch stack on screen (`outputs[band].fits`) and `detectSources()` finds point sources: local maxima in a 5×5 box, 8σ above the background (median and MAD noise), skipping NaNs and a 2-pixel border. `withoutGaia()` keeps the sources with no Gaia star within 2.5 px (15″). They get an orange dashed square: seen by SPHEREx in infrared, but not in Gaia's visible-light catalogue, which is exactly what a cold brown dwarf looks like. (Pink squares are community reports from `CandidateOverlay`.)
+- Safety: sources are only flagged when the Gaia query succeeded and returned stars on the image; an empty or failed query would otherwise mark every source.
+- Hovering near a field star shows "Gaia DR3 star · G 12.3 · moves 0.045″/yr" in the cursor info. The "Gaia stars" button hides all of it.
+- Checked on all five examples with the live `/api/gaia`: in Barnard's dense field every source matches on every epoch; the other targets get 0–5 orange squares per epoch.
+- Limits: the backend returns at most 500 stars (brightest first), so in very dense fields a faint Gaia star may be missing and its source flagged. Galaxies and very red stars also show up as "no Gaia match"; a square means "worth a look", not "new object".
 
 ### Spectrum
 - One measurement per SPHEREx image, at the image centre (3 × 3 px). x = wavelength (µm), y = surface brightness (MJy/sr), with error bars, one colour per epoch.

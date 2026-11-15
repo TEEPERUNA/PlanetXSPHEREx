@@ -9,6 +9,7 @@ interface Props {
   band: Band;
   values: PixelValues | null;
   loading: boolean;
+  gaiaNote?: string | null; // nearest Gaia star under the cursor, e.g. "Gaia DR3 star · G 12.3 · …"
 }
 
 // Number for display, or null when it is missing or NaN.
@@ -17,7 +18,7 @@ function num(v: number | undefined, digits: number): string | null {
 }
 
 // Pixel, sky coordinates and pixel values under the cursor (or the last tap).
-export function CursorInfo({ pixel, meta, band, values, loading }: Props) {
+export function CursorInfo({ pixel, meta, band, values, loading, gaiaNote }: Props) {
   if (!pixel) {
     return <p className="viewer__cursor">Point at the image to see coordinates and pixel values</p>;
   }
@@ -58,6 +59,7 @@ export function CursorInfo({ pixel, meta, band, values, loading }: Props) {
       </p>
       {light.length > 0 && <p>{light.join(" · ")}</p>}
       {instrument.length > 0 && <p>{instrument.join(" · ")}</p>}
+      {gaiaNote && <p className="viewer__cursor-gaia">{gaiaNote}</p>}
       {/* Always shown, so a missing FLAGS layer (older results, ALL band) is visible too. */}
       {!loading && (
         <p className="viewer__flags">

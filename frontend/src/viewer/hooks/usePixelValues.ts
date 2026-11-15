@@ -62,7 +62,7 @@ function isFallbackDetector(img: FitsImage): boolean {
 // One download per file, shared by every viewer on the page.
 const cache = new Map<string, Promise<FitsImage[]>>();
 
-function loadFits(url: string): Promise<FitsImage[]> {
+export function loadFits(url: string): Promise<FitsImage[]> {
   let promise = cache.get(url);
   if (!promise) {
     promise = fetch(url)
@@ -80,7 +80,7 @@ function loadFits(url: string): Promise<FitsImage[]> {
 }
 
 // File of one epoch: "epoch3_D2.fits" or "pixels/D2/epoch3.fits" -> 3.
-function pathForEpoch(paths: string[] | undefined, epoch: number): string | undefined {
+export function pathForEpoch(paths: string[] | undefined, epoch: number): string | undefined {
   return paths?.find((p) => Number(/epoch(\d+)/.exec(p)?.[1]) === epoch);
 }
 
