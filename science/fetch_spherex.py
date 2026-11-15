@@ -441,13 +441,30 @@ def robust_norm(img: np.ndarray) -> np.ndarray:
     return (img - med) / (mad if mad > 0 else 1.0)
 
 
+def get_edge_nan_mask(img: np.ndarray) -> np.ndarray:
+    """Returns a boolean mask of connected NaN regions that touch any image border (missing detector coverage)."""
+    if img is None or img.size == 0 or not np.any(np.isnan(img)):
+        return np.zeros_like(img, dtype=bool) if img is not None else np.zeros((1, 1), dtype=bool)
+    from scipy.ndimage import label
+    nan_mask = np.isnan(img)
+    labeled, n = label(nan_mask, structure=np.ones((3, 3)))
+    edge_nans = np.zeros_like(nan_mask, dtype=bool)
+    for i in range(1, n + 1):
+        comp = (labeled == i)
+        if comp[0, :].any() or comp[-1, :].any() or comp[:, 0].any() or comp[:, -1].any():
+            edge_nans |= comp
+    return edge_nans
+
+
 def repair_star_donuts(img: np.ndarray) -> np.ndarray:
     """
     Repairs stellar core saturation holes ('donuts'), NaN artifacts, and non-NaN flux dips.
 
-    1. Saturated core reconstruction: identifies connected NaN components. Border/sky NaNs outside
-       the field of view are filled with the median sky background, while enclosed saturated star
-       cores are filled with the peak boundary flux (preventing dark center holes).
+    1. Saturated core reconstruction: identifies connected NaN components.
+       Only small interior holes that do not touch the image edge are elevated to the peak
+       boundary flux (preventing dark center holes in saturated stars).
+       Edge-touching NaN regions (missing detector coverage outside the field of view)
+       are filled with the median sky background without boosting to stellar peak flux.
     2. Multi-threshold morphological hole filling: ensures any central crater, saturation
        wrap-around, or zeroed core enclosed within bright stellar contours is elevated to its
        enclosing contour level.
@@ -480,17 +497,15 @@ def repair_star_donuts(img: np.ndarray) -> np.ndarray:
                     out[comp] = med_sky
                     continue
                 max_b = float(np.max(bvals))
-                # Saturated stellar core: interior cutout region with elevated boundary,
-                # or edge-touching source with high flux (> 50% of image peak)
-                is_saturated_core = (not touches_edge and max_b > star_thresh) or (
-                    touches_edge and max_b > 0.5 * img_max and max_b > star_thresh
-                )
-                if is_saturated_core:
+                is_small = comp.sum() <= 0.25 * out.size
+                # Saturated stellar core: only small interior holes that do not touch the image edge
+                if not touches_edge and is_small and max_b > star_thresh:
                     out[comp] = max_b
-                elif touches_edge:
-                    out[comp] = med_sky
-                else:
+                elif not touches_edge and is_small:
                     out[comp] = float(np.median(bvals))
+                else:
+                    # Edge-touching or large missing detector regions: fill with neutral median sky
+                    out[comp] = med_sky
         except Exception:
             # Fallback if scipy labeling fails
             out = np.nan_to_num(out, nan=med_sky)
@@ -577,6 +592,12 @@ def diff_png(a: np.ndarray, b: np.ndarray, path: Path, scale: int, text: str):
     d = clean_b - clean_a
     lim = np.nanpercentile(np.abs(d), 99.5) or 1.0
     arr = np.nan_to_num(np.clip((d / lim + 1) / 2, 0, 1) * 255, nan=127).astype(np.uint8)
+
+    # Edge-touching missing detector regions from either epoch are rendered as neutral gray (127)
+    edge_mask = get_edge_nan_mask(a) | get_edge_nan_mask(b)
+    if np.any(edge_mask):
+        arr[edge_mask] = 127
+
     to_png(arr, path, scale, text)
 
 
@@ -949,6 +970,7 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
         "fov_arcmin": args.size, "pixel_scale_arcsec": PIXEL_SCALE_ARCSEC,
         "shape": list(shape), "bands": args.bands, "detector_ranges_um": DETECTORS,
         "inverted": bool(use_invert),
+        "glare_suppressed": bool(is_epsindib),
         "epochs": epochs_meta, "outputs": outputs, "spectrum": "spectrum.csv",
         "lightcurve": "lightcurve.csv",
         "lightcurve_png": "lightcurve.png",

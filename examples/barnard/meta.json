@@ -351,5 +351,6 @@
       "wcs_x": 14.97,
       "wcs_y": 14.63
     }
-  }
+  },
+  "glare_suppressed": false
 }
