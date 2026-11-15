@@ -75,6 +75,7 @@ viewer/
     ├── chartScale.ts         axis ranges and ticks for the chart
     ├── spectrumStats.ts      averages per detector, noise check
     ├── fits.ts               small FITS reader (pixel values under the cursor)
+    ├── flags.ts              SPHEREx flag bits → names, unreliable or not, tooltip text
     └── stage.ts              backend stage name → user text
 ```
 
@@ -116,6 +117,74 @@ The spectrum keeps the old chart on screen until the new CSV has loaded, so the 
 ### Loading
 `describeStage` maps `queued`, `downloading`, `processing` to text and strips the `preview_` prefix. The bar shows a count only while `done < total`. When the backend sits at `processing 36/36` for minutes, the bar is indeterminate instead of stuck at full.
 
+## Flags (contamination and quality)
+
+SPHEREx marks every pixel of every image with bit flags: saturated, hit by a cosmic ray, dead, afterglow, and so on. The challenge asks for "metadata, like contamination flags", so the viewer shows them in two places:
+
+- **Under the cursor:** `Flags: OVERFLOW, SOURCE`. Unreliable flags are amber and listed first; every name has a plain-language tooltip. `Flags: none` means the pixel is clean.
+- **Under the date:** `· 2.5 % flagged`, the share of unreliable pixels in that image.
+
+### What the flags mean
+
+The names and bits come from the FLAGS header of a real SPHEREx DR1 image (`MSKNnnnn` = name of plane nnnn, `MSKDnnnn` = description). "Unreliable" is the list science counts in `flagged_frac` (`BAD_FLAGS`).
+
+| Bit | Name | Meaning | Unreliable |
+|---|---|---|---|
+| 0 | TRANSIENT | Cosmic-ray hit or other short event during the exposure | yes |
+| 1 | OVERFLOW | Saturated: the source was too bright (the cause of the "donuts") | yes |
+| 2 | SUR_ERROR | Error in onboard processing | yes |
+| 6 | NONFUNC | Permanently unusable pixel | yes |
+| 7 | DICHROIC | Low efficiency due to the dichroic beam splitter | yes |
+| 9 | MISSING_DATA | Onboard data lost | yes |
+| 10 | HOT | Hot pixel | yes |
+| 11 | COLD | Anomalously low signal | yes |
+| 12 | FULLSAMPLE | Full sample history is available | no, information |
+| 14 | PHANMISS | Phantom correction was not applied | no |
+| 15 | NONLINEAR | Nonlinearity correction cannot be applied reliably | yes |
+| 17 | PERSIST | Afterglow from a bright source in an earlier exposure | yes |
+| 19 | OUTLIER | Flagged as an outlier | yes |
+| 20 | CROSSTALK | Echo of a bright source elsewhere on the detector | no, warning |
+| 21 | SOURCE | A known source is at this pixel | no, information |
+| 22 | GHOST | Reflection of a bright source in this exposure | no, warning |
+| 23 | GHOST_FPA | Reflection of a bright source on another detector | no, warning |
+| 24 | GHOST_EXT | Reflection of a bright source outside the field of view | no, warning |
+| 25 | STREAK | Affected by a streak | no, warning |
+| 26 | BLOOM | Charge spilled over from a saturated pixel | yes |
+| 27 | SNOWBALL | Part of a large cosmic-ray "snowball" event | yes |
+| 28 | HALO | Part of a glow around a bright transient | no, warning |
+
+SOURCE alone covers almost every pixel in dense fields (99 % of one full Milky Way image), so it must never count as a problem.
+
+### How it is implemented
+
+**Science (`science/fetch_spherex.py`)**
+1. `FLAG_BITS` is the DR1 table above (name → bit). `BAD_FLAGS` lists the unreliable names, and `bad_mask(bits)` turns them into a bitmask. `BAD_PIXEL_MASK = bad_mask(FLAG_BITS)`.
+2. `read_flag_bits(header)` reads the `MSKNnnnn` keys of each image's FLAGS header, so a later data release with a different layout still decodes correctly. With no keys it returns `FLAG_BITS`.
+3. `parse_cutout_hdul` stores `c.flag_bits` and `c.bad_mask` on each `Cutout`, and computes `flagged_frac` with the image's own mask. `--mask-flags` uses the same mask.
+4. `build_pixel_cube` writes an 8th layer, `FLAGS` (int32), into `pixels/<band>/epochN.fits`. It takes the flags of the **representative image** (the same one used for wavelength and detector pixel) at the **nearest pixel**, because bits cannot be interpolated. The plane names go into the layer header as `MSKNnnnn`. The layer is only written when the image could be mapped onto the 31×31 grid.
+5. `meta.json` gets `flag_bits` (name → bit, from the first image) and `flag_bad` (`BAD_FLAGS`).
+
+**Viewer**
+1. `types.ts`: `Meta.flag_bits`, `Meta.flag_bad`, and `flagged_frac` in `epochs[].detectors`.
+2. `hooks/usePixelValues.ts` reads the `FLAGS` layer like the other layers. `FLAGS` is in `ALWAYS_KEEP`: a layer that is the same everywhere is normally treated as filler and hidden, but "no flags anywhere" is real data.
+3. `lib/flags.ts`: `decodeFlags(value, bits, bad)` turns the integer into names, unreliable first. It falls back to the DR1 table (`DR1_FLAG_BITS`, `DR1_BAD_FLAGS`) when `meta.json` has no `flag_bits`. `FLAG_TEXT` holds the tooltip texts.
+4. `components/CursorInfo.tsx` shows the names as `<abbr>` with the tooltip; `.viewer__flag.is-bad` makes unreliable ones amber.
+5. `lib/frames.ts` `flaggedFraction(epoch, band)` gives the share for one band, or the average over the detectors for ALL. `components/EpochInfo.tsx` shows it **only when `meta.flag_bits` exists**: results made before this change counted every set bit, including SOURCE, and showed 20–100 %.
+
+### Bugs this fixed in science
+- The old bad-pixel mask had three wrong bits: "OUTLIER" at 20 (really CROSSTALK), "BLOOM" at 27 (really SNOWBALL), and an extra bit 28 (HALO).
+- Old results counted every set bit (`flags != 0`), so `flagged_frac` was 0.2–1.0. On a real DR1 cutout the old way gives 27.1 % and the new way 2.5 %.
+
+### Checked
+- Science tests, including the new `test_read_flag_bits` and the FLAGS checks in `test_multi_layer_pixel_cube`. On Windows, `test_gaia_timeout_and_skip_flag` (timing) and the temp-folder cleanup of `test_multi_layer_pixel_cube` (file lock) fail the same way with the code from before this change; the pixel-cube assertions pass with `fits.conf.use_memmap = False`.
+- End to end with real data: one DR1 image read from S3 with `backend/fetch.py` → `parse_cutout_hdul` → `build_pixel_cube` → read back with the viewer's `readFits` and `decodeFlags`. In that 31×31 patch, 649 pixels had no flags, about 290 only informational ones, and about 20 unreliable ones.
+
+### Limits
+- Flags come from one representative image per epoch and band, not from every image in the stack.
+- ALL has no pixel cube, so no flags under the cursor; its "% flagged" is the average of the detectors.
+- The precomputed `examples/` were rebuilt without the original images, so they have no flags. New searches have them.
+- CONTRACT.md does not list `flag_bits`, `flag_bad` or the `FLAGS` layer yet.
+
 ## Testing
 
 No test runner is set up. What has been checked:
@@ -138,11 +207,6 @@ Integration (app side):
 - Target name and credit appear in both the app and the viewer.
 
 Not built: light curve (`lightcurve.csv`), free difference or sum of any two epochs (needs computing from the FITS stacks), zoom.
-
-### Flags
-- Science writes a `FLAGS` layer (int32) into `pixels/<band>/epochN.fits`, and `flag_bits` (name → bit) plus `flag_bad` (names counted as unreliable) into `meta.json`. Bits are read from each SPHEREx image's FLAGS header (`MSKNnnnn` keys); `lib/flags.ts` holds the DR1 table as a fallback.
-- The cursor info shows the flag names on the pixel; unreliable ones are amber, and each name has a plain-language tooltip.
-- "x % flagged" under the date comes from `epochs[].detectors[band].flagged_frac` (ALL averages the detectors). It is only shown when `meta.flag_bits` exists, because older results counted every flag (SOURCE alone covers almost every pixel in dense fields).
 
 ## AI usage
 Parts of this code were written with the help of an AI assistant (Claude).
