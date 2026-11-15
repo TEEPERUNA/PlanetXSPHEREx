@@ -10,71 +10,78 @@ AI-assisted: written with Claude (Anthropic).
 | API | https://planetx-api-38053485414.us-east4.run.app |
 | Docs (try every endpoint) | https://planetx-api-38053485414.us-east4.run.app/docs |
 | Platform | Google Cloud Run, service `planetx-api`, region `us-east4` |
-| Settings | Instance-based billing, min 1 / max 1 instance, 1 CPU, 2 GiB, second-generation runtime |
-| Cache | Cloud Storage bucket `planetx-cache-erik` mounted at `/data` |
-| Deploys | Automatic from `main` (Cloud Build trigger, root `Dockerfile`) |
+| Settings | Instance-based billing, **min 1 / max 1** instance, 1 CPU, 2 GiB, second-generation runtime |
+| Cache | Cloud Storage bucket `planetx-cache-erik` mounted at `/data` (volume `cache`) |
+| Deploys | Automatic from `main` (Cloud Build trigger, root `Dockerfile`), 5–10 min |
 | Data | SPHEREx DR1/QR3 via IRSA SIA + AWS S3 `s3://nasa-irsa-spherex` (public, no credentials) |
 
-Keep max instances at **1**: job state lives in memory.
+Keep max instances at **1**: job state lives in memory, and more instances also start cold (20–30 s).
+Every merge to `main` redeploys – avoid many merges right before or during judging.
 
 ## For the frontend
 
-1. `GET /api/sky?ra=..&dec=..&fov=..` (or `?target=barnard`).
-2. If `status` is `done`: use `meta` and `base_url` right away.
-3. Otherwise poll `GET /api/status/<job>` every ~2 s. Show `preview` as soon as it is not `null`, and show `done / total` and `stage` as progress.
-4. Image URL = `API + base_url + path from meta.json`. `base_url` is relative and can start with `/api/files/` **or** `/api/examples/`, so never hard-code it.
-5. On HTTP 400/404/500 the body is `{"detail": "..."}`; show it to the user. 500 responses include CORS headers, so the browser shows the real message.
-6. Set `VITE_API_BASE_URL=https://planetx-api-38053485414.us-east4.run.app` (in `frontend/.env` locally, UTF-8, and in Vercel's Environment Variables). Without it the frontend falls back to `localhost:8000`.
+1. `GET /api/sky?target=<key>&fov=..` for challenge targets (keep using `target` when the user changes the FOV), or `?ra=..&dec=..&fov=..`.
+2. If `status` is `done`: show `meta` right away.
+3. Otherwise poll `GET /api/status/<job>` every ~2 s. Show `preview` as soon as it is not `null`; show `done / total` and `stage` as progress. Retry a failed poll; on 502/503/504 say "server busy, retrying".
+4. Image URL = `API + base_url + path from meta.json`. `base_url` can start with `/api/files/` **or** `/api/examples/` – never hard-code it.
+5. If `fallback` is `true`, show a banner with `note` (e.g. live data unavailable, showing the precomputed 3′ view). `precomputed: true` means a bundled challenge-target result.
+6. Errors: `status: "error"` has a user-friendly `error`; HTTP 400/404/500 have `{"detail": "..."}`. Show them with a "Try again" button.
+7. `VITE_API_BASE_URL` defaults to the Cloud Run URL; set it to `http://localhost:8000` only to test a local backend.
 
 ## Run locally
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate                 # Mac/Linux: source .venv/bin/activate
-pip install -r backend/requirements.txt
+pip install -r backend/requirements.txt -c backend/constraints.txt
 uvicorn backend.main:app --reload --port 8000
 ```
 Open http://localhost:8000/docs. Results go to `output/` (gitignored).
-Useful while developing: `WARMUP=0` (skip fetching the 5 targets on start), `FETCH_MODE=irsa` (test the fallback).
+Useful: `WARMUP=0` (don't compute targets on start), `FETCH_MODE=irsa` (test the fallback route).
 
-## Deploy
+## Deploy and settings
 
-Merge to `main` → Cloud Build builds the `Dockerfile` → new Cloud Run revision (5–10 min).
-Check: Cloud Run → `planetx-api` → Revisions (green tick, 100 % traffic) → `/api/health`.
+- Merge to `main` → new revision. Check Cloud Run → `planetx-api` → Revision History: newest revision green with 100 % traffic. A failed build keeps the previous revision running.
+- Change settings (CPU, memory, env vars, volumes, scaling) in the service's tabs, then press **Redeploy** (top right).
+- Volume check: Containers tab → volume `cache` = bucket `planetx-cache-erik`, mount path `/data`; the compute service account needs `roles/storage.objectUser` on the bucket.
 
-Change settings without code (CPU, memory, env vars): Cloud Run → `planetx-api` → **Edit & deploy new revision**.
+## Updating data and processing
+
+- **Emil changes the processing:** he reruns `rebuild_examples` and merges code + `examples/` together → after the deploy the targets use the new images. Cached free-coordinate results made with older code are rebuilt automatically in the background on their next request.
+- **New SPHEREx observations:** found automatically (daily background check), no action needed.
+- **New data release (e.g. DR2):** set `SPHEREX_COLLECTIONS=spherex_dr2,spherex_dr1,spherex_qr3` in the Cloud Run variables and redeploy.
+- **Clear the cache:** delete the `output/` folder in the bucket; everything is recomputed on request (the 5 targets keep working from `examples/`).
+- **Upgrade libraries:** change `constraints.txt` deliberately, build and test locally, then merge.
 
 ## Test checklist
 
 | Test | Expected |
 |---|---|
 | `/api/health` | `{"ok": true}` |
-| `/api/targets` | 5 targets, `cached: true` after warm-up |
-| `/api/sky?target=barnard` | `done` instantly; `diff_ALL.png` shows the star moving north |
-| `/api/sky?ra=83.82&dec=-5.39` | `queued` → `preview` → `done` |
-| `/api/sky?ra=abc&dec=1` | 400 |
-| `/api/sky?ra=10&dec=20&fov=50` | 400 |
-| `/api/sky?target=nope` | 404 |
+| `/api/targets` | 5 targets, all `cached: true`, Barnard `dec` ≈ 4.7707 (today's position) |
+| `/api/sky?target=barnard` | `done` instantly, `precomputed: true`; `diff_ALL.png` shows the star moving north |
+| `/api/sky?ra=269.452083&dec=4.693364` | matched to `barnard` (note), star centred |
+| `/api/sky?ra=83.82&dec=-5.39` | `queued` → `preview` → `done` (needs IRSA) |
+| `/api/sky?ra=abc&dec=1` / `fov=50` / `target=nope` | 400 / 400 / 404 |
+| `/api/status/ra1.2.3_dec+1_fov3` | 404 |
 
 ## Logs and debugging
 
-Cloud Run → `planetx-api` → **Observability → Logs**. Useful filters:
-- `TIMING` – per run: `search | download | processing | total` seconds
-- `S3:` – how many cutouts came from S3 and how long it took
-- `falling back` – S3 failed, IRSA cutout service was used
+Cloud Run → `planetx-api` → Observability → Logs. Useful filters:
+- `TIMING` – `search | download | processing | total` seconds per run
+- `S3:` – cutouts from S3 and time · `falling back` – IRSA cutout route used
+- `IRSA SIA failed` – IRSA retries · `Refresh check` / `Rebuilding` – background freshness work
 - `Traceback` – errors
 
-Measured on Cloud Run (S3 route): challenge targets 11–24 s total (download 7–16 s, processing 1–7 s).
+**`DALServiceError: 502 Server Error: Proxy Error … irsa.ipac.caltech.edu`** = NASA's IRSA is down/overloaded, not our bug. Cached results and the 5 targets keep working; new positions return "The SPHEREx data archive (NASA/IPAC IRSA) did not respond".
 
 ## Known issues
 
-- **Free coordinates are slow in processing (~100 s)** because the science module queries the ESA Gaia archive live (`validate_gaia`). Asked Emil for a timeout and a `skip_gaia` flag; once it exists, the quick preview should skip Gaia (one line in `Pipeline.__call__`).
-- **SIMBAD is sometimes down** → long warnings in the logs; the science module falls back to built-in coordinates, results are fine.
-- `RuntimeWarning: All-NaN slice` in logs is harmless (empty edges of a cutout).
-- Results in `examples/` have no `cache.json`, so the first request triggers a background refresh into the cache. This is expected.
+- Free coordinates: processing ~100 s because the science module queries the ESA Gaia archive live; waiting for Emil's timeout / `skip_gaia` flag.
+- SIMBAD is sometimes down → long warnings in logs; built-in coordinates are used, results are fine.
+- `RuntimeWarning: All-NaN slice` is harmless (empty cutout edges).
 
 ## Costs and shutdown
 
-- Runs on the Google Cloud free trial credit (~257 €); one always-on instance is roughly 50–60 €/month.
-- Budget alert is set to 5 € of real (non-credit) cost.
-- **After judging:** Cloud Run → `planetx-api` → Delete (or set minimum instances to 0), and delete the bucket if no longer needed.
+- Runs on the Google Cloud free trial credit (~257 €); one always-on instance ≈ 50–60 €/month. Budget alert: 5 € of real cost.
+- **After judging:** Cloud Run → `planetx-api` → Delete (or minimum instances 0); delete the bucket if no longer needed.

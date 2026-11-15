@@ -1,58 +1,60 @@
 # Backend Plan – Erik
 
 Owner: Erik · Folder: `backend/` · Branch: `backend`
-API contract: [`../CONTRACT.md`](../CONTRACT.md)
+Live API: https://planetx-api-38053485414.us-east4.run.app (docs: `/docs`)
+See also: [`STRUCTURE.md`](STRUCTURE.md) · [`HANDOFF.md`](HANDOFF.md) · [`../CONTRACT.md`](../CONTRACT.md)
 
 ## Done ✅
 
-- **Project setup**: repo structure (`backend/`, `science/`, `frontend/`, `examples/`), `README.md`, `CONTRACT.md`, `.gitignore`, `Dockerfile`, `.dockerignore`
-- **Example data**: Barnard's Star precomputed in `examples/barnard/` for frontend development (real SPHEREx QR3 data, 5 epochs Aug 2025 – Aug 2026; difference image shows the star's known northward proper motion)
-- **FastAPI backend** (`backend/main.py`)
-  - `GET /api/targets`: the 5 challenge targets
-  - `GET /api/sky?target=` or `?ra=&dec=&fov=`: returns cached result instantly or starts a background job
-  - `GET /api/status/{job}`: job progress (`done` / `total` / `stage`)
-  - `GET /api/files/...` and `GET /api/examples/...`: static outputs (PNG frames, GIFs, diff images, spectrum CSV)
-  - Disk cache keyed by target / `ra_dec_fov`: repeated requests are instant
-  - Warm-up: fetches the 5 challenge targets on startup
-  - Quick preview: fast 1-image-per-epoch run first, exposed as `preview` in `/api/status`, then the full run
-  - Fixed: results from `examples/` are served from the correct URL (`base_url`)
-- **Docker**: image builds and runs locally; warm-up fetches all targets
+### Core API
+- FastAPI backend (`main.py`): `/api/targets`, `/api/sky`, `/api/status/{job}`, `/api/files/...`, `/api/examples/...`, `/api/health`
+- Background jobs with progress (`stage`, `done`, `total`) and a **quick preview** (1 image per epoch+detector) before the full result
+- Open CORS, so any website can use the API; coordinates and FOV work from the URL
 
-- **Deployed to Google Cloud Run** ✅ https://planetx-api-38053485414.us-east4.run.app
-  - Region `us-east4` (close to the SPHEREx S3 bucket in `us-east-1`), instance-based billing, 1 instance, 2 GiB
-  - Cache in Cloud Storage bucket `planetx-cache-erik` mounted at `/data`
-  - Continuous deploy: every merge to `main` redeploys automatically
-  - Budget alert set (5 €); runs on the free trial credit
-- **S3 speed test** (`backend/s3_test.py`): S3 data is identical to IRSA (same VERSION, identical pixels);
-  48 images in 16 s with 0 errors vs. IRSA cutouts 54 images in 90–136 s with 30–60 % HTTP 503 errors
-- **Fast S3 downloads** (`backend/fetch.py`)
-  - IRSA SIA search → list of images + S3 paths (newest release first: DR1, then QR3)
-  - Partial reads from `s3://nasa-irsa-spherex` (256 kB blocks, 32 parallel), only the needed pixels
-  - Builds IRSA-style cutouts with corrected WCS → Emil's `parse_cutout_hdul()` → `run(..., cutouts=...)`
-  - Preview and full run share downloads (nothing is fetched twice)
-  - Automatic fallback to the IRSA cutout service if S3 fails (`FETCH_MODE=irsa` forces it)
-- **Cache refresh for new SPHEREx data**
-  - Each result stores a data fingerprint (release + number of images + newest date) in `cache.json`
-  - Cached results are returned instantly; if older than `CACHE_TTL_HOURS` (default 24 h) the backend
-    checks IRSA in the background and rebuilds only if new data exists
-  - `/api/sky` responses include `"refreshing": true/false`
+### Data access
+- **Fast S3 downloads** (`fetch.py`): IRSA SIA search → partial reads from the official SPHEREx copy on AWS S3 (`s3://nasa-irsa-spherex`), only the needed pixels, 32 in parallel, WCS shifted to the cutout
+- Verified with `s3_test.py`: S3 data is identical to IRSA's (same VERSION, identical pixels); 48 images in 16 s with 0 errors vs. IRSA cutouts 54 images in 90–136 s with 30–60 % HTTP 503 errors
+- Uses the newest release first (DR1, then QR3)
+- **Retries**: IRSA SIA query retried 4× (2, 4, 8 s); automatic fallback to the IRSA cutout service if S3 fails
+- Downloads shared between preview and full run (nothing fetched twice)
+- Measured on Cloud Run: challenge targets 11–24 s total (download 7–16 s, processing 1–7 s); `TIMING` lines in the logs
 
-## Next 📋
+### Reliability
+- **Challenge targets bundled in the Docker image** (`examples/`, built by Emil's `rebuild_examples`): the 5 targets always open instantly, even when IRSA is down or after a restart
+- **Fallbacks**: target coordinates (J2000 or today's position, any FOV) are searched as the target, so the moving star stays centred; if live data fails for a target, the precomputed 3′ result is returned with `fallback: true` and a `note`
+- **Persistent cache**: Cloud Storage bucket `planetx-cache-erik` mounted at `/data` (fixed 15.11: the mount was missing, so the cache was lost on every deploy)
+- **Jobs survive restarts**: `/api/status/<job>` rebuilds the job from its id if the server restarted
+- **No double work**: a result being rebuilt in the background is not started a second time; half-written `meta.json` is retried
+- **Clear errors**: user-friendly messages in `error` (no coverage / IRSA not responding / out of memory), technical details in `error_detail` and the logs; HTTP 500 responses include CORS headers and a generic message
+- NaN/Infinity in results are converted to `null` (valid JSON)
+- **Pinned dependency versions** (`constraints.txt`) so a new upstream release cannot break a deploy during judging
 
-1. Merge to `main` → Cloud Run redeploys → measure S3 speed from `us-east4`
-2. Measure where time goes (SIA query vs. downloads vs. processing)
-3. Progressive results: return each epoch's frames as soon as they are ready
-4. Free-coordinate checks: clearer errors, FOV limits
-5. After judging: delete the Cloud Run service or set min instances to 0 (credit is limited)
+### Keeping data fresh
+- Cached results are returned instantly; a light background check runs at most once a day (`CACHE_TTL_HOURS`)
+- Free coordinates: rebuilt when IRSA has new images (fingerprint = release + number of images + newest date)
+- Challenge targets: rebuilt into the cache only when IRSA has images > 30 days newer than the example's last epoch (a new survey pass)
+- Results made with older science code are rebuilt automatically when Emil's code changes (`science_version` hash)
+- New releases (e.g. DR2): add to `SPHEREX_COLLECTIONS`, no code change
 
-## Notes for the team
+### Deployment
+- Google Cloud Run, `us-east4` (next to the S3 bucket in `us-east-1`), instance-based billing, min 1 / max 1 instance, 1 CPU, 2 GiB, second-generation runtime
+- Continuous deploy from `main`; budget alert set; running on the free trial credit
 
-- Always use the `base_url` returned by the API; files can come from `/api/files/` or `/api/examples/`
-- Show `preview` from `/api/status` immediately, then swap to the full result when `status` is `done`
-- API URL: https://planetx-api-38053485414.us-east4.run.app (docs at `/docs`)
-- `/api/sky` may return `"refreshing": true` → a newer result may appear later; frontend can ignore it
-- Suggestion for Emil (his decision): FLAGS masking is off by default, consider which flag bits to mask
+### Docs and submission
+- `STRUCTURE.md`, `HANDOFF.md`, `SUBMISSION_backend.md` (texts for the Space Apps project page)
+
+## Next / if time allows 📋
+
+1. Free coordinates: processing takes ~100 s because of the live Gaia query in the science module → waiting for Emil's timeout / `skip_gaia` flag, then skip Gaia in the quick preview (one line in `Pipeline.__call__`)
+2. Progressive results: show each epoch as soon as it is ready
+3. Backend tests (`job_from_slug`, `clean_json`, `friendly_error`, `/api/sky` routing) and a GitHub Actions check
+4. Limit the in-memory job list (TTL) and add a simple rate limit
+5. Replace `@app.on_event("startup")` with a lifespan handler
+
+## After judging ⚠️
+
+Delete the Cloud Run service `planetx-api` (or set minimum instances to 0) and the bucket if no longer needed – the credit is limited.
 
 ## AI use
 
-Backend code written with the help of Claude (Anthropic); noted in file headers.
+Backend code and docs written with the help of Claude (Anthropic); noted in file headers.
