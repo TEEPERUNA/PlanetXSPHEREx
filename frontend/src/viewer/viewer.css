@@ -193,6 +193,38 @@
   width: 100%;
 }
 
+/* Compare two dates: label + date picker, same look as the sliders' labels */
+.controls__select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted, inherit);
+  font-family: var(--mono, inherit);
+  font-size: 0.75rem;
+}
+
+.controls__select select {
+  min-width: 0;
+  font-size: 0.8rem;
+}
+
+/* "Comparing A … ↔ B …" under the epoch info; the date on screen is bold */
+.viewer__compare {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted, inherit);
+  font-variant-numeric: tabular-nums;
+}
+
+.viewer__compare strong {
+  font-weight: 400;
+}
+
+.viewer__compare strong.is-current {
+  font-weight: 700;
+  color: var(--accent, currentColor);
+}
+
 /* Status */
 /* Empty, loading, error: a dark frame with a faint star field. */
 .status {
