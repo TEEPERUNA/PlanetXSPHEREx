@@ -8,6 +8,7 @@ import { PlaybackControls } from "./components/PlaybackControls";
 import { SpectrumChart } from "./components/SpectrumChart";
 import { LoadingProgress, StatusView } from "./components/StatusView";
 import { useBlink } from "./hooks/useBlink";
+import { usePixelValues } from "./hooks/usePixelValues";
 import { availableBands, framesFor, joinUrl } from "./lib/frames";
 import { gaiaPixelAt, mjdToYear, onImage } from "./lib/gaia";
 import type { Band, Meta, Pixel, ViewerStatus } from "./types";
@@ -92,6 +93,9 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   });
   const currentEpoch = diffOn ? null : (frames[idx]?.epoch ?? null);
 
+  // Values of the pixel under the cursor, for the epoch on screen.
+  const pixelInfo = usePixelValues(meta, baseUrl, activeBand, currentEpoch?.index ?? null, hoverPx);
+
   // Move forward or back, wrapping around.
   function step(delta: number) {
     setFrameIdx((i) => (frames.length ? (i + delta + frames.length) % frames.length : 0));
@@ -133,7 +137,13 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
 
       <div className="viewer__side">
         <EpochInfo frames={frames} frameIdx={idx} band={activeBand} showDiff={diffOn} />
-        <CursorInfo pixel={hoverPx} meta={meta} />
+        <CursorInfo
+          pixel={hoverPx}
+          meta={meta}
+          band={activeBand}
+          values={pixelInfo.values}
+          loading={pixelInfo.loading}
+        />
         {(showGaia || !hasGaia) && (
           <GaiaInfo meta={meta} epoch={diffOn ? (frames[frames.length - 1]?.epoch ?? null) : currentEpoch} showDiff={diffOn} />
         )}
