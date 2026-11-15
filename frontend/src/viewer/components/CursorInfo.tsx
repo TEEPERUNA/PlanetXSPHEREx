@@ -1,4 +1,5 @@
 import type { PixelValues } from "../hooks/usePixelValues";
+import { decodeFlags } from "../lib/flags";
 import { pixelToSky } from "../lib/skyCoords";
 import type { Band, Meta, Pixel } from "../types";
 
@@ -42,6 +43,10 @@ export function CursorInfo({ pixel, meta, band, values, loading }: Props) {
     hasDet && `detector (${Math.round(values!.detX!)}, ${Math.round(values!.detY!)})`,
   ].filter(Boolean);
 
+  // Fourth line: SPHEREx flags on this pixel (from the representative image), bad ones first.
+  const hasFlags = values?.flags !== undefined && Number.isFinite(values.flags);
+  const flags = hasFlags ? decodeFlags(values!.flags!, meta.flag_bits, meta.flag_bad) : [];
+
   let note: string | null = null;
   if (loading) note = "Loading pixel values…";
   else if (band === "ALL" && light.length === 0) note = "Pick D1–D6 to see pixel values";
@@ -53,6 +58,21 @@ export function CursorInfo({ pixel, meta, band, values, loading }: Props) {
       </p>
       {light.length > 0 && <p>{light.join(" · ")}</p>}
       {instrument.length > 0 && <p>{instrument.join(" · ")}</p>}
+      {hasFlags && (
+        <p className="viewer__flags">
+          Flags:{" "}
+          {flags.length === 0
+            ? "none"
+            : flags.map((f, i) => (
+                <span key={f.name}>
+                  {i > 0 && ", "}
+                  <abbr title={f.text} className={f.bad ? "viewer__flag is-bad" : "viewer__flag"}>
+                    {f.name}
+                  </abbr>
+                </span>
+              ))}
+        </p>
+      )}
       {note && <p className="viewer__cursor-note">{note}</p>}
     </div>
   );
