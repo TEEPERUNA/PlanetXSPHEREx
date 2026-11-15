@@ -23,6 +23,7 @@ from types import SimpleNamespace
 from typing import Optional
 
 import math
+import re
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -105,6 +106,39 @@ def done_response(slug: str) -> dict:
             "data_release": info.get("collection"), "timing": info.get("timing")}
 
 
+def friendly_error(e: Exception) -> str:
+    """Turn internal exceptions into short messages a user understands."""
+    name, text = type(e).__name__, str(e).lower()
+    if isinstance(e, LookupError):
+        return "No SPHEREx images cover this position yet. Try another position or a target."
+    if isinstance(e, MemoryError):
+        return "The server ran out of memory for this request. Try a smaller field of view."
+    if (isinstance(e, (TimeoutError, ConnectionError, OSError)) or "timeout" in text
+            or "timed out" in text or "503" in text or "502" in text
+            or name in ("DALServiceError", "DALQueryError", "ReadTimeout", "ConnectTimeout",
+                        "HTTPError", "URLError", "ClientError")):
+        return ("The SPHEREx data archive (NASA/IPAC IRSA) did not respond. "
+                "Please try again in a minute.")
+    return "Processing failed for this position. Please try again or choose another position."
+
+
+def job_from_slug(job: str):
+    """Rebuild a job from its id, e.g. after a server restart lost the in-memory job list.
+    'barnard', 'barnard_fov4', 'ra133.7950_dec-7.2450_fov3' (and '__preview' suffix)."""
+    base = job.removesuffix("__preview")
+    m = re.fullmatch(r"ra([0-9.]+)_dec([+-][0-9.]+)_fov([0-9.]+)", base)
+    if m:
+        ra, dec, fov = float(m[1]), float(m[2]), float(m[3])
+        if fov > MAX_FOV_ARCMIN:
+            return None
+        c = fs.parse_coord(str(ra), str(dec))
+        return coord_job(c, fov)
+    m = re.fullmatch(r"([a-z0-9]+?)(?:_fov([0-9.]+))?", base)
+    if m and m[1] in fs.TARGETS:
+        return target_job(m[1], float(m[2]) if m[2] else 3.0)
+    return None
+
+
 def start_job(slug: str, work, preview: bool = True) -> dict:
     """work(progress, out_slug, per_group) does one pipeline run.
     With preview: a quick 1-image-per-group run first (slug__preview), then the full run."""
@@ -137,11 +171,11 @@ def start_job(slug: str, work, preview: bool = True) -> dict:
                     traceback.print_exc()
             work(progress_for(""), slug, PER_GROUP)
             jobs[slug].update(status="done", stage="done")
-        except LookupError as e:
-            jobs[slug].update(status="error", error=str(e))
         except Exception as e:  # noqa: BLE001
-            traceback.print_exc()
-            jobs[slug].update(status="error", error=f"{type(e).__name__}: {e}")
+            if not isinstance(e, LookupError):
+                traceback.print_exc()
+            jobs[slug].update(status="error", error=friendly_error(e),
+                              error_detail=f"{type(e).__name__}: {e}")
 
     executor.submit(runner)
     return {"status": "queued", "job": slug}
@@ -331,7 +365,17 @@ def status(job: str):
         return done_response(job)
     j = jobs.get(job)
     if not j:
-        raise HTTPException(404, "unknown job")
+        # The server may have restarted (deploy, crash) and lost its in-memory job list.
+        # Job ids encode the request, so start it again instead of failing.
+        rebuilt = job_from_slug(job)
+        if rebuilt is None:
+            raise HTTPException(404, "Unknown job id. Start a new search with /api/sky.")
+        slug, make_pipeline = rebuilt
+        if find_cached(slug):
+            return done_response(slug)
+        resp = start_job(slug, make_pipeline())
+        resp["note"] = "The server restarted, so this search was started again."
+        return resp
     return clean_json({"job": job, **j})
 
 
