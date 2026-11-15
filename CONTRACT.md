@@ -54,8 +54,8 @@ When it's ready, status includes a `preview` object. Show it right away, then sw
 
 ### `GET /api/gaia`
 All Gaia DR3 stars around an image, for the viewer overlay.
-Query: `ra=<deg>&dec=<deg>&radius=<arcsec>` (radius max 600). Viewer sends `meta.ra_deg`,
-`meta.dec_deg` and half the image diagonal plus a margin (3′ field ≈ 130″, 10′ ≈ 430″).
+Query: `ra=<deg>&dec=<deg>&radius=<arcsec>` (radius max 900). Viewer sends `meta.ra_deg`,
+`meta.dec_deg` and half the image diagonal plus a margin (3′ field ≈ 130″, 10′ ≈ 430″, 20′ ≈ 880″).
 ```json
 {"epoch": 2016.0, "source": "Gaia DR3 (VizieR I/355/gaiadr3)",
  "ra": 269.4461, "dec": 4.7707, "radius_arcsec": 130,
@@ -65,7 +65,7 @@ Query: `ra=<deg>&dec=<deg>&radius=<arcsec>` (radius max 600). Viewer sends `meta
 ```
 - `ra`, `dec` in degrees at epoch J2016.0 (not moved; the viewer propagates them to each epoch).
 - `pmra`, `pmdec` in mas/yr, `pmra` includes cos(dec). `null` when Gaia has no proper motion.
-- `g` = Gaia G magnitude. Brightest first, at most 500 stars; `truncated: true` if more exist.
+- `g` = Gaia G magnitude. Brightest first, at most 2000 stars; `truncated: true` if more exist.
 - Cached in memory and on disk forever (Gaia DR3 does not change). VizieR mirrors are tried in
   turn with a 10 s timeout each.
 
