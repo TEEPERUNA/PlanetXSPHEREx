@@ -18,21 +18,26 @@ export function App() {
 
   return (
     <main className="app">
-      <h1>SPHEREx Sky</h1>
+      <header className="app__header">
+        <h1>SPHEREx Sky</h1>
+        <p className="note">See how a patch of sky changes over time.</p>
+      </header>
       <SearchForm initial={initial} onSearch={setTarget} />
       {status.kind === "done" ? (
-        <>
-          {isPreview && <p className="note">Quick preview, full result is still loading…</p>}
+        <section className="result card">
+          {isPreview && <p className="banner">Quick preview, full result is still loading…</p>}
           <h2>{status.meta.target}</h2>
           <GifView key={status.baseUrl} meta={status.meta} baseUrl={status.baseUrl} />
-          <button className="toggle" onClick={() => setFrames(!frames)}>
+          <button className="toggle" aria-expanded={frames} onClick={() => setFrames(!frames)}>
             {frames ? "Hide" : "Show"} frame-by-frame
           </button>
           {frames && <Viewer status={status} />}
           <p className="note">{status.meta.credit}</p>
-        </>
+        </section>
       ) : (
-        <Viewer status={status} />
+        <section className="result card">
+          <Viewer status={status} />
+        </section>
       )}
     </main>
   );

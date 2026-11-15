@@ -13,6 +13,7 @@ export function SearchForm({ initial, onSearch }: Props) {
   const [ra, setRa] = useState(initial?.ra ?? "");
   const [dec, setDec] = useState(initial?.dec ?? "");
   const [fov, setFov] = useState(initial?.fov ?? DEFAULT_FOV);
+  const [active, setActive] = useState(initial?.target ?? null);
 
   // Presets are optional: if the backend is down the form still works.
   useEffect(() => {
@@ -21,37 +22,55 @@ export function SearchForm({ initial, onSearch }: Props) {
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    if (ra.trim() && dec.trim()) onSearch({ ra: ra.trim(), dec: dec.trim(), fov });
+    if (!ra.trim() || !dec.trim()) return;
+    setActive(null);
+    onSearch({ ra: ra.trim(), dec: dec.trim(), fov });
+  }
+
+  function pick(t: Target) {
+    setRa(String(t.ra));
+    setDec(String(t.dec));
+    setActive(t.key);
+    onSearch({ target: t.key, fov });
   }
 
   return (
-    <form className="search" onSubmit={submit}>
-      <label>
-        RA
-        <input value={ra} onChange={(e) => setRa(e.target.value)} placeholder="133.795 or 08h55m10.8s" required />
-      </label>
-      <label>
-        Dec
-        <input value={dec} onChange={(e) => setDec(e.target.value)} placeholder="-7.245 or -7d14m42s" required />
-      </label>
-      <label>
-        Field of view
-        <select value={fov} onChange={(e) => setFov(Number(e.target.value))}>
-          {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-            <option key={n} value={n}>
-              {n} arcmin
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="submit">Show</button>
+    <form className="search card" onSubmit={submit}>
+      <div className="search__coords">
+        <label>
+          Right Ascension
+          <input value={ra} onChange={(e) => setRa(e.target.value)} placeholder="133.795 or 08h55m10.8s" required />
+        </label>
+        <label>
+          Declination
+          <input value={dec} onChange={(e) => setDec(e.target.value)} placeholder="-7.245 or -7d14m42s" required />
+        </label>
+      </div>
+      <div className="search__row">
+        <label>
+          Field of view
+          <select value={fov} onChange={(e) => setFov(Number(e.target.value))}>
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+              <option key={n} value={n}>
+                {n} arcmin
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="submit" className="primary">
+          Show sky
+        </button>
+      </div>
       {targets.length > 0 && (
-        <div className="targets">
-          {targets.map((t) => (
-            <button key={t.key} type="button" onClick={() => onSearch({ target: t.key, fov })}>
-              {t.label}
-            </button>
-          ))}
+        <div className="search__targets">
+          <span className="note">Try a target</span>
+          <div className="pills">
+            {targets.map((t) => (
+              <button key={t.key} type="button" aria-pressed={t.key === active} onClick={() => pick(t)}>
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </form>
