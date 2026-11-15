@@ -72,12 +72,16 @@ Static files listed in `meta.json`, e.g. `/api/files/barnard/frames/ALL/epoch0.p
     "ALL": {
       "frames": ["frames/ALL/epoch0.png", "frames/ALL/epoch1.png"],
       "fits": ["epoch0_ALL.fits", "epoch1_ALL.fits"], // raw calibrated float32 FITS stacks
+      "combined": "combined_ALL.png",             // combined coadd across all epochs
+      "combined_fits": "combined_ALL.fits",       // raw calibrated float32 FITS coadd across all epochs
       "gif": "blink_ALL.gif",
       "diff": "diff_ALL.png"
     },
     "D1": {
       "frames": ["frames/D1/epoch0.png", "frames/D1/epoch1.png"],
       "fits": ["epoch0_D1.fits", "epoch1_D1.fits"],
+      "combined": "combined_D1.png",
+      "combined_fits": "combined_D1.fits",
       "pixels": ["pixels/D1/epoch0.fits", "pixels/D1/epoch1.fits"], // multi-layer pixel cubes
       "gif": "blink_D1.gif",
       "diff": "diff_D1.png"
@@ -155,6 +159,11 @@ Multi-Extension FITS (MEF) cubes registered onto the same 31×31 tangent-plane g
 - `BW`: Bandpass bandwidth in $\mu\text{m}$ per pixel (from spectral WCS "W").
 - `DETX`: Physical detector pixel X coordinate (0–2039) on the SPHEREx focal plane array.
 - `DETY`: Physical detector pixel Y coordinate (0–2039) on the SPHEREx focal plane array.
+
+## Combined Coadd Images (`outputs[band].combined`, `outputs[band].combined_fits`)
+Deep coadded/integrated stacks across all epochs per detector band D1–D6 and ALL:
+- `outputs[band].combined`: High-contrast display-ready PNG image coadded across all epochs for this detector band (`combined_{band}.png`, also available at `frames/{band}/combined.png`).
+- `outputs[band].combined_fits`: Calibrated float32 FITS coadd across all epochs (`combined_{band}.fits`), providing the deepest noise-suppressed reference view in that spectral band.
 
 ## Rules
 - Science (`science/`) may add new keys to `meta.json`, but must not rename or remove existing keys.
