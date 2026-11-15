@@ -17,6 +17,8 @@ import os
 import shutil
 import sys
 import threading
+import urllib.parse
+import urllib.request
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -727,6 +729,121 @@ def delete_candidate(cid: str, request: Request):
             raise HTTPException(404, "Unknown candidate id.")
         (CAND_DIR / f"{cid}.json").unlink(missing_ok=True)
     return {"deleted": cid}
+
+
+# --------------------------------------------------------------------------- Gaia field stars
+# All Gaia DR3 stars around an image, for the viewer overlay. Fetched from VizieR mirrors
+# (short timeout each), cached in memory and on disk (Gaia DR3 never changes).
+
+GAIA_MIRRORS = [m.strip() for m in os.environ.get(
+    "GAIA_MIRRORS",
+    "https://vizier.cfa.harvard.edu,https://vizier.cds.unistra.fr,https://vizier.iucaa.in,"
+    "https://vizier.nao.ac.jp").split(",") if m.strip()]
+GAIA_TIMEOUT_S = float(os.environ.get("GAIA_TIMEOUT_S", "10"))
+GAIA_MAX_STARS = 500
+GAIA_MAX_RADIUS_ARCSEC = 600.0
+GAIA_DIR = OUTPUT_DIR / "_gaia"
+_gaia_mem: dict[str, dict] = {}
+_gaia_locks: dict[str, threading.Lock] = {}
+
+
+def _num(v: str):
+    """TSV cell -> float, or None for blank/NaN (JSON has no NaN)."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
+def parse_vizier_tsv(text: str) -> list[dict]:
+    """Rows of a VizieR asu-tsv answer with -out=Source,RA_ICRS,DE_ICRS,pmRA,pmDE,Gmag.
+    Skips #comments, blank lines, the column-name, unit and dash lines."""
+    stars, cols = [], None
+    for line in text.splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        cells = [c.strip() for c in line.split("\t")]
+        if cols is None:
+            if "Source" in cells and "RA_ICRS" in cells:
+                cols = {name: i for i, name in enumerate(cells)}
+            continue
+        row = dict(zip(cols, (cells + [""] * len(cols))[:len(cols)]))
+        if not row.get("Source", "").isdigit():
+            continue                      # unit line, dash line or junk
+        ra, dec = _num(row.get("RA_ICRS")), _num(row.get("DE_ICRS"))
+        if ra is None or dec is None:
+            continue
+        stars.append({"id": row["Source"], "ra": ra, "dec": dec,
+                      "pmra": _num(row.get("pmRA")), "pmdec": _num(row.get("pmDE")),
+                      "g": _num(row.get("Gmag"))})
+    return stars
+
+
+def fetch_gaia(ra: float, dec: float, radius_arcsec: float) -> list[dict]:
+    """Ask each VizieR mirror in turn. Raises ConnectionError if none answers properly."""
+    q = urllib.parse.urlencode({
+        "-source": "I/355/gaiadr3", "-c": f"{ra:.6f} {dec:+.6f}", "-c.rs": f"{radius_arcsec:g}",
+        "-out": "Source,RA_ICRS,DE_ICRS,pmRA,pmDE,Gmag", "-out.max": str(GAIA_MAX_STARS + 1),
+        "-sort": "Gmag"})
+    errors = []
+    for mirror in GAIA_MIRRORS:
+        url = f"{mirror}/viz-bin/asu-tsv?{q}"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "StarXViewer/1.0"})
+            with urllib.request.urlopen(req, timeout=GAIA_TIMEOUT_S) as r:
+                text = r.read().decode("utf-8", "replace")
+            if "RA_ICRS" not in text:      # error page, not a catalogue answer
+                raise ValueError("no catalogue table in answer")
+            return parse_vizier_tsv(text)
+        except Exception as e:  # noqa: BLE001  try the next mirror
+            errors.append(f"{mirror}: {type(e).__name__}: {str(e)[:80]}")
+    print("  Gaia: all VizieR mirrors failed -> " + " | ".join(errors))
+    raise ConnectionError("no VizieR mirror answered")
+
+
+@app.get("/api/gaia")
+def gaia(ra: str | None = None, dec: str | None = None, radius: str | None = None):
+    """Gaia DR3 stars within `radius` arcsec of ra/dec (degrees). Positions at J2016.0,
+    brightest first, at most 500. The viewer moves them to each SPHEREx epoch itself."""
+    try:
+        ra_f, dec_f, rad_f = float(ra), float(dec), float(radius)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "give ra, dec (degrees) and radius (arcsec) as numbers")
+    if not (0 <= ra_f < 360 and -90 <= dec_f <= 90):
+        raise HTTPException(400, "ra must be 0..360 and dec -90..90 degrees")
+    if not 0 < rad_f <= GAIA_MAX_RADIUS_ARCSEC:
+        raise HTTPException(400, f"radius must be 0..{GAIA_MAX_RADIUS_ARCSEC:g} arcsec")
+    key = f"ra{ra_f:.4f}_dec{dec_f:+.4f}_r{rad_f:.0f}"
+    if key in _gaia_mem:
+        return _gaia_mem[key]
+    with lock:
+        klock = _gaia_locks.setdefault(key, threading.Lock())
+    with klock:                                    # same field asked twice at once -> one query
+        if key in _gaia_mem:
+            return _gaia_mem[key]
+        p = GAIA_DIR / f"{key}.json"
+        try:
+            resp = json.loads(p.read_text())
+        except Exception:  # noqa: BLE001  not cached on disk yet
+            try:
+                stars = fetch_gaia(ra_f, dec_f, rad_f)
+            except ConnectionError:
+                raise HTTPException(503, "Gaia catalogue not reachable right now")
+            stars.sort(key=lambda s: (s["g"] is None, s["g"] if s["g"] is not None else 0))
+            resp = {"epoch": 2016.0, "source": "Gaia DR3 (VizieR I/355/gaiadr3)",
+                    "ra": ra_f, "dec": dec_f, "radius_arcsec": rad_f,
+                    "count": min(len(stars), GAIA_MAX_STARS),
+                    "truncated": len(stars) > GAIA_MAX_STARS,
+                    "stars": stars[:GAIA_MAX_STARS]}
+            try:
+                write_text_atomic(p, json.dumps(resp))
+            except Exception:  # noqa: BLE001  disk cache is optional
+                traceback.print_exc()
+        if len(_gaia_mem) > 2000:
+            _gaia_mem.clear()
+        _gaia_mem[key] = resp
+        return resp
 
 
 def warmup():
