@@ -12,7 +12,7 @@ export interface Epoch {
   date: string; // "2025-08-25"
   mjd_mean: number;
   n_images: number; // all detectors together
-  detectors: Partial<Record<Detector, { n_images: number }>>;
+  detectors: Partial<Record<Detector, { n_images: number; flagged_frac?: number | null }>>;
 }
 
 export interface BandOutput {
@@ -48,6 +48,8 @@ export interface Meta {
   spectrum?: string;
   credit?: string;
   gaia_validation?: GaiaValidation | null;
+  flag_bits?: Record<string, number>; // SPHEREx flag planes, name -> bit
+  flag_bad?: string[]; // flags counted in flagged_frac
 }
 
 // A finished result: meta.json + absolute base URL for its files.

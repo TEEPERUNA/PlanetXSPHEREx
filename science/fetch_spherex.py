@@ -102,23 +102,59 @@ BAND_COLORS = {
     "D6": "#ef4444",  # Red (4.42-5.00 µm)
 }
 
-# SPHEREx Level 2 bad-pixel flag bitmask (Table 16, SPHEREx Explanatory Supplement).
-# Excludes benign informational bits: Bit 12 (FULLSAMPLE, 4096) and Bit 22 (SOURCE, 4194304).
-BAD_PIXEL_MASK = (
-    (1 << 0)    # TRANSIENT (cosmic ray)
-    | (1 << 1)  # OVERFLOW (saturation)
-    | (1 << 2)  # SUR_ERROR
-    | (1 << 6)  # NONFUNC (dead pixel)
-    | (1 << 7)  # DICHROIC
-    | (1 << 9)  # MISSING_DATA
-    | (1 << 10) # HOT pixel
-    | (1 << 11) # COLD pixel
-    | (1 << 15) # NONLINEAR
-    | (1 << 17) # PERSIST
-    | (1 << 20) # OUTLIER
-    | (1 << 27) # BLOOM
-    | (1 << 28) # SNOWBALL
-)
+# SPHEREx Level 2 FLAGS planes: name -> bit. Read from the FLAGS header (MSKNnnnn keys)
+# of a DR1 image (level2_2025W17_4B_0001_1D1_spx_l2b-v27-2026-196.fits). Every cutout's own
+# header is read too (read_flag_bits), so a future data release with another layout still works.
+FLAG_BITS = {
+    "TRANSIENT": 0,      # Transient detected during SUR (cosmic ray)
+    "OVERFLOW": 1,       # Overflow detected during SUR (saturation)
+    "SUR_ERROR": 2,      # Error in onboard processing
+    "NONFUNC": 6,        # Permanently unusable
+    "DICHROIC": 7,       # Low efficiency due to dichroic
+    "MISSING_DATA": 9,   # Onboard data lost
+    "HOT": 10,           # Hot pixel
+    "COLD": 11,          # Anomalously low signal
+    "FULLSAMPLE": 12,    # Pixel full sample history is available (informational)
+    "PHANMISS": 14,      # Phantom correction was not applied
+    "NONLINEAR": 15,     # Nonlinearity correction cannot be applied reliably
+    "PERSIST": 17,       # Persistent charge above threshold
+    "OUTLIER": 19,       # Pixel flagged by Detect Outliers
+    "CROSSTALK": 20,     # Pixel affected by crosstalk
+    "SOURCE": 21,        # Pixel mapped to a known source (informational, ~99 % in dense fields)
+    "GHOST": 22,         # Affected by a bright source inside the exposure
+    "GHOST_FPA": 23,     # Affected by a bright source on another detector
+    "GHOST_EXT": 24,     # Affected by a bright source outside the field of view
+    "STREAK": 25,        # Pixel affected by a streak
+    "BLOOM": 26,         # Pixel part of a bloom artifact
+    "SNOWBALL": 27,      # Pixel part of a snowball artifact
+    "HALO": 28,          # Pixel part of a transient halo
+}
+
+# Flags that make a pixel's value unreliable (counted in flagged_frac, masked with --mask-flags).
+# Informational planes (FULLSAMPLE, SOURCE) and the ghost/halo/crosstalk warnings are not counted.
+BAD_FLAGS = [
+    "TRANSIENT", "OVERFLOW", "SUR_ERROR", "NONFUNC", "DICHROIC", "MISSING_DATA",
+    "HOT", "COLD", "NONLINEAR", "PERSIST", "OUTLIER", "BLOOM", "SNOWBALL",
+]
+
+
+def bad_mask(flag_bits: dict[str, int]) -> int:
+    """Bitmask of BAD_FLAGS for a given name -> bit layout."""
+    return sum(1 << flag_bits[n] for n in BAD_FLAGS if n in flag_bits)
+
+
+def read_flag_bits(header) -> dict[str, int]:
+    """Name -> bit from a FLAGS header (MSKNnnnn = name of plane nnnn). Falls back to FLAG_BITS."""
+    bits = {}
+    for key in header.keys():
+        if len(key) == 8 and key.startswith("MSKN") and key[4:].isdigit():
+            name = str(header[key]).strip()
+            if name:
+                bits[name] = int(key[4:])
+    return bits or dict(FLAG_BITS)
+
+
+BAD_PIXEL_MASK = bad_mask(FLAG_BITS)
 
 # Challenge benchmark targets. Simbad name is queried for coordinates and proper motion (J2000),
 # with fallback coordinates used if Simbad query fails.
@@ -266,6 +302,8 @@ class Cutout:
     center_err: float = np.nan
     flagged_frac: float = np.nan
     version: str = ""
+    flag_bits: dict = None  # name -> bit from this image's FLAGS header
+    bad_mask: int = 0       # BAD_FLAGS as a bitmask for this image's layout (0 = use BAD_PIXEL_MASK)
 
 
 def parse_cutout_hdul(h, mjd: float, band: str, coord: SkyCoord,
@@ -277,6 +315,8 @@ def parse_cutout_hdul(h, mjd: float, band: str, coord: SkyCoord,
     c.image = img - zodi
     c.zodi = zodi
     c.flags = h["FLAGS"].data if "FLAGS" in h else None
+    c.flag_bits = read_flag_bits(h["FLAGS"].header) if "FLAGS" in h else dict(FLAG_BITS)
+    c.bad_mask = bad_mask(c.flag_bits)
     c.variance = h["VARIANCE"].data.astype(np.float32) if "VARIANCE" in h else np.ones_like(img) * 1e-4
     hdr = h["IMAGE"].header
     c.wcs = WCS(hdr)
@@ -366,7 +406,7 @@ def parse_cutout_hdul(h, mjd: float, band: str, coord: SkyCoord,
         var = c.variance[yi - 1:yi + 2, xi - 1:xi + 2]
         c.center_flux = float(np.nanmean(ap))
         c.center_err = float(np.sqrt(np.nansum(var)) / 9)
-    bad_pixels = (c.flags & BAD_PIXEL_MASK) != 0 if c.flags is not None else False
+    bad_pixels = (c.flags & (c.bad_mask or BAD_PIXEL_MASK)) != 0 if c.flags is not None else False
     c.flagged_frac = float(np.mean(bad_pixels))
     return c
 
@@ -418,7 +458,7 @@ def reproject_one(c: Cutout, w: WCS, shape, mask_flags: bool) -> np.ndarray:
     from reproject import reproject_interp
     data = c.image.copy()
     if mask_flags and c.flags is not None:
-        data[(c.flags & BAD_PIXEL_MASK) != 0] = np.nan
+        data[(c.flags & (getattr(c, "bad_mask", 0) or BAD_PIXEL_MASK)) != 0] = np.nan
     out, _ = reproject_interp((data, c.wcs), w, shape_out=shape, order="bilinear")
     return out
 
@@ -613,6 +653,9 @@ def build_pixel_cube(path: Path, sb_st: np.ndarray, sel_b: list[Cutout],
       5. BW: Bandpass bandwidth in um per pixel (from spectral WCS "W")
       6. DETX: Physical detector pixel X coordinate (0-2039)
       7. DETY: Physical detector pixel Y coordinate (0-2039)
+      8. FLAGS (int32): SPHEREx flag bits of the representative image, nearest pixel.
+         Plane names are in the MSKNnnnn header keys and in meta.json "flag_bits".
+         Only written when the image could be mapped onto the grid.
     """
     from reproject import reproject_interp
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -668,9 +711,11 @@ def build_pixel_cube(path: Path, sb_st: np.ndarray, sel_b: list[Cutout],
     # Tangent plane coordinates -> Cutout coordinates
     yy_t, xx_t = np.mgrid[:shape[0], :shape[1]]
     sky_t = w.pixel_to_world(xx_t, yy_t)
+    mapped = False  # True when grid pixels are mapped onto the representative image
     if rep_c and rep_c.wcs:
         try:
             xc_t, yc_t = rep_c.wcs.world_to_pixel(sky_t)
+            mapped = True
         except Exception:
             xc_t = xx_t.astype(np.float32)
             yc_t = yy_t.astype(np.float32)
@@ -724,6 +769,16 @@ def build_pixel_cube(path: Path, sb_st: np.ndarray, sel_b: list[Cutout],
     detx_data = np.nan_to_num(detx_raw, nan=1020.0).astype(np.float32)
     dety_data = np.nan_to_num(dety_raw, nan=1020.0).astype(np.float32)
 
+    # 8. FLAGS: nearest pixel of the representative image (bits cannot be interpolated)
+    flags_data = None
+    if mapped and getattr(rep_c, "flags", None) is not None:
+        fy, fx = rep_c.flags.shape
+        xi = np.rint(np.asarray(xc_t, dtype=float))
+        yi = np.rint(np.asarray(yc_t, dtype=float))
+        inside = np.isfinite(xi) & np.isfinite(yi) & (xi >= 0) & (xi < fx) & (yi >= 0) & (yi < fy)
+        flags_data = np.zeros(shape, dtype=np.int32)
+        flags_data[inside] = np.asarray(rep_c.flags)[yi[inside].astype(int), xi[inside].astype(int)].astype(np.int32)
+
     # Multi-extension FITS with standard WCS headers on each layer
     hdr = w.to_header()
     p_hdu = fits.PrimaryHDU(data=sb_data, header=hdr.copy())
@@ -747,7 +802,14 @@ def build_pixel_cube(path: Path, sb_st: np.ndarray, sel_b: list[Cutout],
     h_dety = fits.ImageHDU(data=dety_data, header=hdr.copy(), name="DETY")
     h_dety.header["BUNIT"] = "pixel"
 
-    hdul = fits.HDUList([p_hdu, h_zodi, h_snr, h_wave, h_bw, h_detx, h_dety])
+    layers = [p_hdu, h_zodi, h_snr, h_wave, h_bw, h_detx, h_dety]
+    if flags_data is not None:
+        h_flags = fits.ImageHDU(data=flags_data, header=hdr.copy(), name="FLAGS")
+        for name, bit in (rep_c.flag_bits or FLAG_BITS).items():
+            h_flags.header[f"MSKN{bit:04d}"] = (name, f"Name for mask plane {bit}")
+        layers.append(h_flags)
+
+    hdul = fits.HDUList(layers)
     hdul.writeto(path, overwrite=True)
     return path
 
@@ -981,6 +1043,9 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
         "lightcurve_png": "lightcurve.png",
         "light_curve": lightcurve_info,
         "gaia_validation": gaia_meta,
+        # SPHEREx flag planes (name -> bit) and the ones counted in flagged_frac
+        "flag_bits": next((c.flag_bits for c in cutouts if c.flag_bits), FLAG_BITS),
+        "flag_bad": BAD_FLAGS,
         "versions": sorted({c.version for c in cutouts if c.version}),
         "generated": Time.now().iso, **extra,
         "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team",

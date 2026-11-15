@@ -41,6 +41,15 @@ export function availableBands(meta: Meta): Band[] {
   return BANDS.filter((band) => (meta.outputs[band]?.frames.length ?? 0) > 0);
 }
 
+// Share of unreliable pixels (bad flags) for one frame, 0–1, or null when unknown.
+// "ALL" averages the detectors that have images in this epoch.
+export function flaggedFraction(epoch: Epoch, band: Band): number | null {
+  const values = (band === "ALL" ? Object.values(epoch.detectors) : [epoch.detectors[band]])
+    .map((d) => d?.flagged_frac)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  return values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
+}
+
 // Number of SPHEREx images behind one frame.
 export function imageCount(epoch: Epoch, band: Band): number {
   if (band === "ALL") return epoch.n_images;

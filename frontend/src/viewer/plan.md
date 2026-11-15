@@ -278,7 +278,15 @@ Tarkistettu `fetch_spherex.py`:n tuottamaa `meta.json`:ia vasten (14.11.2026).
   - M31 on galaksi, joten keskeltä ei välttämättä löydy järkevää Gaia-kohdetta toimivallakaan haulla.
 - [x] Palaute "näkymä hyppää esikatselusta valmiiseen tulokseen (kaista ja frame katoavat)" (15.11.). Viewer muisti kuvan listapaikan, joten täydessä tuloksessa (enemmän epookkeja) näkyi eri päivä. Lisäksi spektri tyhjeni hetkeksi. Korjattu: viewer muistaa päivämäärän (`nearestFrame`), avain on `target|shape`, ja spektri pysyy näkyvissä uuden latautuessa.
 - [x] Haasteen kohta "add together or subtract images taken at different times" (15.11.): "Compare two dates" valitsee päivät A ja B, ja blink vuorottelee vain niiden välillä. Vapaa erotus- tai summakuva kahdesta epookista vaatisi laskentaa FITS-pinoista, joten se jäi tekemättä.
-- [ ] Haasteen kohta "display metadata, like contamination flags": `flagged_frac`-arvot ovat yhä epäuskottavan suuria (Barnard 1,0 kaikkialla, muut 0,2–1,0), joten niitä ei näytetä. Kysytty Emililtä: ovatko esimerkit lasketuttu uudella `BAD_PIXEL_MASK`-tavalla, ja kuuluuko DICHROIC (bitti 7) tai MISSING_DATA (bitti 9) laskea "huonoksi"? Parempi vaihtoehto olisi `FLAGS`-kerros pikselitiedostoon, jolloin hiiren kohdalla voisi näyttää pikselin omat liput.
+- [x] Haasteen kohta "display metadata, like contamination flags" (15.11., Emilin luvalla myös `science/`):
+  - Lippujen viralliset nimet ja bitit luettu SPHEREx DR1 -tiedoston FLAGS-otsakkeesta (`MSKNnnnn`). `fetch_spherex.py` lukee ne nyt jokaisen kuvan otsakkeesta, varataulukkona `FLAG_BITS`.
+  - Korjattu `BAD_PIXEL_MASK`: OUTLIER oli bitissä 20 (= CROSSTALK), BLOOM bitissä 27 (= SNOWBALL), ja ylimääräinen bitti 28 (= HALO). Maski muodostetaan nyt nimistä (`BAD_FLAGS`).
+  - Syy vanhoihin lukuihin 0,2–1,0: vanha laskenta (`flags != 0`) laski mukaan SOURCE- ja FULLSAMPLE-liput. Oikealla DR1-palalla vanha tapa antoi 27,1 % ja uusi 2,5 %.
+  - Pikselitiedostoon uusi kerros `FLAGS` (int32, edustavan kuvan lähin pikseli, nimet otsakkeessa). `meta.json`:iin `flag_bits` ja `flag_bad`.
+  - Viewer: hiiren kohdalla "Flags: OVERFLOW, SOURCE" (epäluotettavat keltaisella, selitys hiirellä). Epookin tietoihin "x % flagged", vain kun `meta.json`:issa on `flag_bits`, eli vanhojen esimerkkien virheellisiä lukuja ei näytetä.
+  - Testattu: Emilin testit + uudet testit (`test_read_flag_bits`, FLAGS-kerros), ja koko ketju oikealla S3-datalla. Kaksi testiä kaatuu Windowsilla myös alkuperäisellä koodilla (Gaia-ajastus, tiedostolukko), joten ne eivät johdu muutoksista.
+  - Esimerkeissä (`examples/`) lippuja ei vielä ole, koska ne on rakennettu ilman alkuperäisiä kuvia. Uudet haut saavat ne julkaisun jälkeen.
+- [ ] CONTRACT.md: lisättävä `flag_bits`, `flag_bad` ja pikselitiedoston `FLAGS`-kerros (yhteinen tiedosto, sovittava tiimin kanssa).
 - [ ] Juho: `GifView` saa `key={status.baseUrl}`. Esikatselun osoite on eri (`…__preview/`), joten GIF-näkymän kaistavalinta nollautuu, kun täysi tulos tulee. Ehdotus: `key={status.meta.target}`.
 - [ ] Viewer: kun Gaia-ennustetta ei ole, näytä selittävä rivi, esimerkiksi "No Gaia prediction for this position." tai "Gaia lookup failed for this position.". Nyt rivi vain puuttuu.
 - [ ] Avain `"inverted": true` käännetyille kuville, jotta viewer voi kertoa sen käyttäjälle (Emil).

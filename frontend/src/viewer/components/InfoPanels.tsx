@@ -21,6 +21,8 @@ export function InfoPanels() {
           <dd>Change only how the image looks on screen, not the data.</dd>
           <dt>Pointer on image</dt>
           <dd>Shows the sky coordinates and the measured values of that pixel: brightness, background, signal-to-noise and wavelength.</dd>
+          <dt>Flags</dt>
+          <dd>SPHEREx marks pixels with known problems. Amber flags (for example OVERFLOW = saturated, TRANSIENT = cosmic ray) mean the value is unreliable; others such as SOURCE are just information. Hover a flag for its meaning. "% flagged" under the date is the share of unreliable pixels in that image.</dd>
           <dt>Spectrum</dt>
           <dd>Brightness against wavelength for the target, one colour per epoch.</dd>
         </dl>

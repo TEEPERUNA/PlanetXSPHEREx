@@ -12,6 +12,7 @@ export interface PixelValues {
   bw?: number; // bandwidth (µm)
   detX?: number; // pixel on the original detector
   detY?: number;
+  flags?: number; // SPHEREx flag bits (see lib/flags.ts)
 }
 
 // Layer names (EXTNAME) in the per-pixel file from science.
@@ -23,7 +24,11 @@ const LAYERS: Record<string, keyof PixelValues> = {
   BW: "bw",
   DETX: "detX",
   DETY: "detY",
+  FLAGS: "flags",
 };
+
+// Layers where the same value everywhere is real data (e.g. no flags anywhere).
+const ALWAYS_KEEP = new Set(["SB", "FLAGS"]);
 
 // A layer with the same value in every pixel is a filler, not data
 // (science writes defaults when the raw images were not available).
@@ -66,7 +71,7 @@ function loadFits(url: string): Promise<FitsImage[]> {
         return res.arrayBuffer();
       })
       .then((buffer) =>
-        readFits(buffer).filter((img) => img.name === "SB" || (!isFiller(img) && !isFallbackDetector(img))),
+        readFits(buffer).filter((img) => ALWAYS_KEEP.has(img.name) || (!isFiller(img) && !isFallbackDetector(img))),
       );
     promise.catch(() => cache.delete(url)); // allow a retry later
     cache.set(url, promise);
