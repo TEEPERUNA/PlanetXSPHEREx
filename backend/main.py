@@ -17,6 +17,8 @@ import os
 import shutil
 import sys
 import threading
+import urllib.parse
+import urllib.request
 import traceback
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -142,10 +144,13 @@ def prune_jobs():
         jobs.pop(k, None)
 
 
-def make_args(fov: float, per_group: int = PER_GROUP) -> SimpleNamespace:
+def make_args(fov: float, per_group: int = PER_GROUP, mask_flags: bool = False) -> SimpleNamespace:
     return SimpleNamespace(size=fov, bands=list(fs.DETECTORS), max=0, per_group=per_group,
-                           workers=DOWNLOAD_WORKERS, mask_flags=False, lo=1.0, hi=99.7, frame_ms=600,
+                           workers=DOWNLOAD_WORKERS, mask_flags=mask_flags, lo=1.0, hi=99.7, frame_ms=600,
                            out=str(OUTPUT_DIR))
+
+
+MASK_SUFFIX = "_mask"   # job id suffix for results with flagged (bad) pixels masked out
 
 
 def slug_for(ra: float, dec: float, fov: float) -> str:
@@ -217,22 +222,24 @@ def friendly_error(e: Exception) -> str:
 
 def job_from_slug(job: str):
     """Rebuild a job from its id, e.g. after a server restart lost the in-memory job list.
-    'barnard', 'barnard_fov4', 'ra133.7950_dec-7.2450_fov3' (and '__preview' suffix)."""
+    'barnard', 'barnard_fov4', 'ra133.7950_dec-7.2450_fov3' (+ '_mask', + '__preview')."""
     num = r"\d+(?:\.\d+)?"
     base = job.removesuffix("__preview")
+    mask = base.endswith(MASK_SUFFIX)
+    base = base.removesuffix(MASK_SUFFIX)
     m = re.fullmatch(rf"ra({num})_dec([+-]{num})_fov({num})", base)
     if m:
         ra, dec, fov = float(m[1]), float(m[2]), float(m[3])
         if not (0 <= ra < 360 and -90 <= dec <= 90 and 0 < fov <= MAX_FOV_ARCMIN):
             return None
         c = fs.parse_coord(str(ra), str(dec))
-        return coord_job(c, fov)
+        return coord_job(c, fov, mask)
     m = re.fullmatch(rf"([a-z0-9]+?)(?:_fov({num}))?", base)
     if m and m[1] in fs.TARGETS:
         fov = float(m[2]) if m[2] else 3.0
         if not 0 < fov <= MAX_FOV_ARCMIN:
             return None
-        return target_job(m[1], fov)
+        return target_job(m[1], fov, mask)
     return None
 
 
@@ -283,9 +290,10 @@ class Pipeline:
     """One pipeline for one position + FOV. Keeps the image list and downloaded cutouts
     between the quick preview run and the full run, so nothing is fetched twice."""
 
-    def __init__(self, resolve, fov: float):
+    def __init__(self, resolve, fov: float, mask_flags: bool = False):
         self.resolve = resolve          # () -> (coord, label, info)
         self.fov = fov
+        self.mask_flags = mask_flags    # True = flagged (bad) pixels left out of the stacks
         self._target = None
         self._images = None
         self.memo: dict = {}
@@ -304,7 +312,7 @@ class Pipeline:
     def __call__(self, progress, out_slug: str, per_group: int):
         t0 = time.time()
         c, label, info = self.target()
-        args = make_args(self.fov, per_group)
+        args = make_args(self.fov, per_group, self.mask_flags)
         fingerprint = None
         if FETCH_MODE == "s3":
             try:
@@ -487,19 +495,19 @@ def fallback_response(slug: str, key: str, reason: str) -> dict:
     return resp
 
 
-def target_job(key: str, fov: float):
-    slug = key if fov == 3.0 else f"{key}_fov{fov:g}"
+def target_job(key: str, fov: float, mask: bool = False):
+    slug = (key if fov == 3.0 else f"{key}_fov{fov:g}") + (MASK_SUFFIX if mask else "")
 
     def make_pipeline():
-        return Pipeline(lambda: fs.target_coord(key), fov)
+        return Pipeline(lambda: fs.target_coord(key), fov, mask)
     return slug, make_pipeline
 
 
-def coord_job(c, fov: float):
-    slug = slug_for(c.ra.deg, c.dec.deg, fov)
+def coord_job(c, fov: float, mask: bool = False):
+    slug = slug_for(c.ra.deg, c.dec.deg, fov) + (MASK_SUFFIX if mask else "")
 
     def make_pipeline():
-        return Pipeline(lambda: (c, f"RA {c.ra.deg:.4f} Dec {c.dec.deg:+.4f}", {}), fov)
+        return Pipeline(lambda: (c, f"RA {c.ra.deg:.4f} Dec {c.dec.deg:+.4f}", {}), fov, mask)
     return slug, make_pipeline
 
 
@@ -538,14 +546,15 @@ def targets():
 @app.get("/api/sky")
 def sky(request: Request, ra: str | None = None, dec: str | None = None,
         target: str | None = Query(None, description="one of /api/targets keys"),
-        fov: float = Query(3.0, gt=0, description="field of view, arcmin")):
+        fov: float = Query(3.0, gt=0, description="field of view, arcmin"),
+        mask_flags: bool = Query(False, description="leave flagged (bad) pixels out of the images")):
     if fov > MAX_FOV_ARCMIN:
         raise HTTPException(400, f"fov must be <= {MAX_FOV_ARCMIN} arcmin")
 
     if target:
         if target not in fs.TARGETS:
             raise HTTPException(404, f"unknown target '{target}'")
-        slug, make_pipeline = target_job(target, fov)
+        slug, make_pipeline = target_job(target, fov, mask_flags)
     elif ra is not None and dec is not None:
         try:
             c = fs.parse_coord(ra, dec)
@@ -556,9 +565,9 @@ def sky(request: Request, ra: str | None = None, dec: str | None = None,
         key = matching_target(c)
         if key:
             target = key
-            slug, make_pipeline = target_job(key, fov)
+            slug, make_pipeline = target_job(key, fov, mask_flags)
         else:
-            slug, make_pipeline = coord_job(c, fov)
+            slug, make_pipeline = coord_job(c, fov, mask_flags)
     else:
         raise HTTPException(400, "give either target or ra+dec")
 
@@ -727,6 +736,121 @@ def delete_candidate(cid: str, request: Request):
             raise HTTPException(404, "Unknown candidate id.")
         (CAND_DIR / f"{cid}.json").unlink(missing_ok=True)
     return {"deleted": cid}
+
+
+# --------------------------------------------------------------------------- Gaia field stars
+# All Gaia DR3 stars around an image, for the viewer overlay. Fetched from VizieR mirrors
+# (short timeout each), cached in memory and on disk (Gaia DR3 never changes).
+
+GAIA_MIRRORS = [m.strip() for m in os.environ.get(
+    "GAIA_MIRRORS",
+    "https://vizier.cfa.harvard.edu,https://vizier.cds.unistra.fr,https://vizier.iucaa.in,"
+    "https://vizier.nao.ac.jp").split(",") if m.strip()]
+GAIA_TIMEOUT_S = float(os.environ.get("GAIA_TIMEOUT_S", "10"))
+GAIA_MAX_STARS = 500
+GAIA_MAX_RADIUS_ARCSEC = 600.0
+GAIA_DIR = OUTPUT_DIR / "_gaia"
+_gaia_mem: dict[str, dict] = {}
+_gaia_locks: dict[str, threading.Lock] = {}
+
+
+def _num(v: str):
+    """TSV cell -> float, or None for blank/NaN (JSON has no NaN)."""
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    return f if math.isfinite(f) else None
+
+
+def parse_vizier_tsv(text: str) -> list[dict]:
+    """Rows of a VizieR asu-tsv answer with -out=Source,RA_ICRS,DE_ICRS,pmRA,pmDE,Gmag.
+    Skips #comments, blank lines, the column-name, unit and dash lines."""
+    stars, cols = [], None
+    for line in text.splitlines():
+        if not line.strip() or line.startswith("#"):
+            continue
+        cells = [c.strip() for c in line.split("\t")]
+        if cols is None:
+            if "Source" in cells and "RA_ICRS" in cells:
+                cols = {name: i for i, name in enumerate(cells)}
+            continue
+        row = dict(zip(cols, (cells + [""] * len(cols))[:len(cols)]))
+        if not row.get("Source", "").isdigit():
+            continue                      # unit line, dash line or junk
+        ra, dec = _num(row.get("RA_ICRS")), _num(row.get("DE_ICRS"))
+        if ra is None or dec is None:
+            continue
+        stars.append({"id": row["Source"], "ra": ra, "dec": dec,
+                      "pmra": _num(row.get("pmRA")), "pmdec": _num(row.get("pmDE")),
+                      "g": _num(row.get("Gmag"))})
+    return stars
+
+
+def fetch_gaia(ra: float, dec: float, radius_arcsec: float) -> list[dict]:
+    """Ask each VizieR mirror in turn. Raises ConnectionError if none answers properly."""
+    q = urllib.parse.urlencode({
+        "-source": "I/355/gaiadr3", "-c": f"{ra:.6f} {dec:+.6f}", "-c.rs": f"{radius_arcsec:g}",
+        "-out": "Source,RA_ICRS,DE_ICRS,pmRA,pmDE,Gmag", "-out.max": str(GAIA_MAX_STARS + 1),
+        "-sort": "Gmag"})
+    errors = []
+    for mirror in GAIA_MIRRORS:
+        url = f"{mirror}/viz-bin/asu-tsv?{q}"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "StarXViewer/1.0"})
+            with urllib.request.urlopen(req, timeout=GAIA_TIMEOUT_S) as r:
+                text = r.read().decode("utf-8", "replace")
+            if "RA_ICRS" not in text:      # error page, not a catalogue answer
+                raise ValueError("no catalogue table in answer")
+            return parse_vizier_tsv(text)
+        except Exception as e:  # noqa: BLE001  try the next mirror
+            errors.append(f"{mirror}: {type(e).__name__}: {str(e)[:80]}")
+    print("  Gaia: all VizieR mirrors failed -> " + " | ".join(errors))
+    raise ConnectionError("no VizieR mirror answered")
+
+
+@app.get("/api/gaia")
+def gaia(ra: str | None = None, dec: str | None = None, radius: str | None = None):
+    """Gaia DR3 stars within `radius` arcsec of ra/dec (degrees). Positions at J2016.0,
+    brightest first, at most 500. The viewer moves them to each SPHEREx epoch itself."""
+    try:
+        ra_f, dec_f, rad_f = float(ra), float(dec), float(radius)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "give ra, dec (degrees) and radius (arcsec) as numbers")
+    if not (0 <= ra_f < 360 and -90 <= dec_f <= 90):
+        raise HTTPException(400, "ra must be 0..360 and dec -90..90 degrees")
+    if not 0 < rad_f <= GAIA_MAX_RADIUS_ARCSEC:
+        raise HTTPException(400, f"radius must be 0..{GAIA_MAX_RADIUS_ARCSEC:g} arcsec")
+    key = f"ra{ra_f:.4f}_dec{dec_f:+.4f}_r{rad_f:.0f}"
+    if key in _gaia_mem:
+        return _gaia_mem[key]
+    with lock:
+        klock = _gaia_locks.setdefault(key, threading.Lock())
+    with klock:                                    # same field asked twice at once -> one query
+        if key in _gaia_mem:
+            return _gaia_mem[key]
+        p = GAIA_DIR / f"{key}.json"
+        try:
+            resp = json.loads(p.read_text())
+        except Exception:  # noqa: BLE001  not cached on disk yet
+            try:
+                stars = fetch_gaia(ra_f, dec_f, rad_f)
+            except ConnectionError:
+                raise HTTPException(503, "Gaia catalogue not reachable right now")
+            stars.sort(key=lambda s: (s["g"] is None, s["g"] if s["g"] is not None else 0))
+            resp = {"epoch": 2016.0, "source": "Gaia DR3 (VizieR I/355/gaiadr3)",
+                    "ra": ra_f, "dec": dec_f, "radius_arcsec": rad_f,
+                    "count": min(len(stars), GAIA_MAX_STARS),
+                    "truncated": len(stars) > GAIA_MAX_STARS,
+                    "stars": stars[:GAIA_MAX_STARS]}
+            try:
+                write_text_atomic(p, json.dumps(resp))
+            except Exception:  # noqa: BLE001  disk cache is optional
+                traceback.print_exc()
+        if len(_gaia_mem) > 2000:
+            _gaia_mem.clear()
+        _gaia_mem[key] = resp
+        return resp
 
 
 def warmup():

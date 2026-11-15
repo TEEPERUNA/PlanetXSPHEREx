@@ -50,6 +50,8 @@ export interface Meta {
   spectrum?: string;
   credit?: string;
   gaia_validation?: GaiaValidation | null;
+  inverted?: boolean; // images drawn as a negative (dark sources on a light sky)
+  light_curve?: unknown; // target brightness per epoch; parsed by lib/lightCurve.ts (two formats)
   flag_bits?: Record<string, number>; // SPHEREx flag planes, name -> bit
   flag_bad?: string[]; // flags counted in flagged_frac
 }

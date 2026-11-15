@@ -9,6 +9,13 @@ interface Props {
   epochs: Epoch[]; // for dates in the legend
   ranges?: Partial<Record<Detector, [number, number]>>; // detector bands in µm
   highlightEpoch?: number; // epoch shown in the blink right now
+  // Spectrum of a clicked pixel instead of the image centre (see hooks/usePixelSpectrum).
+  pixel?: {
+    label: string; // "Pixel (12, 20)"
+    rows: SpectrumRow[] | null; // null while loading
+    approx: boolean; // wavelengths are detector centres
+    onBack: () => void;
+  } | null;
 }
 
 type Mode = "average" | "all";
@@ -24,8 +31,10 @@ const M = { left: 52, right: 12, top: 22, bottom: 50 };
 
 // Spectrum: x = wavelength, y = flux, error bars, colour by epoch.
 // Default view: one averaged point per detector and date, joined by a line.
-export function SpectrumChart({ url, epochs, ranges, highlightEpoch }: Props) {
-  const [rows, setRows] = useState<SpectrumRow[] | null>(null);
+export function SpectrumChart({ url, epochs, ranges, highlightEpoch, pixel }: Props) {
+  const [csvRows, setCsvRows] = useState<SpectrumRow[] | null>(null);
+  // The clicked pixel's spectrum replaces the centre spectrum while it is shown.
+  const rows = pixel ? pixel.rows : csvRows;
   const [error, setError] = useState<string | null>(null);
   const [hover, setHover] = useState<SpectrumPoint | null>(null);
   const [mode, setMode] = useState<Mode>("average");
@@ -43,7 +52,7 @@ export function SpectrumChart({ url, epochs, ranges, highlightEpoch }: Props) {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.text();
       })
-      .then((text) => setRows(parseSpectrum(text)))
+      .then((text) => setCsvRows(parseSpectrum(text)))
       .catch((err: unknown) => {
         if (controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : String(err));
@@ -112,15 +121,20 @@ export function SpectrumChart({ url, epochs, ranges, highlightEpoch }: Props) {
   }
 
   function readout(p: SpectrumPoint): string {
-    const what = mode === "average" ? `${p.detector} average of ${p.count}` : p.detector;
+    const what = mode === "average" && p.count > 1 ? `${p.detector} average of ${p.count}` : p.detector;
     return `${what} · ${p.wavelength_um.toFixed(3)} µm · ${formatTick(p.flux_mjy_sr)} ± ${formatTick(p.err_mjy_sr)} MJy/sr · ${dateOf(p.epoch)}`;
   }
 
   return (
     <section className="spectrum">
       <div className="spectrum__head">
-        <h3>Spectrum</h3>
-        {rows && rows.length > 0 && (
+        <h3>Spectrum{pixel ? ` · ${pixel.label}` : ""}</h3>
+        {pixel && (
+          <button type="button" className="spectrum__back" onClick={pixel.onBack}>
+            Back to image centre
+          </button>
+        )}
+        {!pixel && rows && rows.length > 0 && (
           <div className="spectrum__modes" role="group" aria-label="Spectrum view">
             <button type="button" aria-pressed={mode === "average"} className={mode === "average" ? "is-active" : undefined} onClick={() => setMode("average")}>
               Average per detector
@@ -132,16 +146,31 @@ export function SpectrumChart({ url, epochs, ranges, highlightEpoch }: Props) {
         )}
       </div>
 
-      {error && <p className="spectrum__note">Could not load the spectrum ({error}).</p>}
-      {!error && !rows && <p className="spectrum__note">Loading spectrum…</p>}
-      {rows && rows.length === 0 && <p className="spectrum__note">No spectrum measurements for this position.</p>}
+      {!pixel && error && <p className="spectrum__note">Could not load the spectrum ({error}).</p>}
+      {(pixel ? !rows : !error && !rows) && (
+        <p className="spectrum__note">{pixel ? "Building the spectrum of this pixel…" : "Loading spectrum…"}</p>
+      )}
+      {rows && rows.length === 0 && (
+        <p className="spectrum__note">
+          {pixel ? "No per-pixel values for this pixel." : "No spectrum measurements for this position."}
+        </p>
+      )}
 
       {chart && (
         <>
-          <p className="spectrum__intro">
-            How bright the object at the image centre is at each wavelength. Higher = brighter. One colour per date:
-            if the {mode === "average" ? "lines" : "dots"} of two dates differ, the object changed.
-          </p>
+          {pixel ? (
+            <p className="spectrum__intro">
+              Spectrum of the clicked pixel, from the per-pixel files: one point per detector and date (the centre
+              spectrum has one point per image). The pixel stays fixed on the sky, so a moving star leaves it over time.
+              {pixel.approx && " Wavelengths are the detector centres, because this result has no per-pixel wavelength."}
+            </p>
+          ) : (
+            <p className="spectrum__intro">
+              How bright the object at the image centre is at each wavelength. Higher = brighter. One colour per date:
+              if the {mode === "average" ? "lines" : "dots"} of two dates differ, the object changed. Click the image
+              to see the spectrum of another pixel.
+            </p>
+          )}
 
           {noisy && (
             <p className="spectrum__warning" role="note">
@@ -153,7 +182,7 @@ export function SpectrumChart({ url, epochs, ranges, highlightEpoch }: Props) {
             className="spectrum__chart"
             viewBox={`0 0 ${W} ${H}`}
             role="img"
-            aria-label={`Spectrum of the image centre: ${rows!.length} measurements from ${epochsInData.length} dates`}
+            aria-label={`Spectrum of ${pixel ? pixel.label : "the image centre"}: ${rows!.length} measurements from ${epochsInData.length} dates`}
             onPointerMove={handlePointer}
             onPointerDown={handlePointer}
             onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)}

@@ -5,16 +5,21 @@ import { CandidateOverlay } from "./components/CandidateOverlay";
 import { CandidateReport } from "./components/CandidateReport";
 import { CursorInfo } from "./components/CursorInfo";
 import { EpochInfo } from "./components/EpochInfo";
-import { GaiaInfo } from "./components/GaiaInfo";
+import { GaiaFieldInfo, GaiaInfo } from "./components/GaiaInfo";
 import { GaiaOverlay } from "./components/GaiaOverlay";
 import { InfoPanels } from "./components/InfoPanels";
+import { LightCurveChart } from "./components/LightCurveChart";
 import { PlaybackControls } from "./components/PlaybackControls";
 import { SpectrumChart } from "./components/SpectrumChart";
 import { LoadingProgress, StatusView } from "./components/StatusView";
 import { useBlink } from "./hooks/useBlink";
+import { useGaiaField } from "./hooks/useGaiaField";
+import { usePixelSpectrum } from "./hooks/usePixelSpectrum";
 import { usePixelValues } from "./hooks/usePixelValues";
+import { useSources } from "./hooks/useSources";
 import { availableBands, framesFor, joinUrl, nearestFrame } from "./lib/frames";
 import { gaiaPixelAt, mjdToYear, onImage } from "./lib/gaia";
+import { describeStar, nearestStar, starsOnImage, withoutGaia } from "./lib/gaiaField";
 import type { Band, Meta, Pixel, ViewerStatus } from "./types";
 import "./viewer.css";
 
@@ -86,6 +91,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const [compareB, setCompareB] = useState<number | null>(null);
   const [reporting, setReporting] = useState(false); // candidate report form open
   const [pickPx, setPickPx] = useState<Pixel | null>(null); // pixel chosen for a candidate report
+  const [spectrumPx, setSpectrumPx] = useState<Pixel | null>(null); // clicked pixel shown in the spectrum
   const [candidates, setCandidates] = useState<Candidate[]>([]);
 
   // Community reports in this field. Optional extra, so a failed request just shows none.
@@ -127,6 +133,23 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
     return p !== null && onImage(p, meta);
   });
   const currentEpoch = diffOn ? null : (frames[idx]?.epoch ?? null);
+
+  // All Gaia stars in the field, moved to the date on screen (last epoch in diff mode),
+  // and the bright sources in that image that Gaia does not list.
+  const gaiaField = useGaiaField(meta);
+  const fieldEpoch = currentEpoch ?? frames[frames.length - 1]?.epoch ?? null;
+  const fieldStars = useMemo(
+    () => (fieldEpoch ? starsOnImage(gaiaField.stars, meta, mjdToYear(fieldEpoch.mjd_mean)) : []),
+    [gaiaField.stars, meta, fieldEpoch],
+  );
+  const sources = useSources(meta, baseUrl, activeBand, fieldEpoch?.index ?? null);
+  // Only when the field came back with stars: an empty or failed query would flag everything.
+  const lonely = gaiaField.status === "ok" && fieldStars.length > 0 ? withoutGaia(sources, fieldStars) : [];
+  const hoverStar = hoverPx ? nearestStar(fieldStars, hoverPx.x, hoverPx.y) : null;
+  const showGaiaButton = hasGaia || fieldStars.length > 0;
+
+  // Spectrum of the clicked pixel from the per-pixel files (only when the result has them).
+  const pixelSpectrum = usePixelSpectrum(meta, baseUrl, spectrumPx);
 
   // Values of the pixel under the cursor, for the epoch on screen.
   const pixelInfo = usePixelValues(meta, baseUrl, activeBand, currentEpoch?.index ?? null, hoverPx);
@@ -173,10 +196,15 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         filter={`brightness(${brightness}) contrast(${contrast})`}
         alt={`${meta.target}, ${activeBand}, ${frames[idx]?.epoch.date ?? ""}`}
         onHover={setHoverPx}
-        onPick={reporting ? setPickPx : undefined}
+        onPick={(p) => {
+          if (reporting) setPickPx(p); // a report spot only while the report form is open
+          if (pixelSpectrum.available) setSpectrumPx(p);
+        }}
         overlay={
           <>
-            {hasGaia && showGaia && <GaiaOverlay meta={meta} epochs={bandEpochs} current={currentEpoch} />}
+            {showGaiaButton && showGaia && (
+              <GaiaOverlay meta={meta} epochs={bandEpochs} current={currentEpoch} field={fieldStars} lonely={lonely} />
+            )}
             <CandidateOverlay meta={meta} candidates={candidates} picked={pickPx} />
           </>
         }
@@ -204,6 +232,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           band={activeBand}
           values={pixelInfo.values}
           loading={pixelInfo.loading}
+          gaiaNote={showGaia && hoverStar ? describeStar(hoverStar.star) : null}
         />
         <CandidateReport
           open={reporting}
@@ -223,6 +252,15 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         {(showGaia || !hasGaia) && (
           <GaiaInfo meta={meta} epoch={diffOn ? (frames[frames.length - 1]?.epoch ?? null) : currentEpoch} showDiff={diffOn} />
         )}
+        {showGaia && (
+          <GaiaFieldInfo
+            status={gaiaField.status}
+            onImage={fieldStars.length}
+            truncated={gaiaField.truncated}
+            lonely={lonely.length}
+            date={fieldEpoch?.date ?? null}
+          />
+        )}
 
         <PlaybackControls
           bands={bands}
@@ -240,7 +278,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           hasDiff={diffSrc !== null}
           showDiff={diffOn}
           onToggleDiff={() => setShowDiff((d) => !d)}
-          hasGaia={hasGaia}
+          hasGaia={showGaiaButton}
           showGaia={showGaia}
           onToggleGaia={() => setShowGaia((s) => !s)}
           dates={frames.map((f) => ({ mjd: f.epoch.mjd_mean, date: f.epoch.date }))}
@@ -268,6 +306,24 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
             url={joinUrl(baseUrl, meta.spectrum)}
             epochs={meta.epochs}
             ranges={meta.detector_ranges_um}
+            highlightEpoch={diffOn ? undefined : frames[idx]?.epoch.index}
+            pixel={
+              spectrumPx
+                ? {
+                    label: `Pixel (${spectrumPx.x}, ${spectrumPx.y})`,
+                    rows: pixelSpectrum.rows,
+                    approx: pixelSpectrum.approx,
+                    onBack: () => setSpectrumPx(null),
+                  }
+                : null
+            }
+          />
+        )}
+
+        {meta.light_curve != null && (
+          <LightCurveChart
+            lightCurve={meta.light_curve}
+            epochs={meta.epochs}
             highlightEpoch={diffOn ? undefined : frames[idx]?.epoch.index}
           />
         )}

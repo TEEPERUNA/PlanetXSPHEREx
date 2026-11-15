@@ -62,10 +62,14 @@ viewer/
 │   ├── GaiaOverlay.tsx       green circle + track dots (SVG)
 │   ├── GaiaInfo.tsx          text line that explains the circle
 │   ├── PlaybackControls.tsx  band, play/pause/step, speed, diff, Gaia, brightness, contrast
-│   ├── SpectrumChart.tsx     loads spectrum.csv and draws it
+│   ├── SpectrumChart.tsx     centre spectrum (spectrum.csv) or a clicked pixel's spectrum
+│   ├── LightCurveChart.tsx   target brightness over time, per band
 │   └── StatusView.tsx        empty / loading / error, and LoadingProgress
 ├── hooks/
 │   ├── useBlink.ts           interval timer for the animation
+│   ├── useGaiaField.ts       Gaia stars around the image from /api/gaia
+│   ├── usePixelSpectrum.ts   spectrum of a clicked pixel from the per-pixel files
+│   ├── useSources.ts         point sources in the epoch stack on screen
 │   └── usePixelValues.ts     loads the pixel FITS for the cursor info, hides filler layers
 └── lib/                      pure functions, no React, easy to test
     ├── frames.ts             frames of a band; epoch number from the filename
@@ -76,6 +80,8 @@ viewer/
     ├── spectrumStats.ts      averages per detector, noise check
     ├── fits.ts               small FITS reader (pixel values under the cursor)
     ├── flags.ts              SPHEREx flag bits → names, unreliable or not, tooltip text
+    ├── gaiaField.ts          field stars at a date, source detection, "no Gaia match"
+    ├── lightCurve.ts         meta.light_curve (both formats) → series per band
     └── stage.ts              backend stage name → user text
 ```
 
@@ -106,6 +112,16 @@ The spectrum keeps the old chart on screen until the new CSV has loaded, so the 
 - SVG pixel *i* spans *i* … *i*+1, so circles are drawn at *x* + 0.5.
 - The SVG layer has `position: relative; z-index: 1`. **Do not remove it:** images with a CSS `filter` get their own layer and would otherwise paint over the circles.
 
+### Gaia field stars and sources without a Gaia match
+- `hooks/useGaiaField.ts` asks the backend for every Gaia DR3 star around the image: `getGaia()` in `api/` → `GET /api/gaia?ra&dec&radius` (CONTRACT.md). Radius = half the image diagonal + 30″ for stars that move in (`fieldRadiusArcsec`, max 600″). One request per field; the backend caches it. Positions come at J2016.0.
+- `lib/gaiaField.ts` `starsOnImage()` moves every star with its proper motion to the date on screen (last epoch in diff mode) and keeps the ones on the image. So fast stars move between frames, like the target.
+- `components/GaiaOverlay.tsx` draws the 25 brightest as thin rings (size by G magnitude) and the next 60 as dots, so dense Milky Way fields (Barnard: 214 stars on the image) stay readable. The target itself is left out of the field, the green ring already marks it. On negative images (`meta.inverted`, WISE 0855) the rings are dark.
+- **No Gaia match:** `hooks/useSources.ts` loads the epoch stack on screen (`outputs[band].fits`) and `detectSources()` finds point sources: local maxima in a 5×5 box, 8σ above the background (median and MAD noise), skipping NaNs and a 2-pixel border. `withoutGaia()` keeps the sources with no Gaia star within 2.5 px (15″). They get an orange dashed square: seen by SPHEREx in infrared, but not in Gaia's visible-light catalogue, which is exactly what a cold brown dwarf looks like. (Pink squares are community reports from `CandidateOverlay`.)
+- Safety: sources are only flagged when the Gaia query succeeded and returned stars on the image; an empty or failed query would otherwise mark every source.
+- Hovering near a field star shows "Gaia DR3 star · G 12.3 · moves 0.045″/yr" in the cursor info. The "Gaia stars" button hides all of it.
+- Checked on all five examples with the live `/api/gaia`: in Barnard's dense field every source matches on every epoch; the other targets get 0–5 orange squares per epoch.
+- Limits: the backend returns at most 500 stars (brightest first), so in very dense fields a faint Gaia star may be missing and its source flagged. Galaxies and very red stars also show up as "no Gaia match"; a square means "worth a look", not "new object".
+
 ### Spectrum
 - One measurement per SPHEREx image, at the image centre (3 × 3 px). x = wavelength (µm), y = surface brightness (MJy/sr), with error bars, one colour per epoch.
 - Default view "Average per detector" (`lib/spectrumStats.ts`): one point per detector and date (mean, error of the mean), joined by a line, so the shape and any change between dates are easy to see. "All measurements" shows every point.
@@ -113,6 +129,18 @@ The spectrum keeps the old chart on screen until the new CSV has loaded, so the 
 - Detector ranges D1–D6 are shaded in the background.
 - The epoch on screen in the blink is highlighted and the others are dimmed, so brightness changes between epochs are easy to see.
 - The x axis is fitted to the data (about 0.75–5 µm). The y axis starts at 0 unless flux goes below it. Checked against all five challenge targets: every point fits.
+
+### Spectrum of a clicked pixel
+- Clicking the image (Juho's `onPick`, which also opens the candidate report) sets `spectrumPx`. `hooks/usePixelSpectrum.ts` reads every per-pixel file (`outputs[D1–D6].pixels`, ~60 kB each, cached) and takes, for that pixel: SB (flux), SB ÷ SNR (error) and WAVE (wavelength). The result is one point per detector and epoch, fed into `SpectrumChart` through its `pixel` prop; "Back to image centre" clears it.
+- This is coarser than the centre spectrum (`spectrum.csv` has one point per SPHEREx image). The per-pixel SB is a stack of several images, so its wavelength is that of one representative image.
+- When the WAVE layer is missing or filler (the precomputed examples), the wavelength is the middle of the detector range and the text says so.
+- Saturated core pixels are NaN and left out. The pixel stays fixed on the sky, so a fast star leaves it between epochs (Barnard's D5 value drops from 948 to 174 MJy/sr for that reason).
+- Only offered when the result has per-pixel files.
+
+### Light curve
+- `meta.light_curve` comes in two formats, and `lib/lightCurve.ts` `parseLightCurve()` reads both: per band (current science: `bands.D1.epochs[]`, `variable_bands`) and one series (older results: `epochs[]`, shown as "All detectors"). No light curve → no chart.
+- `components/LightCurveChart.tsx`: one line per band over time, error bars, detector colours as in the science plots. Default scale is relative (flux ÷ the band's mean, dashed line at 1.0), because bands differ a lot in brightness; "MJy/sr" shows absolute values. A vertical line marks the date on screen in the blink.
+- The headline uses science's own verdict (`is_variable`, `variable_bands`: std/mean > 15 % and amplitude > 2.5 × the mean error).
 
 ### Loading
 `describeStage` maps `queued`, `downloading`, `processing` to text and strips the `preview_` prefix. The bar shows a count only while `done < total`. When the backend sits at `processing 36/36` for minutes, the bar is indeterminate instead of stuck at full.
@@ -206,7 +234,7 @@ Integration (app side):
 - `state.ts` sends the preview as `kind: "done"` and does not use the `preview` field.
 - Target name and credit appear in both the app and the viewer.
 
-Not built: light curve (`lightcurve.csv`), free difference or sum of any two epochs (needs computing from the FITS stacks), zoom.
+Not built: free difference or sum of any two epochs (needs computing from the FITS stacks), zoom, a full-resolution spectrum of any pixel (needs a per-image "spectral cube" from science; the per-pixel files only give one point per detector and date).
 
 ## AI usage
 Parts of this code were written with the help of an AI assistant (Claude).

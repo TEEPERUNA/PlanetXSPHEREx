@@ -7,10 +7,11 @@ AI-assisted: written with Claude (Anthropic).
 
 | File | What it does |
 |---|---|
-| `main.py` | FastAPI app: endpoints, job queue, quick preview, cache, fallbacks, background freshness checks, warm-up, error handling |
+| `main.py` | FastAPI app: endpoints, job queue, quick preview, cache, fallbacks, background freshness checks, warm-up, error handling, rate limits, candidate reports, Gaia field stars |
 | `fetch.py` | Fast data access: IRSA SIA search (with retries) + partial reads from AWS S3 → `Cutout` objects for the science module |
-| `requirements.txt` | Backend dependencies (includes `../science/requirements.txt`) |
-| `constraints.txt` | Exact pinned versions used in the Docker image |
+| `requirements.txt` | Backend + science runtime libraries (names only; add any new science library here too) |
+| `constraints.txt` | Exact pinned versions used in the Docker image (the only place with versions) |
+| `CANDIDATES.md` | Candidate reports API for the frontend |
 | `s3_test.py` | Test script: S3 vs. IRSA (same data? which is faster?) |
 | `PLAN.md` | What is done and what is next |
 | `HANDOFF.md` | How to run, deploy, test and debug the backend |
@@ -22,6 +23,7 @@ Related files outside `backend/`:
 - `../science/rebuild_examples.py`: Emil's script that regenerates `examples/`
 - `../examples/`: precomputed challenge-target results, served at `/api/examples/`
 - `../CONTRACT.md`: API and `meta.json` format shared with the frontend
+- `../.github/workflows/docker-build.yml`: builds the Docker image on every push (catches dependency problems before deploy)
 
 ## Request flow
 
@@ -62,7 +64,13 @@ Pipeline (class in main.py), one run:
 | `GET /api/status/{job}` | Progress (`stage`, `done`, `total`, `preview`), error, or the finished result |
 | `GET /api/files/{job}/{path}` | Files from the cache (bucket) |
 | `GET /api/examples/{job}/{path}` | Files from the bundled precomputed results |
+| `GET /api/gaia?ra=&dec=&radius=` | Gaia DR3 stars around a position (J2016.0, brightest first, max 500), cached forever |
+| `POST /api/candidates` | Store a community candidate report |
+| `GET /api/candidates[?ra=&dec=&radius_arcmin=]` | Reports, newest first, optionally only one field |
+| `GET /api/candidates/{id}` · `DELETE …` | One report · delete (admin token) |
 | `GET /docs` | Interactive API docs (Swagger) |
+
+`/api/sky` also takes `mask_flags=true` (flagged pixels left out of the stacks).
 
 Extra fields in a finished result (besides `meta`, `base_url`): `precomputed` (bundled example), `fallback` (not exactly what was asked), `note`, `refreshing`, `data_release`, `timing`, `science_version`. Full format: `../CONTRACT.md`.
 
@@ -71,6 +79,7 @@ Extra fields in a finished result (besides `meta`, `base_url`): `precomputed` (b
 - Challenge target, default FOV: `barnard`, `epsindib`, `wise0855`, `rwaur`, `rdra`
 - Challenge target, other FOV: `barnard_fov5`
 - Free coordinates: `ra133.7950_dec-7.2450_fov3`
+- Masked images: `+ _mask`, e.g. `barnard_mask`, `ra133.7950_dec-7.2450_fov3_mask`
 - Quick preview: `<job>__preview` · background check (internal): `<job>__refresh`
 
 ## Where results come from (priority order)
@@ -84,6 +93,9 @@ output/<job>/
   cache.json     written by backend: fingerprint, collection, source, checked_at, code_version, timing
   frames/…, blink_*.gif, diff_*.png, *.fits, spectrum.csv, lightcurve.*
 output/_checks/<target>.json   last freshness check for a bundled example
+output/_candidates/<id>.json   one community candidate report each
+output/_gaia/<key>.json        cached Gaia field-star answers
+output/<job>__new/             temporary folder of a background rebuild (swapped in when done)
 ```
 
 ## Freshness rules (background, never delays the response)
@@ -111,3 +123,9 @@ output/_checks/<target>.json   last freshness check for a bundled example
 | `MAX_FOV_ARCMIN` | `20` | Largest allowed field of view |
 | `WARMUP` | `1` | Compute missing challenge targets on startup |
 | `JOB_WORKERS` | `2` | Jobs running at the same time |
+| `RATE_JOBS` / `RATE_WINDOW_S` | `20` / `600` | New searches per IP per window |
+| `MAX_ACTIVE_JOBS` | `20` | Queued + running jobs before `503` busy |
+| `CANDIDATE_RATE` | `10` | Candidate reports per IP per window |
+| `CANDIDATES_ADMIN_TOKEN` | – | Enables `DELETE /api/candidates/{id}` |
+| `GAIA_MIRRORS` | Harvard, CDS, IUCAA, NAOJ | VizieR mirrors for `/api/gaia`, tried in order |
+| `GAIA_TIMEOUT_S` | `10` | Timeout per mirror |

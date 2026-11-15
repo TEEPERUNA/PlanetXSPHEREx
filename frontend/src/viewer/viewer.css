@@ -197,6 +197,61 @@
   border-radius: 50%;
 }
 
+/* Gaia field stars: thin light rings (size by brightness), faint ones as dots */
+.gaia__field {
+  fill: none;
+  stroke: #e0f2fe;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.75;
+}
+
+.gaia__field-dot {
+  fill: #e0f2fe;
+  opacity: 0.45;
+}
+
+/* Negative images (light sky): dark rings and dots so they stay visible */
+.gaia--inverted .gaia__field {
+  stroke: #0c4a6e;
+  opacity: 0.9;
+}
+
+.gaia--inverted .gaia__field-dot {
+  fill: #0c4a6e;
+}
+
+.gaia--inverted .gaia__nomatch {
+  stroke: #c2410c;
+}
+
+/* Bright source with no Gaia star: orange dashed square (pink is for community reports) */
+.gaia__nomatch {
+  fill: none;
+  stroke: #fb923c;
+  stroke-width: 1.5;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.viewer__gaia-key--field {
+  border-width: 1px;
+  border-color: #e0f2fe;
+}
+
+.viewer__nomatch-key {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin: 0 5px 0 2px;
+  vertical-align: -1px;
+  border: 1.5px dashed #fb923c;
+}
+
+.viewer__cursor-gaia {
+  color: #e0f2fe;
+}
+
 /* Controls */
 .controls {
   display: grid;
@@ -514,6 +569,45 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+/* Clicked-pixel spectrum: way back to the centre spectrum */
+.spectrum__back {
+  font-size: 0.8rem;
+}
+
+/* Light curve (shares the spectrum chart classes) */
+.lightcurve h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.lightcurve__verdict {
+  margin: 4px 0 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.lightcurve__verdict.is-variable {
+  color: #fbbf24;
+}
+
+/* Dashed line at 1.0 = the band's average */
+.lightcurve__mean {
+  stroke: currentColor;
+  stroke-dasharray: 4 3;
+  opacity: 0.35;
+}
+
+/* The date shown in the blink right now */
+.lightcurve__now {
+  stroke: var(--accent, currentColor);
+  stroke-width: 1.5;
+  opacity: 0.6;
+}
+
+.lightcurve__series:not(.is-variable) {
+  opacity: 0.75;
 }
 
 /* Info dropdowns (Controls info, Website info) */

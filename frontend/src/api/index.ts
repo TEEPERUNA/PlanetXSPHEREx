@@ -61,6 +61,28 @@ export function startSky(s: Search, signal?: AbortSignal) {
 export const getStatus = (job: string, signal?: AbortSignal) =>
   getJson<SkyResponse>(`/api/status/${encodeURIComponent(job)}`, signal);
 
+// Gaia DR3 stars around an image (CONTRACT.md, GET /api/gaia). Positions at J2016.0.
+export interface GaiaStar {
+  id: string;
+  ra: number; // degrees, J2016.0
+  dec: number;
+  pmra: number | null; // mas/yr, includes cos(dec)
+  pmdec: number | null;
+  g: number | null; // Gaia G magnitude
+}
+
+export interface GaiaField {
+  epoch: number; // 2016.0
+  count: number;
+  truncated: boolean; // more stars exist than were returned (brightest first)
+  stars: GaiaStar[];
+}
+
+export function getGaia(ra: number, dec: number, radiusArcsec: number, signal?: AbortSignal) {
+  const q = new URLSearchParams({ ra: ra.toFixed(6), dec: dec.toFixed(6), radius: radiusArcsec.toFixed(0) });
+  return getJson<GaiaField>(`/api/gaia?${q}`, signal);
+}
+
 // Community "report a candidate" reports (see backend/CANDIDATES.md).
 export type CandidateKind = "moving" | "faint" | "spectrum" | "other";
 

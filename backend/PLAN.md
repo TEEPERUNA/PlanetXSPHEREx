@@ -10,6 +10,10 @@ See also: [`STRUCTURE.md`](STRUCTURE.md) · [`HANDOFF.md`](HANDOFF.md) · [`../C
 - FastAPI backend (`main.py`): `/api/targets`, `/api/sky`, `/api/status/{job}`, `/api/files/...`, `/api/examples/...`, `/api/health`
 - Background jobs with progress (`stage`, `done`, `total`) and a **quick preview** (1 image per epoch+detector) before the full result
 - Open CORS, so any website can use the API; coordinates and FOV work from the URL
+- **Community candidate reports** (`/api/candidates`): report, list by field, moderation; one JSON file per report in the bucket, works when IRSA is down (`CANDIDATES.md`)
+- **Gaia DR3 field stars** (`/api/gaia`): all Gaia stars around an image for the viewer overlay; VizieR mirrors tried in turn (10 s each), cached forever in memory and in the bucket
+- **Masked images** (`/api/sky?...&mask_flags=true`): flagged (bad) pixels left out of the stacks, using Emil's `flag_bad` list; cached separately (`<job>_mask`)
+- Field of view up to 20 arcmin
 
 ### Data access
 - **Fast S3 downloads** (`fetch.py`): IRSA SIA search → partial reads from the official SPHEREx copy on AWS S3 (`s3://nasa-irsa-spherex`), only the needed pixels, 32 in parallel, WCS shifted to the cutout
@@ -27,7 +31,11 @@ See also: [`STRUCTURE.md`](STRUCTURE.md) · [`HANDOFF.md`](HANDOFF.md) · [`../C
 - **No double work**: a result being rebuilt in the background is not started a second time; half-written `meta.json` is retried
 - **Clear errors**: user-friendly messages in `error` (no coverage / IRSA not responding / out of memory), technical details in `error_detail` and the logs; HTTP 500 responses include CORS headers and a generic message
 - NaN/Infinity in results are converted to `null` (valid JSON)
-- **Pinned dependency versions** (`constraints.txt`) so a new upstream release cannot break a deploy during judging
+- **Pinned dependency versions** (`constraints.txt`) so a new upstream release cannot break a deploy during judging; versions live only there (fixed 15.11: conflicting pins in `science/requirements.txt` broke the Docker build)
+- **Docker build check** in GitHub Actions on every push
+- **Atomic cache updates**: background rebuilds go to a temp folder and are swapped in file by file (`meta.json` last), so a user never sees a half-written result
+- **Rate limits**: 20 new searches and 10 candidate reports per IP per 10 min, max 20 queued jobs (`429` / `503` with a clear message); cached results and challenge targets are never limited
+- Finished jobs are forgotten from memory after an hour (results stay on disk); startup uses a lifespan handler
 
 ### Keeping data fresh
 - Cached results are returned instantly; a light background check runs at most once a day (`CACHE_TTL_HOURS`)
@@ -46,10 +54,10 @@ See also: [`STRUCTURE.md`](STRUCTURE.md) · [`HANDOFF.md`](HANDOFF.md) · [`../C
 ## Next / if time allows 📋
 
 1. Free coordinates: processing takes ~100 s because of the live Gaia query in the science module → waiting for Emil's timeout / `skip_gaia` flag, then skip Gaia in the quick preview (one line in `Pipeline.__call__`)
-2. Progressive results: show each epoch as soon as it is ready
-3. Backend tests (`job_from_slug`, `clean_json`, `friendly_error`, `/api/sky` routing) and a GitHub Actions check
-4. Limit the in-memory job list (TTL) and add a simple rate limit
-5. Replace `@app.on_event("startup")` with a lifespan handler
+2. Measure a 20 arcmin search on Cloud Run (`TIMING` in the logs); lower `MAX_FOV_ARCMIN` if it is too slow or runs out of memory
+3. Progressive results: show each epoch as soon as it is ready
+4. Backend unit tests (`job_from_slug`, `clean_json`, `friendly_error`, `parse_vizier_tsv`, `/api/sky` routing)
+5. Candidate moderation page (now: `DELETE` with the admin token)
 
 ## After judging ⚠️
 
