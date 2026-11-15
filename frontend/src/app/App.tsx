@@ -29,15 +29,18 @@ export function App() {
   return (
     <main className="app">
       <header className="app__header">
-        <h1>SPHEREx Sky</h1>
+        <h1>
+          <span className="app__mark" aria-hidden="true" />
+          SPHEREx Sky
+        </h1>
         <p className="note">See how a patch of sky changes over time.</p>
+        {result && gif && (
+          <a className="app__download" href={result.baseUrl + gif} download>
+            Download GIF
+          </a>
+        )}
       </header>
       <SearchForm initial={initial} onSearch={setTarget} />
-      {result && gif && (
-        <a className="note" href={result.baseUrl + gif} download>
-          Download GIF
-        </a>
-      )}
       <section className={"result card" + (open ? " is-open" : "")}>
         <Viewer status={status} />
       </section>

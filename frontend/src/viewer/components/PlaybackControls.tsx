@@ -46,15 +46,17 @@ export function PlaybackControls(p: Props) {
       </div>
 
       <div className="controls__row">
-        <button type="button" onClick={() => p.onStep(-1)} disabled={!p.canPlay} aria-label="Previous frame">
-          ◀
-        </button>
-        <button type="button" onClick={p.onTogglePlay} disabled={!p.canPlay}>
-          {p.playing ? "Pause" : "Play"}
-        </button>
-        <button type="button" onClick={() => p.onStep(1)} disabled={!p.canPlay} aria-label="Next frame">
-          ▶
-        </button>
+        <div className="controls__transport">
+          <button type="button" onClick={() => p.onStep(-1)} disabled={!p.canPlay} aria-label="Previous frame">
+            ◀
+          </button>
+          <button type="button" onClick={p.onTogglePlay} disabled={!p.canPlay}>
+            {p.playing ? "Pause" : "Play"}
+          </button>
+          <button type="button" onClick={() => p.onStep(1)} disabled={!p.canPlay} aria-label="Next frame">
+            ▶
+          </button>
+        </div>
 
         <label className="controls__slider">
           Speed {p.fps} fps

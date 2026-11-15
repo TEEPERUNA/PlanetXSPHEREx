@@ -18,13 +18,20 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Readouts in mono so numbers line up */
+.viewer__info,
+.viewer__cursor,
+.spectrum__readout {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+}
+
 .viewer__cursor {
   display: grid;
   gap: 2px;
   min-height: 4.5em; /* room for three lines, so the page does not jump */
   margin: 0;
-  opacity: 0.8;
-  font-variant-numeric: tabular-nums;
+  color: var(--muted, inherit);
 }
 
 .viewer__cursor p {
@@ -32,8 +39,7 @@
 }
 
 .viewer__cursor-note {
-  font-size: 0.85rem;
-  opacity: 0.8;
+  font-family: var(--sans, inherit);
 }
 
 .viewer__credit {
@@ -48,6 +54,10 @@
   aspect-ratio: 1;
   max-width: 100%;
   background: #000;
+  border: 1px solid var(--border, #222);
+  border-radius: var(--radius, 8px);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.5);
   touch-action: none; /* taps go to the viewer, not page scroll */
   cursor: crosshair;
 }
@@ -125,25 +135,86 @@
 .controls__slider {
   display: grid;
   gap: 2px;
-  font-size: 0.85rem;
 }
 
-.controls button.is-active {
-  font-weight: 700;
-  outline: 2px solid currentColor;
+/* Prev / play / next as one joined group */
+.controls__transport {
+  display: flex;
+}
+
+.controls__transport button {
+  border-radius: 0;
+}
+
+.controls__transport button + button {
+  margin-left: -1px;
+}
+
+.controls__transport button:first-child {
+  border-radius: 999px 0 0 999px;
+}
+
+.controls__transport button:last-child {
+  border-radius: 0 999px 999px 0;
+}
+
+.controls__transport button:nth-child(2) {
+  min-width: 72px;
+}
+
+.controls__slider {
+  flex: 1;
+  min-width: 120px;
+  color: var(--muted, inherit);
+  font-family: var(--mono, inherit);
+  font-size: 0.75rem;
+}
+
+.controls__slider input {
+  width: 100%;
 }
 
 /* Status */
+/* Empty, loading, error: a dark frame with a faint star field. */
 .status {
   display: grid;
-  gap: 8px;
-  padding: 24px;
+  place-content: center;
+  gap: 10px;
+  min-height: min(60vh, 520px);
+  padding: 32px 24px;
   text-align: center;
+  border: 1px solid var(--border, #222);
+  border-radius: var(--radius, 8px);
+  background:
+    radial-gradient(1px 1px at 12% 22%, #fff8, transparent 60%),
+    radial-gradient(1px 1px at 78% 14%, #fff6, transparent 60%),
+    radial-gradient(1.5px 1.5px at 64% 72%, #fff7, transparent 60%),
+    radial-gradient(1px 1px at 28% 84%, #fff5, transparent 60%),
+    radial-gradient(1px 1px at 90% 58%, #fff6, transparent 60%),
+    radial-gradient(1.5px 1.5px at 42% 38%, #ffd2b0aa, transparent 60%),
+    radial-gradient(1px 1px at 6% 64%, #fff4, transparent 60%),
+    radial-gradient(600px 300px at 50% 50%, rgb(255 138 61 / 0.06), transparent 70%),
+    #050607;
+}
+
+.status p {
+  margin: 0;
+}
+
+.status .progress {
+  width: min(320px, 100%);
+  justify-self: center;
 }
 
 .status--error .status__message,
 .status__hint {
-  opacity: 0.8;
+  color: var(--muted, inherit);
+  font-size: 0.85rem;
+}
+
+.status--error > p:first-child {
+  color: var(--danger, #f66);
+  font-weight: 600;
 }
 
 /* Progress (loading state and preview notice) */
@@ -154,6 +225,8 @@
 
 .progress__label {
   margin: 0;
+  font-family: var(--mono, inherit);
+  font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -165,9 +238,10 @@
 .viewer__notice {
   display: grid;
   gap: 6px;
-  padding: 8px 12px;
-  border: 1px dashed currentColor;
-  border-radius: 6px;
+  padding: 10px 14px;
+  background: var(--accent-soft, transparent);
+  border: 1px solid rgb(255 138 61 / 0.35);
+  border-radius: 8px;
   font-size: 0.9rem;
 }
 
@@ -177,8 +251,12 @@
 
 /* Spectrum */
 .spectrum h3 {
-  margin: 0 0 4px;
-  font-size: 1rem;
+  margin: 0 0 6px;
+  color: var(--muted, inherit);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .spectrum__note,
@@ -219,7 +297,8 @@
 .spectrum__bandlabel,
 .spectrum__title {
   fill: currentColor;
-  font-size: 11px;
+  font-family: var(--mono, inherit);
+  font-size: 10px;
 }
 
 .spectrum__tick,
