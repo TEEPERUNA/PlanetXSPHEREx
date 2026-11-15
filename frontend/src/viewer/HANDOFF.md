@@ -137,7 +137,12 @@ Integration (app side):
 - `state.ts` sends the preview as `kind: "done"` and does not use the `preview` field.
 - Target name and credit appear in both the app and the viewer.
 
-Not built: light curve (`lightcurve.csv`), contamination flags in the UI (the `flagged_frac` values are still implausibly high, 0.2–1.0, so they are not shown until science confirms them), free difference or sum of any two epochs (needs computing from the FITS stacks), zoom.
+Not built: light curve (`lightcurve.csv`), free difference or sum of any two epochs (needs computing from the FITS stacks), zoom.
+
+### Flags
+- Science writes a `FLAGS` layer (int32) into `pixels/<band>/epochN.fits`, and `flag_bits` (name → bit) plus `flag_bad` (names counted as unreliable) into `meta.json`. Bits are read from each SPHEREx image's FLAGS header (`MSKNnnnn` keys); `lib/flags.ts` holds the DR1 table as a fallback.
+- The cursor info shows the flag names on the pixel; unreliable ones are amber, and each name has a plain-language tooltip.
+- "x % flagged" under the date comes from `epochs[].detectors[band].flagged_frac` (ALL averages the detectors). It is only shown when `meta.flag_bits` exists, because older results counted every flag (SOURCE alone covers almost every pixel in dense fields).
 
 ## AI usage
 Parts of this code were written with the help of an AI assistant (Claude).

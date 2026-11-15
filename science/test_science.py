@@ -62,17 +62,35 @@ def test_gaia_validation_with_slug_variants():
 
 def test_bad_pixel_flag_mask():
     print("Testing SPHEREx bad-pixel flag bitmask (excluding FULLSAMPLE & SOURCE)...")
-    clean_flags = np.full((10, 10), 4096 | 4194304, dtype=np.int64) # Bit 12 and Bit 22
+    bits = fs.FLAG_BITS
+    # Official DR1 planes (FLAGS header MSKNnnnn keys)
+    assert bits["SOURCE"] == 21 and bits["OUTLIER"] == 19 and bits["BLOOM"] == 26 and bits["SNOWBALL"] == 27
+    clean_flags = np.full((10, 10), (1 << bits["FULLSAMPLE"]) | (1 << bits["SOURCE"]), dtype=np.int64)
     dirty_flags = clean_flags.copy()
-    dirty_flags[0, 0] |= 2  # OVERFLOW (saturation)
-    dirty_flags[1, 1] |= 64 # NONFUNC (dead pixel)
-    
+    dirty_flags[0, 0] |= 1 << bits["OVERFLOW"]  # saturation
+    dirty_flags[1, 1] |= 1 << bits["NONFUNC"]   # dead pixel
+    dirty_flags[2, 2] |= 1 << bits["HALO"]      # warning only, not counted
+
     old_frac = float(np.mean(dirty_flags != 0))
     assert old_frac == 1.0, f"Expected 1.0, got {old_frac}"
-    
+
     new_frac = float(np.mean((dirty_flags & fs.BAD_PIXEL_MASK) != 0))
     assert new_frac == 0.02, f"Expected 0.02 (2%), got {new_frac}"
     print("  ✓ BAD_PIXEL_MASK correctly ignores FULLSAMPLE and SOURCE bits (flagged_frac = 0.02 instead of 1.0)!")
+
+
+def test_read_flag_bits():
+    print("Testing flag plane names from a FLAGS header...")
+    from astropy.io import fits
+    hdr = fits.Header()
+    hdr["MSKN0001"] = "OVERFLOW"
+    hdr["MSKN0021"] = "SOURCE"
+    hdr["MSKN0030"] = "NEWFLAG"  # a plane a future release might add
+    bits = fs.read_flag_bits(hdr)
+    assert bits == {"OVERFLOW": 1, "SOURCE": 21, "NEWFLAG": 30}, bits
+    assert fs.bad_mask(bits) == 1 << 1  # only OVERFLOW is a bad flag here
+    assert fs.read_flag_bits(fits.Header()) == fs.FLAG_BITS  # no MSKN keys -> built-in table
+    print("  ✓ read_flag_bits reads MSKNnnnn keys and falls back to the DR1 table")
 
 def test_per_band_lightcurve_barnard_scenario():
     print("Testing Per-Band Light Curve (Barnard's Star unequal detector scenario)...")
@@ -421,6 +439,22 @@ def test_multi_layer_pixel_cube():
             assert 0.0 <= h["DETY"].data[15, 15] <= 2039.0
             assert np.isclose(h["DETX"].data[15, 15], 515.0)
             assert np.isclose(h["DETY"].data[15, 15], 815.0)
+            assert "FLAGS" not in h, "No FLAGS layer expected when the cutout has no flags"
+
+    # 1b. FLAGS layer: nearest pixel of the representative image, plane names in the header
+    flags = np.full(shape, 1 << fs.FLAG_BITS["SOURCE"], dtype=np.int32)
+    flags[15, 15] |= 1 << fs.FLAG_BITS["OVERFLOW"]
+    flagged = fs.Cutout(**{**cutout.__dict__, "flags": flags, "flag_bits": dict(fs.FLAG_BITS)})
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cube_path = Path(tmpdir) / "pixels" / "D3" / "epoch0.fits"
+        fs.build_pixel_cube(cube_path, flagged.image, [flagged], w, shape, "D3")
+        with fits.open(cube_path) as h:
+            assert "FLAGS" in h, "FLAGS layer missing"
+            f = h["FLAGS"].data
+            assert f.shape == shape and f.dtype.kind == "i", f"FLAGS must be integer, got {f.dtype}"
+            assert f[15, 15] == (1 << fs.FLAG_BITS["SOURCE"]) | (1 << fs.FLAG_BITS["OVERFLOW"])
+            assert f[0, 0] == 1 << fs.FLAG_BITS["SOURCE"]
+            assert h["FLAGS"].header["MSKN0001"] == "OVERFLOW"
 
     # 2. Integration test via run()
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -434,6 +468,8 @@ def test_multi_layer_pixel_cube():
         assert "pixels" in meta["outputs"]["D3"]
         assert meta["outputs"]["D3"]["pixels"] == ["pixels/D3/epoch0.fits"]
         assert (out_dir / "pixels" / "D3" / "epoch0.fits").exists()
+        assert meta["flag_bits"]["SOURCE"] == 21 and "OVERFLOW" in meta["flag_bad"]
+        assert "SOURCE" not in meta["flag_bad"]
 
     print("  ✓ Multi-layer pixel cubes correctly generated with all 7 float32 layers (SB, ZODI, SNR, WAVE, BW, DETX, DETY)!")
 
@@ -441,6 +477,7 @@ if __name__ == "__main__":
     test_slug_and_target_identification()
     test_gaia_validation_with_slug_variants()
     test_bad_pixel_flag_mask()
+    test_read_flag_bits()
     test_per_band_lightcurve_barnard_scenario()
     test_per_band_lightcurve_variable_scenario()
     test_proper_motion_aperture_tracking()

@@ -90,10 +90,10 @@ PlanetXSPHEREx/
 │           │   ├── chartScale.ts  axes and scales for SpectrumChart
 │           │   ├── spectrumStats.ts averages per detector, noise check
 │           │   ├── fits.ts        small FITS reader → pixels/<band>/epochN.fits
+│           │   ├── flags.ts       SPHEREx flag bits → names and plain-language meaning
 │           │   └── stage.ts       backend stage → text for the user
 │           ├── HANDOFF.md ....... technical handoff: how the viewer works
-│           ├── plan.md .......... working plan and open issues (Finnish)
-│           └── msg_to_eliz.txt .. how to test the API by hand
+│           └── plan.md .......... working plan and open issues (Finnish)
 ```
 
 ## Rules

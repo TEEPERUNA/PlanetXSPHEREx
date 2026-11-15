@@ -182,7 +182,13 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
       />
 
       <div className="viewer__side">
-        <EpochInfo frames={frames} frameIdx={idx} band={activeBand} showDiff={diffOn} />
+        <EpochInfo
+          frames={frames}
+          frameIdx={idx}
+          band={activeBand}
+          showDiff={diffOn}
+          showFlagged={meta.flag_bits !== undefined}
+        />
         {compareActive && (
           <p className="viewer__compare">
             Comparing{" "}
