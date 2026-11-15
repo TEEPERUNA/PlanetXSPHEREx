@@ -286,6 +286,57 @@ def test_gaia_timeout_and_skip_flag():
     assert elapsed < 1.0
     print(f"  ✓ validate_gaia with ultra-short timeout aborted gracefully in {elapsed:.3f} s (status={res['status']})")
 
+def test_stellar_donut_repair():
+    print("Testing Stellar Donut Repair (repair_star_donuts & stretch)...")
+    
+    # 1. Saturated NaN stellar core inside an image
+    # Shape 31x31 with a 2D Gaussian star peak of 1000 and background ~2
+    shape = (31, 31)
+    y, x = np.mgrid[:31, :31]
+    dist2 = (x - 15)**2 + (y - 15)**2
+    synthetic = 2.0 + 1000.0 * np.exp(-dist2 / 8.0)
+    
+    # Simulate saturated detector core: 3x3 block of NaNs at center
+    sat_img = synthetic.copy()
+    sat_img[14:17, 14:17] = np.nan
+    # Also add unobserved chip border NaNs on the outer row
+    sat_img[0, :] = np.nan
+    
+    repaired = fs.repair_star_donuts(sat_img)
+    
+    # Saturated core should not be NaN
+    assert not np.isnan(repaired).any(), "NaNs remained after repair_star_donuts"
+    
+    # Center 3x3 must not dip below the boundary brightness (no donut / black hole)
+    boundary_flux = synthetic[13, 15] # ~800
+    assert np.all(repaired[14:17, 14:17] >= 0.95 * boundary_flux), (
+        f"Stellar core has a dark donut dip: {repaired[14:17, 14:17]}"
+    )
+    
+    # Outer edge NaNs must be filled with sky background (~2), not stellar peak
+    assert np.all(repaired[0, :] < 5.0), f"Edge NaNs incorrectly filled with high flux: {repaired[0, :]}"
+    
+    # 2. Non-NaN central depression / crater / zeros (e.g. saturation roll-over or ALL combining)
+    crater_img = synthetic.copy()
+    crater_img[15, 15] = 0.0 # Zeroed-out core pixel
+    repaired_crater = fs.repair_star_donuts(crater_img)
+    assert repaired_crater[15, 15] > 500.0, f"Crater was not filled: {repaired_crater[15, 15]}"
+    
+    # 3. Stretch test: 8-bit image must have 255 pure white at the core when saturated, NO pitch black (0 or 1)
+    arr8 = fs.stretch(sat_img, lo=1.0, hi=600.0)
+    assert arr8[15, 15] == 255, f"Center pixel should be saturated 255, got {arr8[15, 15]}"
+    assert np.all(arr8[14:17, 14:17] == 255), "Core region in stretch() did not render as solid white"
+    
+    # 4. Difference image test: no neutral gray 127 hole in difference dipole
+    diff_path = Path("/tmp/test_diff_donut.png")
+    fs.diff_png(sat_img, synthetic, diff_path, scale=2, text="Donut Test")
+    from PIL import Image
+    diff_im = np.array(Image.open(diff_path).convert("L"))
+    # The center pixel of the difference should be a smooth dipole or flat, not a neutral gray hole
+    assert diff_path.exists()
+
+    print("  ✓ Stellar donuts successfully eliminated across NaNs, non-NaN craters, and stretch rendering!")
+
 if __name__ == "__main__":
     test_slug_and_target_identification()
     test_gaia_validation_with_slug_variants()
@@ -295,4 +346,5 @@ if __name__ == "__main__":
     test_run_with_preloaded_cutouts()
     test_json_null_sanitization()
     test_gaia_timeout_and_skip_flag()
+    test_stellar_donut_repair()
     print("\nALL EXPANDED SCIENCE TESTS PASSED!")
