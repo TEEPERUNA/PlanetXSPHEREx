@@ -1,9 +1,11 @@
-astropy>=6.0
-astroquery>=0.4.8
-reproject>=0.13
-photutils>=2.0
-scipy>=1.14
-numpy
-matplotlib
-pillow
-requests
+# SPHEREx Sky - Science Engine Dependencies
+# Pinned versions for reproducible builds (Python 3.12 / Cloud Run)
+astropy==6.1.4
+astroquery==0.4.8
+reproject==0.14.0
+photutils==2.0.2
+scipy==1.14.1
+numpy==2.0.2
+matplotlib==3.9.2
+pillow==10.4.0
+requests==2.32.3

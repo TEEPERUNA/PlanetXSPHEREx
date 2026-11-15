@@ -314,12 +314,66 @@
   font-variant-numeric: tabular-nums;
 }
 
-.spectrum__point line {
+.spectrum__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.spectrum__head h3 {
+  margin: 0;
+}
+
+.spectrum__modes {
+  display: flex;
+  gap: 4px;
+}
+
+.spectrum__modes button {
+  font-size: 0.8rem;
+}
+
+.spectrum__modes button.is-active {
+  font-weight: 700;
+  outline: 2px solid currentColor;
+}
+
+.spectrum__intro {
+  margin: 4px 0;
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+
+.spectrum__warning {
+  margin: 4px 0;
+  padding: 6px 10px;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.spectrum__hint {
+  fill: currentColor;
+  font-size: 10px;
+  opacity: 0.55;
+}
+
+.spectrum__line {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.spectrum__err {
+  stroke: currentColor;
   stroke-width: 1.2;
 }
 
-/* Epochs not shown in the blink right now */
-.spectrum__point.is-dim {
+/* Dates not shown in the blink right now */
+.spectrum__epoch.is-dim {
   opacity: 0.3;
 }
 
