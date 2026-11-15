@@ -11,6 +11,8 @@ export function InfoPanels() {
           <dd>Play loops the images in date order like a short video. The arrows step one image at a time and pause playback.</dd>
           <dt>Speed</dt>
           <dd>How many images per second the loop shows.</dd>
+          <dt>Compare two dates</dt>
+          <dd>Pick date A and date B. The loop then switches only between those two, the classic blink comparator: an object that moved jumps back and forth.</dd>
           <dt>Difference image</dt>
           <dd>The last epoch minus the first. White is brighter now, black is fainter now, so moving or changing objects stand out.</dd>
           <dt>Gaia position</dt>
