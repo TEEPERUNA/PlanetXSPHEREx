@@ -144,10 +144,13 @@ def prune_jobs():
         jobs.pop(k, None)
 
 
-def make_args(fov: float, per_group: int = PER_GROUP) -> SimpleNamespace:
+def make_args(fov: float, per_group: int = PER_GROUP, mask_flags: bool = False) -> SimpleNamespace:
     return SimpleNamespace(size=fov, bands=list(fs.DETECTORS), max=0, per_group=per_group,
-                           workers=DOWNLOAD_WORKERS, mask_flags=False, lo=1.0, hi=99.7, frame_ms=600,
+                           workers=DOWNLOAD_WORKERS, mask_flags=mask_flags, lo=1.0, hi=99.7, frame_ms=600,
                            out=str(OUTPUT_DIR))
+
+
+MASK_SUFFIX = "_mask"   # job id suffix for results with flagged (bad) pixels masked out
 
 
 def slug_for(ra: float, dec: float, fov: float) -> str:
@@ -219,22 +222,24 @@ def friendly_error(e: Exception) -> str:
 
 def job_from_slug(job: str):
     """Rebuild a job from its id, e.g. after a server restart lost the in-memory job list.
-    'barnard', 'barnard_fov4', 'ra133.7950_dec-7.2450_fov3' (and '__preview' suffix)."""
+    'barnard', 'barnard_fov4', 'ra133.7950_dec-7.2450_fov3' (+ '_mask', + '__preview')."""
     num = r"\d+(?:\.\d+)?"
     base = job.removesuffix("__preview")
+    mask = base.endswith(MASK_SUFFIX)
+    base = base.removesuffix(MASK_SUFFIX)
     m = re.fullmatch(rf"ra({num})_dec([+-]{num})_fov({num})", base)
     if m:
         ra, dec, fov = float(m[1]), float(m[2]), float(m[3])
         if not (0 <= ra < 360 and -90 <= dec <= 90 and 0 < fov <= MAX_FOV_ARCMIN):
             return None
         c = fs.parse_coord(str(ra), str(dec))
-        return coord_job(c, fov)
+        return coord_job(c, fov, mask)
     m = re.fullmatch(rf"([a-z0-9]+?)(?:_fov({num}))?", base)
     if m and m[1] in fs.TARGETS:
         fov = float(m[2]) if m[2] else 3.0
         if not 0 < fov <= MAX_FOV_ARCMIN:
             return None
-        return target_job(m[1], fov)
+        return target_job(m[1], fov, mask)
     return None
 
 
@@ -285,9 +290,10 @@ class Pipeline:
     """One pipeline for one position + FOV. Keeps the image list and downloaded cutouts
     between the quick preview run and the full run, so nothing is fetched twice."""
 
-    def __init__(self, resolve, fov: float):
+    def __init__(self, resolve, fov: float, mask_flags: bool = False):
         self.resolve = resolve          # () -> (coord, label, info)
         self.fov = fov
+        self.mask_flags = mask_flags    # True = flagged (bad) pixels left out of the stacks
         self._target = None
         self._images = None
         self.memo: dict = {}
@@ -306,7 +312,7 @@ class Pipeline:
     def __call__(self, progress, out_slug: str, per_group: int):
         t0 = time.time()
         c, label, info = self.target()
-        args = make_args(self.fov, per_group)
+        args = make_args(self.fov, per_group, self.mask_flags)
         fingerprint = None
         if FETCH_MODE == "s3":
             try:
@@ -489,19 +495,19 @@ def fallback_response(slug: str, key: str, reason: str) -> dict:
     return resp
 
 
-def target_job(key: str, fov: float):
-    slug = key if fov == 3.0 else f"{key}_fov{fov:g}"
+def target_job(key: str, fov: float, mask: bool = False):
+    slug = (key if fov == 3.0 else f"{key}_fov{fov:g}") + (MASK_SUFFIX if mask else "")
 
     def make_pipeline():
-        return Pipeline(lambda: fs.target_coord(key), fov)
+        return Pipeline(lambda: fs.target_coord(key), fov, mask)
     return slug, make_pipeline
 
 
-def coord_job(c, fov: float):
-    slug = slug_for(c.ra.deg, c.dec.deg, fov)
+def coord_job(c, fov: float, mask: bool = False):
+    slug = slug_for(c.ra.deg, c.dec.deg, fov) + (MASK_SUFFIX if mask else "")
 
     def make_pipeline():
-        return Pipeline(lambda: (c, f"RA {c.ra.deg:.4f} Dec {c.dec.deg:+.4f}", {}), fov)
+        return Pipeline(lambda: (c, f"RA {c.ra.deg:.4f} Dec {c.dec.deg:+.4f}", {}), fov, mask)
     return slug, make_pipeline
 
 
@@ -540,14 +546,15 @@ def targets():
 @app.get("/api/sky")
 def sky(request: Request, ra: str | None = None, dec: str | None = None,
         target: str | None = Query(None, description="one of /api/targets keys"),
-        fov: float = Query(3.0, gt=0, description="field of view, arcmin")):
+        fov: float = Query(3.0, gt=0, description="field of view, arcmin"),
+        mask_flags: bool = Query(False, description="leave flagged (bad) pixels out of the images")):
     if fov > MAX_FOV_ARCMIN:
         raise HTTPException(400, f"fov must be <= {MAX_FOV_ARCMIN} arcmin")
 
     if target:
         if target not in fs.TARGETS:
             raise HTTPException(404, f"unknown target '{target}'")
-        slug, make_pipeline = target_job(target, fov)
+        slug, make_pipeline = target_job(target, fov, mask_flags)
     elif ra is not None and dec is not None:
         try:
             c = fs.parse_coord(ra, dec)
@@ -558,9 +565,9 @@ def sky(request: Request, ra: str | None = None, dec: str | None = None,
         key = matching_target(c)
         if key:
             target = key
-            slug, make_pipeline = target_job(key, fov)
+            slug, make_pipeline = target_job(key, fov, mask_flags)
         else:
-            slug, make_pipeline = coord_job(c, fov)
+            slug, make_pipeline = coord_job(c, fov, mask_flags)
     else:
         raise HTTPException(400, "give either target or ra+dec")
 
