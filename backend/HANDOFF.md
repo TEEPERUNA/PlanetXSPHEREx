@@ -26,7 +26,11 @@ Every merge to `main` redeploys – avoid many merges right before or during jud
 4. Image URL = `API + base_url + path from meta.json`. `base_url` can start with `/api/files/` **or** `/api/examples/` – never hard-code it.
 5. If `fallback` is `true`, show a banner with `note` (e.g. live data unavailable, showing the precomputed 3′ view). `precomputed: true` means a bundled challenge-target result.
 6. Errors: `status: "error"` has a user-friendly `error`; HTTP 400/404/500 have `{"detail": "..."}`. Show them with a "Try again" button.
-7. `VITE_API_BASE_URL` defaults to the Cloud Run URL; set it to `http://localhost:8000` only to test a local backend.
+7. HTTP `429` (too many new searches / reports from one IP) and `503` (server busy) also have a `detail` text – show it.
+8. Masked images: add `mask_flags=true` to `/api/sky`; the job id ends in `_mask`.
+9. Candidate reports: `POST` / `GET /api/candidates`, see [`CANDIDATES.md`](CANDIDATES.md).
+10. Gaia field stars: `GET /api/gaia?ra=&dec=&radius=<arcsec, max 600>` → J2016.0 positions + proper motions, brightest first; `503` = catalogue unreachable, show only the target star.
+11. `VITE_API_BASE_URL` defaults to the Cloud Run URL; set it to `http://localhost:8000` only to test a local backend.
 
 ## Run locally
 
@@ -50,7 +54,8 @@ Useful: `WARMUP=0` (don't compute targets on start), `FETCH_MODE=irsa` (test the
 - **Emil changes the processing:** he reruns `rebuild_examples` and merges code + `examples/` together → after the deploy the targets use the new images. Cached free-coordinate results made with older code are rebuilt automatically in the background on their next request.
 - **New SPHEREx observations:** found automatically (daily background check), no action needed.
 - **New data release (e.g. DR2):** set `SPHEREX_COLLECTIONS=spherex_dr2,spherex_dr1,spherex_qr3` in the Cloud Run variables and redeploy.
-- **Clear the cache:** delete the `output/` folder in the bucket; everything is recomputed on request (the 5 targets keep working from `examples/`).
+- **Clear the cache:** delete the `output/` folder in the bucket; everything is recomputed on request (the 5 targets keep working from `examples/`). Keep `output/_candidates/` (the community reports); `output/_gaia/` can be deleted freely.
+- **Delete a spam report:** set `CANDIDATES_ADMIN_TOKEN` in the Cloud Run variables, then `DELETE /api/candidates/<id>` with header `X-Admin-Token: <token>` (or delete the file in `output/_candidates/`).
 - **Upgrade libraries:** change `constraints.txt` deliberately, build and test locally, then merge.
 
 ## Test checklist
@@ -64,6 +69,11 @@ Useful: `WARMUP=0` (don't compute targets on start), `FETCH_MODE=irsa` (test the
 | `/api/sky?ra=83.82&dec=-5.39` | `queued` → `preview` → `done` (needs IRSA) |
 | `/api/sky?ra=abc&dec=1` / `fov=50` / `target=nope` | 400 / 400 / 404 |
 | `/api/status/ra1.2.3_dec+1_fov3` | 404 |
+| `/api/sky?target=barnard&mask_flags=true` | job `barnard_mask`, then `done` |
+| `/api/gaia?ra=269.4461&dec=4.7707&radius=130` | ~330 stars, first = Barnard (`g` 8.19, `pmdec` ≈ 10362) |
+| `/api/gaia?ra=1&dec=1&radius=700` | 400 |
+| `POST /api/candidates` `{"ra":269.45,"dec":4.69}` | 201, `near_challenge_target: "barnard"` |
+| `GET /api/candidates` | `{count, candidates}` |
 
 ## Logs and debugging
 
@@ -72,6 +82,7 @@ Cloud Run → `planetx-api` → Observability → Logs. Useful filters:
 - `S3:` – cutouts from S3 and time · `falling back` – IRSA cutout route used
 - `IRSA SIA failed` – IRSA retries · `Refresh check` / `Rebuilding` – background freshness work
 - `Traceback` – errors
+- `Gaia: all VizieR mirrors failed` – `/api/gaia` could not reach any VizieR mirror
 
 **`DALServiceError: 502 Server Error: Proxy Error … irsa.ipac.caltech.edu`** = NASA's IRSA is down/overloaded, not our bug. Cached results and the 5 targets keep working; new positions return "The SPHEREx data archive (NASA/IPAC IRSA) did not respond".
 

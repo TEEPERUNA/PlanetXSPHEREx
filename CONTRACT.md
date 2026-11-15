@@ -20,6 +20,8 @@ Query params, use one of these:
 - `ra=<deg or 08h55m10.8s>&dec=<deg or -7d14m42s>`
 
 Optional: `fov=<arcmin>` (default 3, max 20).
+Optional: `mask_flags=true` → flagged (bad) pixels, the planes in `meta.flag_bad`, are left out of the
+stacks. Separate result and job id (ends in `_mask`); default `false`.
 
 Responses:
 ```json
