@@ -147,6 +147,16 @@
         "frames/D1/epoch1.png",
         "frames/D1/epoch2.png"
       ],
+      "fits": [
+        "epoch0_D1.fits",
+        "epoch1_D1.fits",
+        "epoch2_D1.fits"
+      ],
+      "pixels": [
+        "pixels/D1/epoch0.fits",
+        "pixels/D1/epoch1.fits",
+        "pixels/D1/epoch2.fits"
+      ],
       "gif": "blink_D1.gif",
       "diff": "diff_D1.png"
     },
@@ -155,6 +165,16 @@
         "frames/D2/epoch0.png",
         "frames/D2/epoch1.png",
         "frames/D2/epoch2.png"
+      ],
+      "fits": [
+        "epoch0_D2.fits",
+        "epoch1_D2.fits",
+        "epoch2_D2.fits"
+      ],
+      "pixels": [
+        "pixels/D2/epoch0.fits",
+        "pixels/D2/epoch1.fits",
+        "pixels/D2/epoch2.fits"
       ],
       "gif": "blink_D2.gif",
       "diff": "diff_D2.png"
@@ -165,6 +185,16 @@
         "frames/D3/epoch1.png",
         "frames/D3/epoch2.png"
       ],
+      "fits": [
+        "epoch0_D3.fits",
+        "epoch1_D3.fits",
+        "epoch2_D3.fits"
+      ],
+      "pixels": [
+        "pixels/D3/epoch0.fits",
+        "pixels/D3/epoch1.fits",
+        "pixels/D3/epoch2.fits"
+      ],
       "gif": "blink_D3.gif",
       "diff": "diff_D3.png"
     },
@@ -173,6 +203,16 @@
         "frames/D4/epoch0.png",
         "frames/D4/epoch1.png",
         "frames/D4/epoch2.png"
+      ],
+      "fits": [
+        "epoch0_D4.fits",
+        "epoch1_D4.fits",
+        "epoch2_D4.fits"
+      ],
+      "pixels": [
+        "pixels/D4/epoch0.fits",
+        "pixels/D4/epoch1.fits",
+        "pixels/D4/epoch2.fits"
       ],
       "gif": "blink_D4.gif",
       "diff": "diff_D4.png"
@@ -183,6 +223,16 @@
         "frames/D5/epoch1.png",
         "frames/D5/epoch2.png"
       ],
+      "fits": [
+        "epoch0_D5.fits",
+        "epoch1_D5.fits",
+        "epoch2_D5.fits"
+      ],
+      "pixels": [
+        "pixels/D5/epoch0.fits",
+        "pixels/D5/epoch1.fits",
+        "pixels/D5/epoch2.fits"
+      ],
       "gif": "blink_D5.gif",
       "diff": "diff_D5.png"
     },
@@ -192,6 +242,16 @@
         "frames/D6/epoch1.png",
         "frames/D6/epoch2.png"
       ],
+      "fits": [
+        "epoch0_D6.fits",
+        "epoch1_D6.fits",
+        "epoch2_D6.fits"
+      ],
+      "pixels": [
+        "pixels/D6/epoch0.fits",
+        "pixels/D6/epoch1.fits",
+        "pixels/D6/epoch2.fits"
+      ],
       "gif": "blink_D6.gif",
       "diff": "diff_D6.png"
     },
@@ -200,6 +260,11 @@
         "frames/ALL/epoch0.png",
         "frames/ALL/epoch1.png",
         "frames/ALL/epoch2.png"
+      ],
+      "fits": [
+        "epoch0_ALL.fits",
+        "epoch1_ALL.fits",
+        "epoch2_ALL.fits"
       ],
       "gif": "blink_ALL.gif",
       "diff": "diff_ALL.png"
@@ -238,15 +303,23 @@
     "status": "VALIDATED_NON_GAIA",
     "gaia_dr3_source_id": null,
     "target": "WISE 0855-0714",
-    "message": "WISE 0855 is a cold Y dwarf (T ~ 250 K) invisible in optical Gaia DR3. Astrometry verified via unWISE/CatWISE.",
+    "target_key": "wise0855",
+    "message": "WISE 0855 is a cold Y-dwarf (T ~ 250 K), invisible in optical Gaia DR3. Proper motion validated via CatWISE2020 & unWISE astrometry.",
     "reference_epoch": "J2016.0",
     "target_epoch": 2026.33,
-    "predicted_ra": 133.771642,
-    "predicted_dec": -7.243215,
+    "predicted_ra": 133.768005,
+    "predicted_dec": -7.242916,
     "pmra_masyr": -8118.0,
     "pmdec_masyr": 673.0,
     "accumulated_shift_arcsec": 84.17,
-    "is_match": true
+    "residual_offset_arcsec": null,
+    "is_match": true,
+    "pixel_coords": {
+      "canvas_x": 14.29,
+      "canvas_y": 15.06,
+      "wcs_x": 14.29,
+      "wcs_y": 14.94
+    }
   },
   "versions": [
     "7.0.5"
@@ -255,5 +328,6 @@
   "pmra_masyr": -8118.0,
   "pmdec_masyr": 673.0,
   "propagated_to": 2026.87,
-  "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team"
+  "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team",
+  "inverted": true
 }

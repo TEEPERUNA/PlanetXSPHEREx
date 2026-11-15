@@ -191,6 +191,16 @@
         "frames/D1/epoch2.png",
         "frames/D1/epoch3.png"
       ],
+      "fits": [
+        "epoch0_D1.fits",
+        "epoch2_D1.fits",
+        "epoch3_D1.fits"
+      ],
+      "pixels": [
+        "pixels/D1/epoch0.fits",
+        "pixels/D1/epoch2.fits",
+        "pixels/D1/epoch3.fits"
+      ],
       "gif": "blink_D1.gif",
       "diff": "diff_D1.png"
     },
@@ -202,6 +212,20 @@
         "frames/D2/epoch3.png",
         "frames/D2/epoch4.png"
       ],
+      "fits": [
+        "epoch0_D2.fits",
+        "epoch1_D2.fits",
+        "epoch2_D2.fits",
+        "epoch3_D2.fits",
+        "epoch4_D2.fits"
+      ],
+      "pixels": [
+        "pixels/D2/epoch0.fits",
+        "pixels/D2/epoch1.fits",
+        "pixels/D2/epoch2.fits",
+        "pixels/D2/epoch3.fits",
+        "pixels/D2/epoch4.fits"
+      ],
       "gif": "blink_D2.gif",
       "diff": "diff_D2.png"
     },
@@ -212,6 +236,18 @@
         "frames/D3/epoch3.png",
         "frames/D3/epoch4.png"
       ],
+      "fits": [
+        "epoch0_D3.fits",
+        "epoch2_D3.fits",
+        "epoch3_D3.fits",
+        "epoch4_D3.fits"
+      ],
+      "pixels": [
+        "pixels/D3/epoch0.fits",
+        "pixels/D3/epoch2.fits",
+        "pixels/D3/epoch3.fits",
+        "pixels/D3/epoch4.fits"
+      ],
       "gif": "blink_D3.gif",
       "diff": "diff_D3.png"
     },
@@ -220,6 +256,16 @@
         "frames/D4/epoch0.png",
         "frames/D4/epoch2.png",
         "frames/D4/epoch3.png"
+      ],
+      "fits": [
+        "epoch0_D4.fits",
+        "epoch2_D4.fits",
+        "epoch3_D4.fits"
+      ],
+      "pixels": [
+        "pixels/D4/epoch0.fits",
+        "pixels/D4/epoch2.fits",
+        "pixels/D4/epoch3.fits"
       ],
       "gif": "blink_D4.gif",
       "diff": "diff_D4.png"
@@ -232,6 +278,20 @@
         "frames/D5/epoch3.png",
         "frames/D5/epoch4.png"
       ],
+      "fits": [
+        "epoch0_D5.fits",
+        "epoch1_D5.fits",
+        "epoch2_D5.fits",
+        "epoch3_D5.fits",
+        "epoch4_D5.fits"
+      ],
+      "pixels": [
+        "pixels/D5/epoch0.fits",
+        "pixels/D5/epoch1.fits",
+        "pixels/D5/epoch2.fits",
+        "pixels/D5/epoch3.fits",
+        "pixels/D5/epoch4.fits"
+      ],
       "gif": "blink_D5.gif",
       "diff": "diff_D5.png"
     },
@@ -243,6 +303,20 @@
         "frames/D6/epoch3.png",
         "frames/D6/epoch4.png"
       ],
+      "fits": [
+        "epoch0_D6.fits",
+        "epoch1_D6.fits",
+        "epoch2_D6.fits",
+        "epoch3_D6.fits",
+        "epoch4_D6.fits"
+      ],
+      "pixels": [
+        "pixels/D6/epoch0.fits",
+        "pixels/D6/epoch1.fits",
+        "pixels/D6/epoch2.fits",
+        "pixels/D6/epoch3.fits",
+        "pixels/D6/epoch4.fits"
+      ],
       "gif": "blink_D6.gif",
       "diff": "diff_D6.png"
     },
@@ -253,6 +327,13 @@
         "frames/ALL/epoch2.png",
         "frames/ALL/epoch3.png",
         "frames/ALL/epoch4.png"
+      ],
+      "fits": [
+        "epoch0_ALL.fits",
+        "epoch1_ALL.fits",
+        "epoch2_ALL.fits",
+        "epoch3_ALL.fits",
+        "epoch4_ALL.fits"
       ],
       "gif": "blink_ALL.gif",
       "diff": "diff_ALL.png"
@@ -301,20 +382,27 @@
   },
   "gaia_validation": {
     "status": "CONFIRMED_MATCH",
-    "gaia_dr3_source_id": 6412595995574316544,
+    "gaia_dr3_source_id": 6412596012146801152,
     "target": "Epsilon Indi B",
-    "message": "Confirmed Gaia DR3 counterpart. Proper motion propagated from J2016.0 to 2026.74.",
+    "target_key": "epsindib",
+    "message": "Confirmed Gaia DR3 benchmark target (Epsilon Indi B). Proper motion propagated from J2016.0 to 2026.74.",
     "reference_epoch": "J2016.0",
     "target_epoch": 2026.74,
-    "predicted_ra": 331.065402,
-    "predicted_dec": -56.790266,
-    "pmra_masyr": 3966.7,
-    "pmdec_masyr": -2536.2,
+    "predicted_ra": 331.098145,
+    "predicted_dec": -56.801171,
+    "pmra_masyr": 3981.98,
+    "pmdec_masyr": -2466.83,
     "parallax_mas": 275.8,
-    "phot_g_mean_mag": 4.69,
-    "accumulated_shift_arcsec": 50.57,
-    "residual_offset_arcsec": 75.924,
-    "is_match": true
+    "phot_g_mean_mag": 19.8,
+    "accumulated_shift_arcsec": 50.31,
+    "residual_offset_arcsec": 1.753,
+    "is_match": true,
+    "pixel_coords": {
+      "canvas_x": 14.9,
+      "canvas_y": 14.73,
+      "wcs_x": 14.9,
+      "wcs_y": 15.27
+    }
   },
   "versions": [
     "7.0.5"
@@ -323,5 +411,6 @@
   "pmra_masyr": 3966.7,
   "pmdec_masyr": -2536.2,
   "propagated_to": 2026.87,
-  "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team"
+  "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team",
+  "inverted": false
 }
