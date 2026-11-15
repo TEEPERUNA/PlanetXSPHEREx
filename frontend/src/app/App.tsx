@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { Viewer } from "../viewer";
 import { DEFAULT_FOV, searchFromUrl, useSky } from "../state";
 import { getTargets, type Target } from "../api";
@@ -11,10 +11,15 @@ import { ShipAudio } from "./beyond/shipAudio";
 import { GameHud, MissionLog, Toasts } from "./beyond/GameHud";
 import { HuntLayer, catalogPixels } from "./beyond/HuntLayer";
 import { useGame } from "./beyond/useGame";
+import { Arcade } from "./beyond/Arcade";
+import { Hangar } from "./beyond/Hangar";
+import { ShipIcon } from "./beyond/ShipIcon";
+import { HAILS, shipById } from "./beyond/ships";
 import "./app.css";
 import "./beyond/beyond.css";
 import "./beyond/ship.css";
 import "./beyond/game.css";
+import "./beyond/fleet.css";
 
 const initial = searchFromUrl();
 
@@ -100,8 +105,47 @@ export function App() {
     onMission: () => soundRef.current && audio.current.fanfare(),
     onRank: () => soundRef.current && audio.current.fanfare(),
   });
-  const { complete, visit, lock, toast } = game;
+  const { complete, visit, lock, toast, scan, flight } = game;
   const [logOpen, setLogOpen] = useState(false);
+  const [hangarOpen, setHangarOpen] = useState(false);
+  const ship = shipById(game.progress.ship);
+
+  // Flight simulator. It ends by itself when a search that was loading at the start finishes.
+  const [arcadeOpen, setArcadeOpen] = useState(false);
+  const arcadeDuringLoad = useRef(false);
+  const openArcade = useCallback(() => {
+    arcadeDuringLoad.current = status.kind === "loading";
+    setArcadeOpen(true);
+  }, [status.kind]);
+  const closeArcade = useCallback(
+    (score: number, duringWarp: boolean) => {
+      setArcadeOpen(false);
+      flight(score, duringWarp);
+    },
+    [flight],
+  );
+  const sfx = {
+    shoot: () => soundRef.current && audio.current.shoot(),
+    boom: () => soundRef.current && audio.current.boom(),
+    hurt: () => soundRef.current && audio.current.hurt(),
+    pickup: () => soundRef.current && audio.current.pickup(),
+  };
+
+  // Passing ships: hails (at most one every 40 s) and scans with a real fact.
+  const lastHail = useRef(0);
+  const onHail = useCallback(
+    (name: string) => {
+      const now = Date.now();
+      if (now - lastHail.current < 40000 || Math.random() < 0.4) return;
+      lastHail.current = now;
+      toast({ kind: "hail", title: `Incoming hail · ${name}`, detail: HAILS[Math.floor(Math.random() * HAILS.length)] });
+    },
+    [toast],
+  );
+  const onScan = useCallback(
+    (name: string) => scan(name, HAILS[Math.floor(Math.random() * HAILS.length)]),
+    [scan],
+  );
   const [hunting, setHunting] = useState(false);
   const canHunt = fx && !!result && catalogPixels(result.meta).length > 0;
   useEffect(() => {
@@ -192,11 +236,17 @@ export function App() {
         if (canHunt) setHunting((h) => !h);
         else toast({ kind: "info", title: "Hunt mode needs a target", detail: "Pick a destination first" });
       } else if (e.key === "m" || e.key === "M") setLogOpen((o) => !o);
-      else if (e.key === "Escape") setLogOpen(false);
+      else if (e.key === "g" || e.key === "G") setHangarOpen((o) => !o);
+      else if (e.key === "f" || e.key === "F") openArcade();
+      else if (e.key === "Escape") {
+        setLogOpen(false);
+        setHangarOpen(false);
+      }
     }
+    if (arcadeOpen) return; // the simulator owns the keyboard
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fx, targets, setCourseTo, canHunt, toast]);
+  }, [fx, targets, setCourseTo, canHunt, toast, openArcade, arcadeOpen]);
 
   const link =
     status.kind === "empty" ? "standby"
@@ -206,8 +256,37 @@ export function App() {
     : "linked";
 
   return (
-    <div className={"ship" + (fx ? " fx-ship" : "") + (warp ? " is-warp" : "") + (hunting ? " is-hunting" : "")}>
-      {fx && <Starfield warp={warp} burst={burst} />}
+    <div
+      className={"ship" + (fx ? " fx-ship" : "") + (warp ? " is-warp" : "") + (hunting ? " is-hunting" : "")}
+      data-ship={ship.id}
+      style={
+        fx
+          ? ({
+              "--accent": ship.accent,
+              "--accent-rgb": ship.accentRgb,
+              "--accent-soft": `rgb(${ship.accentRgb} / 0.14)`,
+            } as CSSProperties)
+          : undefined
+      }
+    >
+      {fx && <Starfield warp={warp} burst={burst} onScan={onScan} onHail={onHail} />}
+      {fx && arcadeOpen && (
+        <Arcade
+          ship={ship}
+          link={status.kind === "loading" ? { stage: status.stage, done: status.done, total: status.total } : null}
+          dataReady={arcadeDuringLoad.current && status.kind === "done"}
+          onExit={closeArcade}
+          sfx={sfx}
+        />
+      )}
+      {fx && hangarOpen && (
+        <Hangar
+          xp={game.progress.xp}
+          current={ship.id}
+          onSelect={(id) => game.selectShip(id)}
+          onClose={() => setHangarOpen(false)}
+        />
+      )}
       {fx && booting && <BootSequence onDone={endBoot} />}
 
       {fx && (
@@ -221,8 +300,13 @@ export function App() {
         </div>
       )}
       {fx && warp && (
-        <div className="ship__warp" aria-hidden="true">
-          <span>Warp engaged</span>
+        <div className="ship__warp">
+          <span aria-hidden="true">Warp engaged</span>
+          {!arcadeOpen && (
+            <button type="button" className="ship__warp-play primary" onClick={openArcade}>
+              Long jump ahead · fly the simulator while you wait
+            </button>
+          )}
         </div>
       )}
       {fx && arrived && (
@@ -243,7 +327,7 @@ export function App() {
       <main className={"app" + (fx ? " fx" : "")}>
         <header className="app__header">
           <h1>
-            <span className="app__mark" aria-hidden="true" />
+            {fx ? <ShipIcon ship={ship} size={30} /> : <span className="app__mark" aria-hidden="true" />}
             STARx Viewer
           </h1>
           {fx && (
@@ -268,6 +352,8 @@ export function App() {
             canHunt={canHunt}
             onHunt={() => setHunting((h) => !h)}
             onMissions={() => setLogOpen(true)}
+            onHangar={() => setHangarOpen(true)}
+            onSimulator={openArcade}
           />
         )}
 

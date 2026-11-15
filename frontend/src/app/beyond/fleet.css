@@ -1,0 +1,166 @@
+/* demo/beyond: ships, hangar, flight simulator and the hull look.
+   The flown ship sets --accent / --accent-rgb on .ship, so the whole bridge takes its colour. */
+
+.ship { --accent-rgb: 34 211 238; }
+
+/* ---------- Hull look: hex plating, panel brackets ---------- */
+.ship.fx-ship::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.07;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='98' viewBox='0 0 56 98'%3E%3Cpath d='M28 66L0 50V16L28 0l28 16v34L28 66zm0 32L0 82V66l28 16 28-16v16L28 98z' fill='none' stroke='%23ffffff' stroke-width='1'/%3E%3C/svg%3E");
+  mask: radial-gradient(ellipse at center, transparent 35%, #000 85%);
+  -webkit-mask: radial-gradient(ellipse at center, transparent 35%, #000 85%);
+}
+/* Accent brackets in two corners of every panel */
+.fx .card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(var(--accent), var(--accent)) 0 0 / 22px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) 0 0 / 2px 22px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) 100% 100% / 22px 2px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) 100% 100% / 2px 22px no-repeat;
+  filter: drop-shadow(0 0 4px var(--accent));
+}
+.fx .app__header h1 .ship-icon { flex: none; filter: drop-shadow(0 0 6px var(--accent)); }
+
+/* ---------- Ship icon ---------- */
+.ship-icon { overflow: visible; }
+.ship-icon.is-locked { opacity: 0.55; }
+.ship-icon__flame { opacity: 0.85; }
+
+/* ---------- HUD ship button ---------- */
+.app .game-hud__ship {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 14px 4px 6px;
+  text-align: left;
+  border-color: rgb(var(--accent-rgb) / 0.6);
+}
+.game-hud__ship > span { display: grid; line-height: 1.15; }
+.game-hud__ship-name { font: 800 0.85rem "Orbitron", var(--sans); letter-spacing: 0.1em; color: var(--accent); }
+.game-hud__ship-role { font: 0.7rem var(--mono); color: var(--muted); }
+.game-hud__best { color: var(--muted); font-size: 0.85em; }
+
+/* ---------- Warp: simulator offer ---------- */
+.app .ship__warp-play, .ship__warp-play {
+  position: absolute;
+  left: 50%;
+  top: calc(46% + 70px);
+  transform: translateX(-50%);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+/* ---------- Toast: hails ---------- */
+.toast--hail { border-color: #94a3b8; box-shadow: 0 0 24px rgb(148 163 184 / 0.35); }
+.toast--hail .toast__title { font-family: var(--mono); font-size: 0.8rem; letter-spacing: 0.06em; color: #cbd5e1; }
+.toast--hail .toast__detail { font-family: var(--sans); font-weight: 500; color: #e2e8f0; }
+
+/* Mission log and hangar sit outside .app, so give their buttons the bridge style here */
+.mission-log button:not(.hangar__ship) {
+  min-height: 34px;
+  padding: 6px 16px;
+  font: 500 0.9rem var(--sans);
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.mission-log button:not(.hangar__ship):hover { border-color: var(--accent); box-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.45); }
+.mission-log button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- Hangar ---------- */
+.hangar__panel { width: min(860px, 100%); }
+.hangar__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.app .hangar__ship, .hangar__ship {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  min-height: 0;
+  padding: 18px 16px 16px;
+  color: var(--text);
+  text-align: center;
+  background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--ship) 22%, transparent), rgb(255 255 255 / 0.02) 70%);
+  border: 1px solid color-mix(in srgb, var(--ship) 45%, transparent);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.hangar__ship:hover:not(:disabled) { transform: translateY(-4px); box-shadow: 0 10px 40px color-mix(in srgb, var(--ship) 40%, transparent); border-color: var(--ship); }
+.hangar__ship.is-active { border-color: var(--ship); box-shadow: 0 0 30px color-mix(in srgb, var(--ship) 55%, transparent); }
+.hangar__ship.is-locked { cursor: not-allowed; filter: grayscale(0.7); }
+.hangar__art { display: grid; place-items: center; height: 104px; }
+.hangar__name { font: 800 1.1rem "Orbitron", var(--sans); letter-spacing: 0.1em; color: var(--ship); }
+.hangar__role { font: 0.8rem var(--mono); color: var(--muted); }
+.hangar__stats { display: grid; gap: 4px; width: 100%; margin-top: 4px; }
+.hangar__stat { display: flex; justify-content: space-between; align-items: center; font: 0.72rem var(--mono); color: var(--muted); }
+.hangar__pips { display: flex; gap: 3px; }
+.hangar__pips i { width: 14px; height: 6px; background: rgb(255 255 255 / 0.1); border-radius: 2px; }
+.hangar__pips i.is-on { background: var(--ship); box-shadow: 0 0 6px var(--ship); }
+.hangar__status { margin-top: 4px; font: 700 0.75rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ship); }
+.hangar__ship.is-locked .hangar__status { color: var(--muted); }
+
+/* ---------- Flight simulator ---------- */
+.arcade { position: fixed; inset: 0; z-index: 45; background: #020308; cursor: crosshair; touch-action: none; }
+.arcade__canvas { display: block; width: 100vw; height: 100vh; }
+.arcade__ui { position: absolute; top: 18px; right: 24px; }
+.arcade__help {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  margin: 0;
+  transform: translateX(-50%);
+  font: 0.75rem var(--mono);
+  color: var(--muted);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.arcade__panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 28px 40px;
+  transform: translate(-50%, -50%);
+  background: rgb(4 6 12 / 0.9);
+  border: 1px solid rgb(var(--accent-rgb) / 0.7);
+  border-radius: 16px;
+  box-shadow: 0 0 60px rgb(var(--accent-rgb) / 0.4);
+}
+.arcade__title { margin: 0; font: 800 clamp(1.4rem, 4vw, 2.6rem) "Orbitron", var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: #4ade80; text-shadow: 0 0 20px #4ade80; }
+.arcade__title.is-bad { color: #f87171; text-shadow: 0 0 20px #f87171; }
+.arcade__score { margin: 0; font: 600 1rem var(--mono); color: #e2e8f0; }
+.arcade__actions { display: flex; gap: 10px; }
+.arcade button {
+  min-height: 36px;
+  padding: 7px 16px;
+  font: 600 0.9rem var(--sans);
+  color: var(--text);
+  background: rgb(18 20 24 / 0.9);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.arcade button.primary { color: #021216; background: var(--accent); border-color: var(--accent); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .ship-icon__flame { animation: fx-flame 0.12s steps(2) infinite alternate; transform-box: fill-box; transform-origin: top; }
+  @keyframes fx-flame { to { transform: scaleY(0.6); opacity: 0.6; } }
+  .hangar__ship.is-active .ship-icon { animation: fx-hover 2.4s ease-in-out infinite; }
+  @keyframes fx-hover { 50% { transform: translateY(-6px); } }
+  .arcade__panel { animation: fx-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+}

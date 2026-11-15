@@ -4,11 +4,31 @@
 // - `burst`: each increase fires a burst of sparks from the centre (a result arrived).
 // - Reduced motion: one still frame, no animation.
 import { useEffect, useRef } from "react";
+import { SHIPS, TRAFFIC, drawShip, type ShipDesign } from "./ships";
 
 interface Props {
   warp: boolean;
   burst: number;
+  onScan?: (name: string) => void; // a passing ship was clicked
+  onHail?: (name: string) => void; // a passing ship came into view
 }
+
+interface Npc {
+  name: string;
+  design: ShipDesign;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  scale: number;
+  born: number;
+}
+
+// Clicks on the UI never count as scanning a ship behind it.
+const UI = "button,a,input,select,textarea,label,.card,.telemetry,.game-hud,.radar,.toast,.mission-log,.hangar,.arcade,.boot,.banner";
+
+// Passing ships keep their shape but get a muted "civilian" livery.
+const NPC_DESIGNS: ShipDesign[] = SHIPS.map((s) => ({ ...s, hull: "#475569", accent: "#94a3b8" }));
 
 interface Star {
   x: number; // -1..1, scaled by the spread
@@ -48,10 +68,14 @@ function newStar(far = false): Star {
   };
 }
 
-export function Starfield({ warp, burst }: Props) {
+export function Starfield({ warp, burst, onScan, onHail }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const warpRef = useRef(warp);
   const burstRef = useRef(0); // bursts waiting to be drawn
+  const scanRef = useRef(onScan);
+  const hailRef = useRef(onHail);
+  scanRef.current = onScan;
+  hailRef.current = onHail;
 
   useEffect(() => {
     warpRef.current = warp;
@@ -72,6 +96,8 @@ export function Starfield({ warp, burst }: Props) {
     let stars: Star[] = [];
     const sparks: Spark[] = [];
     const meteors: Meteor[] = [];
+    const npcs: Npc[] = [];
+    let nextNpc = performance.now() + 4000; // first ship after a few seconds
     let speed = 0.0007; // depth per frame
     const mouse = { x: 0, y: 0, tx: 0, ty: 0 };
     let raf = 0;
@@ -173,6 +199,53 @@ export function Starfield({ warp, burst }: Props) {
         ctx!.stroke();
       }
 
+      // Passing ships: cross the screen with blinking nav lights, not during warp.
+      if (!warpRef.current && t > nextNpc && npcs.length < 2) {
+        nextNpc = t + 9000 + Math.random() * 12000;
+        const fromLeft = Math.random() < 0.5;
+        const vx = (fromLeft ? 1 : -1) * (0.7 + Math.random() * 0.9);
+        const npc: Npc = {
+          name: pick(TRAFFIC),
+          design: pick(NPC_DESIGNS),
+          x: fromLeft ? -40 : w + 40,
+          y: h * (0.15 + Math.random() * 0.7),
+          vx,
+          vy: (Math.random() - 0.5) * 0.35,
+          scale: 0.9 + Math.random() * 0.6,
+          born: t,
+        };
+        npcs.push(npc);
+        hailRef.current?.(npc.name);
+      }
+      for (let i = npcs.length - 1; i >= 0; i--) {
+        const n = npcs[i];
+        n.x += n.vx * f * (warpRef.current ? 6 : 1);
+        n.y += n.vy * f;
+        if (n.x < -80 || n.x > w + 80) {
+          npcs.splice(i, 1);
+          continue;
+        }
+        const angle = Math.atan2(n.vx, -n.vy);
+        drawShip(ctx!, n.design, n.x, n.y, n.scale, angle, 0.6, t);
+        // Red/green navigation lights on the wing tips
+        const blink = Math.floor((t - n.born) / 500) % 2 === 0;
+        const side = 14 * n.scale;
+        const px = Math.cos(angle) * side;
+        const py = Math.sin(angle) * side;
+        ctx!.fillStyle = blink ? "rgba(248,113,113,0.95)" : "rgba(248,113,113,0.25)";
+        ctx!.beginPath();
+        ctx!.arc(n.x - px, n.y - py, 2, 0, Math.PI * 2);
+        ctx!.fill();
+        ctx!.fillStyle = blink ? "rgba(74,222,128,0.25)" : "rgba(74,222,128,0.95)";
+        ctx!.beginPath();
+        ctx!.arc(n.x + px, n.y + py, 2, 0, Math.PI * 2);
+        ctx!.fill();
+        ctx!.fillStyle = "rgba(203,213,225,0.55)";
+        ctx!.font = "10px 'JetBrains Mono', monospace";
+        ctx!.textAlign = "center";
+        ctx!.fillText(n.name.toUpperCase(), n.x, n.y - 26 * n.scale);
+      }
+
       // Burst of sparks when a result arrives.
       while (burstRef.current > 0) {
         burstRef.current -= 1;
@@ -213,16 +286,31 @@ export function Starfield({ warp, burst }: Props) {
       mouse.ty = (e.clientY / h) * 2 - 1;
     }
 
+    // Click on open sky near a passing ship = scan it.
+    function onClick(e: MouseEvent) {
+      if ((e.target as Element | null)?.closest?.(UI)) return;
+      const hit = npcs.find((n) => Math.hypot(n.x - e.clientX, n.y - e.clientY) < 34 * n.scale);
+      if (!hit) return;
+      scanRef.current?.(hit.name);
+      for (let i = 0; i < 40; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const v = 1 + Math.random() * 4;
+        sparks.push({ x: hit.x, y: hit.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, hue: "74,222,128" });
+      }
+    }
+
     resize();
     window.addEventListener("resize", resize);
     if (!reduce) {
       window.addEventListener("pointermove", onPointer);
+      window.addEventListener("click", onClick);
       raf = requestAnimationFrame(frame);
     }
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener("resize", resize);
       window.removeEventListener("pointermove", onPointer);
+      window.removeEventListener("click", onClick);
     };
   }, []);
 

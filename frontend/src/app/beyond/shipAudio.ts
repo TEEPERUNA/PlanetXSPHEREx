@@ -106,6 +106,42 @@ export class ShipAudio {
     this.tone(110, 0, 0.25, "sawtooth", 0.09);
   }
 
+  // Simulator: laser blip (rate-limited so held fire doesn't drone), explosion, hit, pickup.
+  private lastShot = 0;
+  shoot(): void {
+    const now = performance.now();
+    if (now - this.lastShot < 120) return;
+    this.lastShot = now;
+    this.tone(1760, 0, 0.06, "square", 0.025);
+  }
+
+  boom(): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master) return;
+    const len = Math.floor(ctx.sampleRate * 0.35);
+    const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 2;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 900;
+    const g = ctx.createGain();
+    g.gain.value = 0.22;
+    src.connect(filter).connect(g).connect(this.master);
+    src.start();
+  }
+
+  hurt(): void {
+    this.tone(180, 0, 0.3, "sawtooth", 0.12);
+    this.tone(120, 0.08, 0.3, "sawtooth", 0.1);
+  }
+
+  pickup(): void {
+    [880, 1175, 1568].forEach((f, i) => this.tone(f, i * 0.05, 0.15, "sine", 0.1));
+  }
+
   // Mission complete or promotion: a bright arpeggio.
   fanfare(): void {
     [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, i * 0.09, 0.5, "triangle", 0.14));

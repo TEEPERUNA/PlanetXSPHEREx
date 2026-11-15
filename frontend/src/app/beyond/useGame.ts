@@ -1,10 +1,23 @@
 // Game state: XP, missions, visited destinations, locked targets, and toasts.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { DESTINATIONS, LOCK_XP, MISSIONS, EMPTY, loadProgress, rankFor, saveProgress, type MissionId, type Progress } from "./game";
+import {
+  DESTINATIONS,
+  LOCK_XP,
+  MAX_FLIGHT_XP,
+  MISSIONS,
+  SCAN_XP,
+  EMPTY,
+  loadProgress,
+  rankFor,
+  saveProgress,
+  type MissionId,
+  type Progress,
+} from "./game";
+import { shipById } from "./ships";
 
 export interface Toast {
   id: number;
-  kind: "mission" | "rank" | "lock" | "info";
+  kind: "mission" | "rank" | "lock" | "info" | "hail";
   title: string;
   detail?: string;
 }
@@ -82,11 +95,50 @@ export function useGame(events: GameEvents = {}) {
     [complete, toast, update],
   );
 
+  // A passing ship was clicked.
+  const scan = useCallback(
+    (name: string, fact: string) => {
+      const first = !ref.current.scanned.includes(name);
+      if (first) update((p) => ({ ...p, xp: p.xp + SCAN_XP, scanned: [...p.scanned, name] }));
+      toast({ kind: "hail", title: `Scanned · ${name}${first ? ` · +${SCAN_XP} XP` : ""}`, detail: fact });
+      complete("hail");
+    },
+    [complete, toast, update],
+  );
+
+  // A simulator run ended.
+  const flight = useCallback(
+    (score: number, duringWarp: boolean) => {
+      const xp = Math.min(MAX_FLIGHT_XP, Math.floor(score / 10));
+      const record = score > ref.current.best;
+      update((p) => ({ ...p, xp: p.xp + xp, best: Math.max(p.best, score) }));
+      toast({
+        kind: "mission",
+        title: `Simulator · ${score} points${record ? " · new record" : ""}`,
+        detail: xp > 0 ? `+${xp} XP` : "No XP this time",
+      });
+      if (duringWarp && score > 0) complete("defender");
+      if (score >= 1000) complete("ace");
+    },
+    [complete, toast, update],
+  );
+
+  // Fly another ship, if the rank allows it.
+  const selectShip = useCallback(
+    (id: string) => {
+      const ship = shipById(id);
+      if (rankFor(ref.current.xp).index < ship.unlockRank) return;
+      update((p) => (p.ship === ship.id ? p : { ...p, ship: ship.id }));
+      toast({ kind: "info", title: `Now flying the ${ship.name}`, detail: ship.role });
+    },
+    [toast, update],
+  );
+
   const reset = useCallback(() => {
     ref.current = EMPTY;
     setProgress(EMPTY);
     toast({ kind: "info", title: "Progress reset", detail: "Back to Cadet" });
   }, [toast]);
 
-  return { progress, toasts, toast, complete, visit, lock, reset };
+  return { progress, toasts, toast, complete, visit, lock, scan, flight, selectShip, reset };
 }

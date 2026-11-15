@@ -13,7 +13,7 @@
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--accent);
-  text-shadow: 0 0 8px rgb(34 211 238 / 0.6);
+  text-shadow: 0 0 8px rgb(var(--accent-rgb) / 0.6);
 }
 .fx .ship-label::before { content: "◆ "; }
 .fx .viewer__side::before {
@@ -22,7 +22,7 @@
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--accent);
-  text-shadow: 0 0 8px rgb(34 211 238 / 0.6);
+  text-shadow: 0 0 8px rgb(var(--accent-rgb) / 0.6);
 }
 .fx .viewer__title::before {
   content: "Viewscreen · ";
@@ -39,10 +39,10 @@
   grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
   gap: 1px;
   overflow: hidden;
-  background: rgb(34 211 238 / 0.22);
-  border: 1px solid rgb(34 211 238 / 0.35);
+  background: rgb(var(--accent-rgb) / 0.22);
+  border: 1px solid rgb(var(--accent-rgb) / 0.35);
   border-radius: var(--radius);
-  box-shadow: 0 0 30px rgb(34 211 238 / 0.12), inset 0 0 20px rgb(34 211 238 / 0.06);
+  box-shadow: 0 0 30px rgb(var(--accent-rgb) / 0.12), inset 0 0 20px rgb(var(--accent-rgb) / 0.06);
 }
 .telemetry__cell {
   display: grid;
@@ -64,7 +64,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
-  text-shadow: 0 0 8px rgb(34 211 238 / 0.5);
+  text-shadow: 0 0 8px rgb(var(--accent-rgb) / 0.5);
 }
 .telemetry__cell.is-linked .telemetry__value { color: #4ade80; text-shadow: 0 0 8px rgb(74 222 128 / 0.6); }
 .telemetry__cell.is-acquiring .telemetry__value,
@@ -85,9 +85,9 @@
   justify-items: center;
   padding: 12px 14px;
   background: rgb(8 10 14 / 0.75);
-  border: 1px solid rgb(34 211 238 / 0.35);
+  border: 1px solid rgb(var(--accent-rgb) / 0.35);
   border-radius: var(--radius);
-  box-shadow: 0 0 30px rgb(34 211 238 / 0.1), inset 0 0 30px rgb(34 211 238 / 0.06);
+  box-shadow: 0 0 30px rgb(var(--accent-rgb) / 0.1), inset 0 0 30px rgb(var(--accent-rgb) / 0.06);
 }
 .radar__title, .radar__hint {
   margin: 0;
@@ -108,9 +108,9 @@
   text-align: center;
 }
 .radar svg { width: 100%; max-width: 240px; height: auto; overflow: visible; }
-.radar__rim { stroke: rgb(34 211 238 / 0.55); stroke-width: 1; }
-.radar__ring { fill: none; stroke: rgb(34 211 238 / 0.16); stroke-width: 0.7; }
-.radar__equator { fill: none; stroke: rgb(34 211 238 / 0.4); stroke-width: 0.8; stroke-dasharray: 2 3; }
+.radar__rim { stroke: rgb(var(--accent-rgb) / 0.55); stroke-width: 1; }
+.radar__ring { fill: none; stroke: rgb(var(--accent-rgb) / 0.16); stroke-width: 0.7; }
+.radar__equator { fill: none; stroke: rgb(var(--accent-rgb) / 0.4); stroke-width: 0.8; stroke-dasharray: 2 3; }
 .radar__label { fill: var(--muted); font: 7px var(--mono); }
 .radar__sweep { transform-box: view-box; transform-origin: 100px 100px; }
 .radar__blip { cursor: pointer; outline: none; }
@@ -130,7 +130,7 @@
   width: 76px;
   height: 76px;
   background: linear-gradient(135deg, #2a313c, #0e1116 60%);
-  box-shadow: 0 0 12px rgb(34 211 238 / 0.25);
+  box-shadow: 0 0 12px rgb(var(--accent-rgb) / 0.25);
 }
 /* A diagonal window strut across each corner */
 .ship__strut--tl { top: 0; left: 0; clip-path: polygon(0 34%, 34% 0, 52% 0, 0 52%); }
@@ -142,12 +142,12 @@
   bottom: 76px;
   width: 8px;
   background:
-    radial-gradient(circle, #22d3ee 0 1.6px, transparent 2.4px) center top / 8px 46px repeat-y,
+    radial-gradient(circle, var(--accent) 0 1.6px, transparent 2.4px) center top / 8px 46px repeat-y,
     linear-gradient(90deg, #0e1116, #262c36, #0e1116);
   opacity: 0.85;
 }
-.ship__rail--l { left: 0; border-right: 1px solid rgb(34 211 238 / 0.3); }
-.ship__rail--r { right: 0; border-left: 1px solid rgb(34 211 238 / 0.3); }
+.ship__rail--l { left: 0; border-right: 1px solid rgb(var(--accent-rgb) / 0.3); }
+.ship__rail--r { right: 0; border-left: 1px solid rgb(var(--accent-rgb) / 0.3); }
 @media (max-width: 899px) { .ship__hull { display: none; } }
 
 /* ---------- Warp overlay + arrival ---------- */
@@ -156,7 +156,7 @@
   inset: 0;
   z-index: 4;
   pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 45%, rgb(34 211 238 / 0.14) 75%, rgb(167 139 250 / 0.3));
+  background: radial-gradient(ellipse at center, transparent 45%, rgb(var(--accent-rgb) / 0.14) 75%, rgb(167 139 250 / 0.3));
 }
 .ship__warp span {
   position: absolute;
@@ -167,7 +167,7 @@
   letter-spacing: 0.4em;
   text-transform: uppercase;
   color: #e0f2fe;
-  text-shadow: 0 0 18px #22d3ee, 0 0 40px #a78bfa;
+  text-shadow: 0 0 18px var(--accent), 0 0 40px #a78bfa;
   white-space: nowrap;
 }
 .ship__arrived {
@@ -182,9 +182,9 @@
   transform: translate(-50%, -50%);
   pointer-events: none;
   background: rgb(4 6 10 / 0.7);
-  border: 1px solid rgb(34 211 238 / 0.6);
+  border: 1px solid rgb(var(--accent-rgb) / 0.6);
   border-radius: 12px;
-  box-shadow: 0 0 40px rgb(34 211 238 / 0.45);
+  box-shadow: 0 0 40px rgb(var(--accent-rgb) / 0.45);
   backdrop-filter: blur(6px);
   opacity: 0;
 }
@@ -199,7 +199,7 @@
   font: 800 clamp(1.2rem, 3vw, 2.2rem) "Orbitron", var(--sans);
   letter-spacing: 0.08em;
   color: #fff;
-  text-shadow: 0 0 20px #22d3ee;
+  text-shadow: 0 0 20px var(--accent);
 }
 
 /* ---------- Boot screen ---------- */
@@ -217,10 +217,10 @@
   width: min(680px, 100%);
   font: 500 clamp(0.75rem, 1.6vw, 1rem) / 1.9 var(--mono);
   color: #67e8f9;
-  text-shadow: 0 0 8px rgb(34 211 238 / 0.7);
+  text-shadow: 0 0 8px rgb(var(--accent-rgb) / 0.7);
 }
 .boot__screen p { margin: 0; min-height: 1.9em; white-space: pre-wrap; }
-.boot__screen p.boot__final { margin-top: 12px; font-weight: 700; color: #fff; text-shadow: 0 0 14px #22d3ee; }
+.boot__screen p.boot__final { margin-top: 12px; font-weight: 700; color: #fff; text-shadow: 0 0 14px var(--accent); }
 .boot__cursor { display: inline-block; width: 0.6em; height: 1.1em; margin-left: 2px; background: #67e8f9; vertical-align: text-bottom; }
 .boot__skip {
   position: absolute;

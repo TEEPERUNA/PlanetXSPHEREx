@@ -10,7 +10,10 @@ export type MissionId =
   | "explorer"
   | "grand-tour"
   | "sharpshooter"
-  | "engineer";
+  | "engineer"
+  | "hail"
+  | "defender"
+  | "ace";
 
 export interface Mission {
   id: MissionId;
@@ -30,7 +33,13 @@ export const MISSIONS: Mission[] = [
   { id: "grand-tour", title: "Grand tour", brief: "Visit all five destinations.", xp: 200 },
   { id: "sharpshooter", title: "Sharpshooter", brief: "Lock on to three different targets.", xp: 250 },
   { id: "engineer", title: "Engineer", brief: "Power up the ship's sound system.", xp: 25 },
+  { id: "hail", title: "First contact", brief: "Click a passing ship to scan it.", xp: 50 },
+  { id: "defender", title: "Defender", brief: "Fly the simulator while the ship is in warp.", xp: 75 },
+  { id: "ace", title: "Ace pilot", brief: "Score 1000 points in the flight simulator.", xp: 150 },
 ];
+
+export const SCAN_XP = 20; // each new ship scanned
+export const MAX_FLIGHT_XP = 200; // per simulator run
 
 export const LOCK_XP = 50; // each new target locked
 export const DESTINATIONS = 5;
@@ -39,10 +48,11 @@ const RANKS: [number, string][] = [
   [0, "Cadet"],
   [100, "Ensign"],
   [300, "Lieutenant"],
-  [600, "Commander"],
-  [1000, "Captain"],
-  [1300, "Admiral"],
+  [650, "Commander"],
+  [1100, "Captain"],
+  [1700, "Admiral"],
 ];
+export const RANK_NAMES = RANKS.map(([, name]) => name);
 
 export interface Rank {
   index: number;
@@ -62,9 +72,12 @@ export interface Progress {
   done: MissionId[];
   visited: string[]; // destination keys
   locked: string[]; // targets locked in hunt mode
+  scanned: string[]; // passing ships scanned
+  ship: string; // flown ship id
+  best: number; // best simulator score
 }
 
-export const EMPTY: Progress = { xp: 0, done: [], visited: [], locked: [] };
+export const EMPTY: Progress = { xp: 0, done: [], visited: [], locked: [], scanned: [], ship: "kestrel", best: 0 };
 const KEY = "starx-game-v1";
 
 // Progress lives in this browser only. Storage can be blocked, so fail quietly.
