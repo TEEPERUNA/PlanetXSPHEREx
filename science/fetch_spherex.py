@@ -248,13 +248,19 @@ def query_images(coord: SkyCoord, size_deg: float, bands: list[str]):
 
 @dataclass
 class Cutout:
-    mjd: float
-    band: str
-    url: str
+    mjd: float = 0.0
+    band: str = ""
+    url: str = ""
     image: np.ndarray = None
     flags: np.ndarray = None
     variance: np.ndarray = None
+    zodi: np.ndarray = None
     wcs: WCS = None
+    swcs: WCS = None
+    wave_map: np.ndarray = None
+    bw_map: np.ndarray = None
+    x0: float = 1005.0
+    y0: float = 1005.0
     wavelength_um: float = np.nan
     center_flux: float = np.nan
     center_err: float = np.nan
@@ -267,13 +273,67 @@ def parse_cutout_hdul(h, mjd: float, band: str, coord: SkyCoord,
     """Parses an opened FITS HDUList into a Cutout object and computes photometry and wavelength."""
     c = Cutout(mjd=float(mjd), band=str(band).replace("SPHEREx-", ""), url=url)
     img = h["IMAGE"].data.astype(np.float32)
-    zodi = h["ZODI"].data.astype(np.float32) if "ZODI" in h else 0.0
+    zodi = h["ZODI"].data.astype(np.float32) if ("ZODI" in h and h["ZODI"].data is not None) else np.zeros_like(img)
     c.image = img - zodi
-    c.flags = h["FLAGS"].data
-    c.variance = h["VARIANCE"].data.astype(np.float32)
+    c.zodi = zodi
+    c.flags = h["FLAGS"].data if "FLAGS" in h else None
+    c.variance = h["VARIANCE"].data.astype(np.float32) if "VARIANCE" in h else np.ones_like(img) * 1e-4
     hdr = h["IMAGE"].header
     c.wcs = WCS(hdr)
     c.version = str(h[0].header.get("VERSION", ""))
+    ny, nx = c.image.shape
+
+    # Determine detector cutout origin x0, y0 (0-based detector pixel coordinate)
+    x0, y0 = None, None
+    for kx, ky in [
+        ("CNPIX1", "CNPIX2"),
+        ("XMIN", "YMIN"),
+        ("DETX_MIN", "DETY_MIN"),
+        ("CRPIX1A", "CRPIX2A")
+    ]:
+        if kx in hdr and ky in hdr:
+            try:
+                vx, vy = float(hdr[kx]), float(hdr[ky])
+                if kx == "CNPIX1":
+                    x0, y0 = vx - 1.0, vy - 1.0
+                else:
+                    x0, y0 = vx, vy
+                break
+            except (ValueError, TypeError):
+                pass
+    if x0 is None and "CRPIX1" in hdr and "CRPIX2" in hdr:
+        try:
+            cr1 = float(hdr["CRPIX1"])
+            cr2 = float(hdr["CRPIX2"])
+            x0_cand = 1020.5 - cr1
+            y0_cand = 1020.5 - cr2
+            if 0.0 <= x0_cand <= 2040.0 and 0.0 <= y0_cand <= 2040.0:
+                x0, y0 = x0_cand, y0_cand
+        except (ValueError, TypeError):
+            pass
+    if x0 is None or y0 is None:
+        x0 = max(0.0, 1020.0 - nx / 2.0)
+        y0 = max(0.0, 1020.0 - ny / 2.0)
+    c.x0 = float(x0)
+    c.y0 = float(y0)
+
+    # 2D Spectral WCS: WAVE and BW
+    yy, xx = np.mgrid[:ny, :nx]
+    try:
+        swcs = WCS(hdr, fobj=h, key="W")
+        swcs.sip = None
+        c.swcs = swcs
+        res = swcs.pixel_to_world(xx, yy)
+        if isinstance(res, (tuple, list)):
+            c.wave_map = np.array(u.Quantity(res[0]).to(u.um).value, dtype=np.float32)
+            c.bw_map = np.array(u.Quantity(res[1]).to(u.um).value, dtype=np.float32)
+        else:
+            c.wave_map = np.array(u.Quantity(res).to(u.um).value, dtype=np.float32)
+            c.bw_map = np.full((ny, nx), 0.05, dtype=np.float32)
+    except Exception:
+        c.swcs = None
+        c.wave_map = None
+        c.bw_map = None
 
     # Proper motion compensation in photometry and spectroscopy:
     # If the target has significant proper motion (e.g. Barnard's Star, WISE 0855),
@@ -288,17 +348,19 @@ def parse_cutout_hdul(h, mjd: float, band: str, coord: SkyCoord,
         target_pos = propagate(coord.ra.deg, coord.dec.deg, pmra, pmdec, prop_from, cutout_yr)
 
     x, y = c.wcs.world_to_pixel(target_pos)
-    try:
-        swcs = WCS(hdr, fobj=h, key="W")
-        swcs.sip = None
-        wl, _bw = swcs.pixel_to_world(x, y)
-        c.wavelength_um = float(u.Quantity(wl).to(u.um).value)
-    except Exception:
-        c.wavelength_um = np.nan
+    xi, yi = int(round(float(x))), int(round(float(y)))
+    if c.wave_map is not None and 0 <= xi < nx and 0 <= yi < ny:
+        c.wavelength_um = float(c.wave_map[yi, xi])
+    elif c.swcs is not None:
+        try:
+            wl, _bw = c.swcs.pixel_to_world(x, y)
+            c.wavelength_um = float(u.Quantity(wl).to(u.um).value)
+        except Exception:
+            c.wavelength_um = np.nan
+    else:
+        c.wavelength_um = float(np.mean(DETECTORS.get(c.band, [1.0, 1.0])))
 
     # 3x3 aperture centered on target -> spectral point
-    xi, yi = int(round(float(x))), int(round(float(y)))
-    ny, nx = c.image.shape
     if 1 <= xi < nx - 1 and 1 <= yi < ny - 1:
         ap = c.image[yi - 1:yi + 2, xi - 1:xi + 2]
         var = c.variance[yi - 1:yi + 2, xi - 1:xi + 2]
@@ -379,13 +441,30 @@ def robust_norm(img: np.ndarray) -> np.ndarray:
     return (img - med) / (mad if mad > 0 else 1.0)
 
 
+def get_edge_nan_mask(img: np.ndarray) -> np.ndarray:
+    """Returns a boolean mask of connected NaN regions that touch any image border (missing detector coverage)."""
+    if img is None or img.size == 0 or not np.any(np.isnan(img)):
+        return np.zeros_like(img, dtype=bool) if img is not None else np.zeros((1, 1), dtype=bool)
+    from scipy.ndimage import label
+    nan_mask = np.isnan(img)
+    labeled, n = label(nan_mask, structure=np.ones((3, 3)))
+    edge_nans = np.zeros_like(nan_mask, dtype=bool)
+    for i in range(1, n + 1):
+        comp = (labeled == i)
+        if comp[0, :].any() or comp[-1, :].any() or comp[:, 0].any() or comp[:, -1].any():
+            edge_nans |= comp
+    return edge_nans
+
+
 def repair_star_donuts(img: np.ndarray) -> np.ndarray:
     """
     Repairs stellar core saturation holes ('donuts'), NaN artifacts, and non-NaN flux dips.
 
-    1. Saturated core reconstruction: identifies connected NaN components. Border/sky NaNs outside
-       the field of view are filled with the median sky background, while enclosed saturated star
-       cores are filled with the peak boundary flux (preventing dark center holes).
+    1. Saturated core reconstruction: identifies connected NaN components.
+       Only small interior holes that do not touch the image edge are elevated to the peak
+       boundary flux (preventing dark center holes in saturated stars).
+       Edge-touching NaN regions (missing detector coverage outside the field of view)
+       are filled with the median sky background without boosting to stellar peak flux.
     2. Multi-threshold morphological hole filling: ensures any central crater, saturation
        wrap-around, or zeroed core enclosed within bright stellar contours is elevated to its
        enclosing contour level.
@@ -418,17 +497,15 @@ def repair_star_donuts(img: np.ndarray) -> np.ndarray:
                     out[comp] = med_sky
                     continue
                 max_b = float(np.max(bvals))
-                # Saturated stellar core: interior cutout region with elevated boundary,
-                # or edge-touching source with high flux (> 50% of image peak)
-                is_saturated_core = (not touches_edge and max_b > star_thresh) or (
-                    touches_edge and max_b > 0.5 * img_max and max_b > star_thresh
-                )
-                if is_saturated_core:
+                is_small = comp.sum() <= 0.25 * out.size
+                # Saturated stellar core: only small interior holes that do not touch the image edge
+                if not touches_edge and is_small and max_b > star_thresh:
                     out[comp] = max_b
-                elif touches_edge:
-                    out[comp] = med_sky
-                else:
+                elif not touches_edge and is_small:
                     out[comp] = float(np.median(bvals))
+                else:
+                    # Edge-touching or large missing detector regions: fill with neutral median sky
+                    out[comp] = med_sky
         except Exception:
             # Fallback if scipy labeling fails
             out = np.nan_to_num(out, nan=med_sky)
@@ -515,7 +592,164 @@ def diff_png(a: np.ndarray, b: np.ndarray, path: Path, scale: int, text: str):
     d = clean_b - clean_a
     lim = np.nanpercentile(np.abs(d), 99.5) or 1.0
     arr = np.nan_to_num(np.clip((d / lim + 1) / 2, 0, 1) * 255, nan=127).astype(np.uint8)
+
+    # Edge-touching missing detector regions from either epoch are rendered as neutral gray (127)
+    edge_mask = get_edge_nan_mask(a) | get_edge_nan_mask(b)
+    if np.any(edge_mask):
+        arr[edge_mask] = 127
+
     to_png(arr, path, scale, text)
+
+
+def build_pixel_cube(path: Path, sb_st: np.ndarray, sel_b: list[Cutout],
+                     w: WCS, shape: tuple[int, int], band: str) -> Path:
+    """
+    Constructs a multi-extension FITS (MEF) pixel cube for (epoch, band) on the 31x31 tangent plane.
+    Layers (EXTNAME, float32):
+      1. SB: Surface Brightness (IMAGE - ZODI, MJy/sr)
+      2. ZODI: Model zodiacal light foreground (MJy/sr)
+      3. SNR: Signal-to-noise ratio per pixel (SB / sqrt(VARIANCE))
+      4. WAVE: Central wavelength in um per pixel (from spectral WCS "W")
+      5. BW: Bandpass bandwidth in um per pixel (from spectral WCS "W")
+      6. DETX: Physical detector pixel X coordinate (0-2039)
+      7. DETY: Physical detector pixel Y coordinate (0-2039)
+    """
+    from reproject import reproject_interp
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 1. SB: Surface Brightness (from stack)
+    sb_data = sb_st.astype(np.float32)
+
+    # 2. ZODI: Zodiacal light model (from stack or cutouts)
+    zodi_list = []
+    for c in sel_b:
+        if getattr(c, "zodi", None) is not None:
+            try:
+                z_reproj, _ = reproject_interp((c.zodi.astype(np.float32), c.wcs), w, shape_out=shape, order="bilinear")
+                zodi_list.append(z_reproj)
+            except Exception:
+                pass
+    if zodi_list:
+        zodi_data = np.nanmedian(np.stack(zodi_list), axis=0).astype(np.float32)
+        if np.isnan(zodi_data).any():
+            med_z = float(np.nanmedian(zodi_data)) if not np.isnan(np.nanmedian(zodi_data)) else 0.0
+            zodi_data = np.nan_to_num(zodi_data, nan=med_z).astype(np.float32)
+    else:
+        zodi_data = np.zeros(shape, dtype=np.float32)
+
+    # 3. SNR: SB / sqrt(VARIANCE)
+    var_list = []
+    for c in sel_b:
+        if getattr(c, "variance", None) is not None:
+            try:
+                v_reproj, _ = reproject_interp((c.variance.astype(np.float32), c.wcs), w, shape_out=shape, order="bilinear")
+                var_list.append(v_reproj)
+            except Exception:
+                pass
+    if var_list:
+        var_data = np.nanmedian(np.stack(var_list), axis=0) / max(1, len(var_list))
+        with np.errstate(invalid="ignore", divide="ignore"):
+            snr_data = np.where((var_data > 0) & np.isfinite(var_data) & np.isfinite(sb_data),
+                                sb_data / np.sqrt(np.maximum(var_data, 1e-12)), 0.0)
+            snr_data = np.nan_to_num(snr_data, nan=0.0).astype(np.float32)
+    else:
+        med_sb = float(np.nanmedian(sb_data))
+        mad_sb = float(np.nanmedian(np.abs(sb_data - med_sb))) * 1.4826
+        sigma_sb = max(mad_sb, 1e-4)
+        snr_data = np.nan_to_num(sb_data / sigma_sb, nan=0.0).astype(np.float32)
+
+    # Representative cutout for detector coordinates, wavelength and bandwidth
+    mjd_med = float(np.median([c.mjd for c in sel_b])) if sel_b else 0.0
+    rep_c = min(sel_b, key=lambda c: (
+        c.flagged_frac if (c.flagged_frac is not None and np.isfinite(c.flagged_frac)) else 0.0,
+        abs(c.mjd - mjd_med)
+    )) if sel_b else None
+
+    # Tangent plane coordinates -> Cutout coordinates
+    yy_t, xx_t = np.mgrid[:shape[0], :shape[1]]
+    sky_t = w.pixel_to_world(xx_t, yy_t)
+    if rep_c and rep_c.wcs:
+        try:
+            xc_t, yc_t = rep_c.wcs.world_to_pixel(sky_t)
+        except Exception:
+            xc_t = xx_t.astype(np.float32)
+            yc_t = yy_t.astype(np.float32)
+    else:
+        xc_t = xx_t.astype(np.float32)
+        yc_t = yy_t.astype(np.float32)
+
+    # 4 & 5. WAVE and BW
+    wave_data = None
+    bw_data = None
+    if rep_c and getattr(rep_c, "swcs", None) is not None:
+        try:
+            res = rep_c.swcs.pixel_to_world(xc_t, yc_t)
+            if isinstance(res, (tuple, list)):
+                wave_data = np.array(u.Quantity(res[0]).to(u.um).value, dtype=np.float32)
+                bw_data = np.array(u.Quantity(res[1]).to(u.um).value, dtype=np.float32)
+            else:
+                wave_data = np.array(u.Quantity(res).to(u.um).value, dtype=np.float32)
+        except Exception:
+            pass
+
+    if wave_data is None and rep_c and getattr(rep_c, "wave_map", None) is not None:
+        try:
+            wave_reproj, _ = reproject_interp((rep_c.wave_map, rep_c.wcs), w, shape_out=shape, order="bilinear")
+            wave_data = wave_reproj.astype(np.float32)
+            if getattr(rep_c, "bw_map", None) is not None:
+                bw_reproj, _ = reproject_interp((rep_c.bw_map, rep_c.wcs), w, shape_out=shape, order="bilinear")
+                bw_data = bw_reproj.astype(np.float32)
+        except Exception:
+            pass
+
+    band_range = DETECTORS.get(band, (1.0, 1.0))
+    def_center_wl = float(rep_c.wavelength_um) if (rep_c and np.isfinite(getattr(rep_c, "wavelength_um", np.nan))) else float(np.mean(band_range))
+    def_bw = float((band_range[1] - band_range[0]) / 16.0) if band_range[1] > band_range[0] else 0.05
+
+    if wave_data is None:
+        wave_data = np.full(shape, def_center_wl, dtype=np.float32)
+    else:
+        wave_data = np.nan_to_num(wave_data, nan=def_center_wl).astype(np.float32)
+
+    if bw_data is None:
+        bw_data = np.full(shape, def_bw, dtype=np.float32)
+    else:
+        bw_data = np.nan_to_num(bw_data, nan=def_bw).astype(np.float32)
+
+    # 6 & 7. DETX and DETY (clipped to valid detector bounds 0-2039)
+    x0 = getattr(rep_c, "x0", 1020.0 - shape[1] / 2.0) if rep_c else (1020.0 - shape[1] / 2.0)
+    y0 = getattr(rep_c, "y0", 1020.0 - shape[0] / 2.0) if rep_c else (1020.0 - shape[0] / 2.0)
+    detx_raw = np.clip(xc_t + x0, 0.0, 2039.0).astype(np.float32)
+    dety_raw = np.clip(yc_t + y0, 0.0, 2039.0).astype(np.float32)
+    detx_data = np.nan_to_num(detx_raw, nan=1020.0).astype(np.float32)
+    dety_data = np.nan_to_num(dety_raw, nan=1020.0).astype(np.float32)
+
+    # Multi-extension FITS with standard WCS headers on each layer
+    hdr = w.to_header()
+    p_hdu = fits.PrimaryHDU(data=sb_data, header=hdr.copy())
+    p_hdu.header["EXTNAME"] = "SB"
+    p_hdu.header["BUNIT"] = "MJy/sr"
+
+    h_zodi = fits.ImageHDU(data=zodi_data, header=hdr.copy(), name="ZODI")
+    h_zodi.header["BUNIT"] = "MJy/sr"
+
+    h_snr = fits.ImageHDU(data=snr_data, header=hdr.copy(), name="SNR")
+
+    h_wave = fits.ImageHDU(data=wave_data, header=hdr.copy(), name="WAVE")
+    h_wave.header["BUNIT"] = "um"
+
+    h_bw = fits.ImageHDU(data=bw_data, header=hdr.copy(), name="BW")
+    h_bw.header["BUNIT"] = "um"
+
+    h_detx = fits.ImageHDU(data=detx_data, header=hdr.copy(), name="DETX")
+    h_detx.header["BUNIT"] = "pixel"
+
+    h_dety = fits.ImageHDU(data=dety_data, header=hdr.copy(), name="DETY")
+    h_dety.header["BUNIT"] = "pixel"
+
+    hdul = fits.HDUList([p_hdu, h_zodi, h_snr, h_wave, h_bw, h_detx, h_dety])
+    hdul.writeto(path, overwrite=True)
+    return path
 
 
 # --------------------------------------------------------------------------- main pipeline
@@ -628,6 +862,8 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
                                   "flagged_frac": float(np.mean([c.flagged_frac for c in sel if c.band == b]))}
             fits.PrimaryHDU(st.astype(np.float32), header=w.to_header()).writeto(
                 out / f"epoch{e}_{b}.fits", overwrite=True)
+            build_pixel_cube(out / "pixels" / b / f"epoch{e}.fits", st,
+                             [c for c in sel if c.band == b], w, shape, b)
         
         # Combine all detectors (S/N-weighted, preserving NaNs where no detector has valid data)
         per = [robust_norm(stacks[(e, b)]) for b in args.bands if (e, b) in stacks]
@@ -699,6 +935,10 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
             "frames": [f"frames/{b}/epoch{e}.png" for e, _ in ims],
             "fits": [f"epoch{e}_{b}.fits" for e in range(n_ep) if (e, b) in stacks]
         }
+        if b in args.bands:
+            pixel_files = [f"pixels/{b}/epoch{e}.fits" for e in range(n_ep) if (e, b) in stacks]
+            if pixel_files:
+                files["pixels"] = pixel_files
         if len(pil) > 1:
             pil[0].save(out / f"blink_{b}.gif", save_all=True, append_images=pil[1:],
                         duration=args.frame_ms, loop=0)
@@ -730,6 +970,7 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
         "fov_arcmin": args.size, "pixel_scale_arcsec": PIXEL_SCALE_ARCSEC,
         "shape": list(shape), "bands": args.bands, "detector_ranges_um": DETECTORS,
         "inverted": bool(use_invert),
+        "glare_suppressed": bool(is_epsindib),
         "epochs": epochs_meta, "outputs": outputs, "spectrum": "spectrum.csv",
         "lightcurve": "lightcurve.csv",
         "lightcurve_png": "lightcurve.png",

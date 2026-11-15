@@ -364,7 +364,78 @@ def test_stellar_donut_repair():
     # The center pixel of the difference should be a smooth dipole or flat, not a neutral gray hole
     assert diff_path.exists()
 
+    # 5. Edge NaNs bordering high flux (e.g. Epsilon Indi B scenario) must stay neutral sky, not bright white
+    edge_bright_img = synthetic.copy()
+    edge_bright_img[0:5, 0:5] = np.nan
+    repaired_edge = fs.repair_star_donuts(edge_bright_img)
+    assert np.all(repaired_edge[0:5, 0:5] < 10.0), f"Edge NaNs bordering star were filled with bright flux: {repaired_edge[0:5, 0:5]}"
+
+    # In diff_png, edge NaNs must be rendered as neutral gray (127)
+    diff_edge_path = Path("/tmp/test_diff_edge.png")
+    fs.diff_png(edge_bright_img, synthetic, diff_edge_path, scale=1, text="")
+    diff_edge_arr = np.array(Image.open(diff_edge_path).convert("L"))
+    # In PIL image with flipud, FITS row 0:5 is bottom rows -5:
+    assert np.all(diff_edge_arr[-5:, 0:5] == 127), f"Edge NaNs did not render as neutral gray 127 in diff_png: {diff_edge_arr[-5:, 0:5]}"
+
     print("  ✓ Stellar donuts successfully eliminated across NaNs, non-NaN craters, and stretch rendering!")
+
+def test_multi_layer_pixel_cube():
+    print("Testing Multi-Layer Pixel Cubes (SB, ZODI, SNR, WAVE, BW, DETX, DETY)...")
+    from types import SimpleNamespace
+    import tempfile
+    import json
+    from astropy.io import fits
+
+    coord = SkyCoord(269.452 * u.deg, 4.693 * u.deg, frame="icrs")
+    w, shape = fs.target_wcs(coord, 3.0 / 60.0)
+
+    # 1. Direct unit test of build_pixel_cube
+    cutout = fs.Cutout(
+        mjd=60912.0, band="D3", url="test_cube.fits",
+        image=np.ones(shape, dtype=np.float32) * 15.0,
+        zodi=np.ones(shape, dtype=np.float32) * 3.0,
+        variance=np.ones(shape, dtype=np.float32) * 0.04,
+        wcs=w, x0=500.0, y0=800.0, wavelength_um=1.95,
+        center_flux=15.0, center_err=0.02, flagged_frac=0.01, version="7.0.5"
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        cube_path = Path(tmpdir) / "pixels" / "D3" / "epoch0.fits"
+        fs.build_pixel_cube(cube_path, cutout.image, [cutout], w, shape, "D3")
+        assert cube_path.exists(), "Pixel cube file was not created"
+
+        with fits.open(cube_path) as h:
+            expected_exts = ["SB", "ZODI", "SNR", "WAVE", "BW", "DETX", "DETY"]
+            for ext in expected_exts:
+                assert ext in h, f"Extension {ext} missing from pixel cube"
+                data = h[ext].data
+                assert data.shape == shape, f"Extension {ext} shape mismatch: {data.shape} vs {shape}"
+                assert data.dtype == np.float32 or data.dtype.str.endswith("f4"), f"Extension {ext} dtype mismatch: {data.dtype}"
+                assert np.all(np.isfinite(data)), f"Extension {ext} contains non-finite values"
+
+            # Check specific values
+            assert np.isclose(h["SB"].data[15, 15], 15.0)
+            assert np.isclose(h["ZODI"].data[15, 15], 3.0)
+            assert np.isclose(h["SNR"].data[15, 15], 15.0 / 0.2)  # 15 / sqrt(0.04) = 75.0
+            assert np.isclose(h["WAVE"].data[15, 15], 1.95)
+            assert 0.0 <= h["DETX"].data[15, 15] <= 2039.0
+            assert 0.0 <= h["DETY"].data[15, 15] <= 2039.0
+            assert np.isclose(h["DETX"].data[15, 15], 515.0)
+            assert np.isclose(h["DETY"].data[15, 15], 815.0)
+
+    # 2. Integration test via run()
+    with tempfile.TemporaryDirectory() as tmpdir:
+        args = SimpleNamespace(
+            size=3.0, bands=["D3"], max=0, per_group=0, workers=2,
+            mask_flags=False, lo=1.0, hi=99.7, frame_ms=600, out=tmpdir,
+            show_gaia=False, invert=False, skip_gaia=True
+        )
+        out_dir = fs.run(coord, "Test Star", "test_star", args, {}, cutouts=[cutout])
+        meta = json.loads((out_dir / "meta.json").read_text())
+        assert "pixels" in meta["outputs"]["D3"]
+        assert meta["outputs"]["D3"]["pixels"] == ["pixels/D3/epoch0.fits"]
+        assert (out_dir / "pixels" / "D3" / "epoch0.fits").exists()
+
+    print("  ✓ Multi-layer pixel cubes correctly generated with all 7 float32 layers (SB, ZODI, SNR, WAVE, BW, DETX, DETY)!")
 
 if __name__ == "__main__":
     test_slug_and_target_identification()
@@ -377,4 +448,5 @@ if __name__ == "__main__":
     test_json_null_sanitization()
     test_gaia_timeout_and_skip_flag()
     test_stellar_donut_repair()
+    test_multi_layer_pixel_cube()
     print("\nALL EXPANDED SCIENCE TESTS PASSED!")
