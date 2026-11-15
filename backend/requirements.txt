@@ -1,4 +1,15 @@
--r ../science/requirements.txt
+# Backend + science runtime. Exact versions come from backend/constraints.txt (Docker build).
+# Not "-r ../science/requirements.txt": its pins conflicted with constraints.txt and broke the
+# Docker build. If science/ needs a new library, add its name here too.
+astropy
+astroquery
+reproject
+photutils
+scipy
+numpy
+matplotlib
+pillow
+requests
 fastapi>=0.110
 uvicorn[standard]>=0.29
 pydantic>=2.7

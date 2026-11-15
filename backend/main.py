@@ -14,10 +14,12 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
 import threading
 import traceback
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
@@ -45,8 +47,19 @@ MAX_FOV_ARCMIN = float(os.environ.get("MAX_FOV_ARCMIN", "10"))
 WARMUP = os.environ.get("WARMUP", "1") == "1"
 FETCH_MODE = os.environ.get("FETCH_MODE", "s3")             # "s3" (fast) or "irsa" (cutout service)
 CACHE_TTL_HOURS = float(os.environ.get("CACHE_TTL_HOURS", "24"))  # how often to check for new data
+RATE_JOBS = int(os.environ.get("RATE_JOBS", "20"))        # new (uncached) searches per IP ...
+RATE_WINDOW_S = int(os.environ.get("RATE_WINDOW_S", "600"))  # ... per this many seconds
+MAX_ACTIVE_JOBS = int(os.environ.get("MAX_ACTIVE_JOBS", "20"))  # queued+processing, then "busy"
+JOB_KEEP_S = int(os.environ.get("JOB_KEEP_S", "3600"))    # finished jobs kept in memory this long
 
-app = FastAPI(title="SPHEREx Sky API", version="0.1")
+
+@asynccontextmanager
+async def lifespan(_app):
+    warmup()
+    yield
+
+
+app = FastAPI(title="SPHEREx Sky API", version="0.1", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.mount("/api/files", StaticFiles(directory=OUTPUT_DIR), name="files")
 if (ROOT / "examples").is_dir():
@@ -55,6 +68,68 @@ if (ROOT / "examples").is_dir():
 executor = ThreadPoolExecutor(max_workers=int(os.environ.get("JOB_WORKERS", "2")))
 jobs: dict[str, dict] = {}
 lock = threading.Lock()
+_hits: dict[str, list[float]] = {}   # rate limit: ip -> times of new searches
+
+
+def write_text_atomic(p: Path, text: str):
+    """Write to a temp file and rename it into place, so a reader never sees half a file."""
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(f"{p.name}.tmp{os.getpid()}_{threading.get_ident()}")
+    tmp.write_text(text)
+    os.replace(tmp, p)
+
+
+def publish(tmp_slug: str, slug: str):
+    """Move a finished rebuild from OUTPUT_DIR/tmp_slug into OUTPUT_DIR/slug file by file.
+    Every file is replaced atomically and meta.json/cache.json go last, so a reader sees either
+    the old complete result or the new one, never a half-written mix. (Directory renames are not
+    atomic on the Cloud Storage mount, so files are swapped one at a time.)"""
+    src, dst = OUTPUT_DIR / tmp_slug, OUTPUT_DIR / slug
+    files = [p for p in src.rglob("*") if p.is_file()]
+    files.sort(key=lambda p: p.name in ("meta.json", "cache.json"))
+    for p in files:
+        d = dst / p.relative_to(src)
+        d.parent.mkdir(parents=True, exist_ok=True)
+        tmp = d.with_name(d.name + ".tmp")
+        shutil.copyfile(p, tmp)
+        os.replace(tmp, d)
+    shutil.rmtree(src, ignore_errors=True)
+
+
+def client_ip(request: Request) -> str:
+    fwd = request.headers.get("x-forwarded-for")   # Cloud Run puts the real client IP here
+    return (fwd.split(",")[0] if fwd else (request.client.host if request.client else "?")).strip()
+
+
+def check_capacity(request: Request):
+    """Protect the single instance: limit new searches per IP and the total queue length.
+    Cached results and challenge targets are never limited."""
+    now = time.time()
+    with lock:
+        active = sum(1 for j in jobs.values() if j.get("status") in ("queued", "processing"))
+        if active >= MAX_ACTIVE_JOBS:
+            raise HTTPException(503, "The server is busy with other searches. Please try again in "
+                                     "a minute, or pick one of the challenge targets.")
+        ip = client_ip(request)
+        hits = [t for t in _hits.get(ip, []) if now - t < RATE_WINDOW_S]
+        if len(hits) >= RATE_JOBS:
+            raise HTTPException(429, "Too many new searches from your address. Please wait a few "
+                                     "minutes, or pick one of the challenge targets.")
+        hits.append(now)
+        if len(_hits) > 5000:
+            _hits.clear()
+        _hits[ip] = hits
+
+
+def prune_jobs():
+    """Forget finished jobs older than JOB_KEEP_S so the job list cannot grow forever.
+    (Results stay on disk; a later request finds them from the cache.) Call with lock held."""
+    if len(jobs) < 200:
+        return
+    now = time.time()
+    for k in [k for k, j in jobs.items()
+              if j.get("status") in ("done", "error") and now - j.get("t", 0) > JOB_KEEP_S]:
+        jobs.pop(k, None)
 
 
 def make_args(fov: float, per_group: int = PER_GROUP) -> SimpleNamespace:
@@ -158,8 +233,9 @@ def start_job(slug: str, work, preview: bool = True) -> dict:
         j = jobs.get(slug)
         if j and j["status"] in ("queued", "processing"):
             return {"status": j["status"], "job": slug}
+        prune_jobs()
         jobs[slug] = {"status": "queued", "done": 0, "total": 0, "stage": "queued",
-                      "error": None, "preview": None}
+                      "error": None, "preview": None, "t": time.time()}
 
     def progress_for(stage_prefix):
         def progress(done, total, stage):
@@ -182,12 +258,12 @@ def start_job(slug: str, work, preview: bool = True) -> dict:
                 except Exception:  # noqa: BLE001  preview failure is not fatal
                     traceback.print_exc()
             work(progress_for(""), slug, PER_GROUP)
-            jobs[slug].update(status="done", stage="done")
+            jobs[slug].update(status="done", stage="done", t=time.time())
         except Exception as e:  # noqa: BLE001
             if not isinstance(e, LookupError):
                 traceback.print_exc()
             jobs[slug].update(status="error", error=friendly_error(e),
-                              error_detail=f"{type(e).__name__}: {e}")
+                              error_detail=f"{type(e).__name__}: {e}", t=time.time())
 
     executor.submit(runner)
     return {"status": "queued", "job": slug}
@@ -275,7 +351,7 @@ def write_cache_info(slug: str, fingerprint, collection, source: str, timing: di
     p = cache_info_path(slug)
     if p.parent.exists():
         old = read_cache_info(slug) or {}
-        p.write_text(json.dumps({"fingerprint": fingerprint, "collection": collection,
+        write_text_atomic(p, json.dumps({"fingerprint": fingerprint, "collection": collection,
                                  "source": source, "checked_at": time.time(),
                                  "code_version": SCIENCE_VERSION,
                                  "timing": timing or old.get("timing")}))
@@ -300,9 +376,8 @@ def read_example_check(slug: str):
 
 
 def write_example_check(slug: str, newest_mjd):
-    p = _check_path(slug)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps({"checked_at": time.time(), "newest_irsa_mjd": newest_mjd}))
+    write_text_atomic(_check_path(slug),
+                      json.dumps({"checked_at": time.time(), "newest_irsa_mjd": newest_mjd}))
 
 
 def refresh_running(slug: str) -> bool:
@@ -340,7 +415,14 @@ def maybe_refresh(slug: str, make_pipeline) -> bool:
         old_code = bool(info) and info.get("code_version") not in (None, SCIENCE_VERSION)
         if info and not old_code and time.time() - info.get("checked_at", 0) < ttl:
             return False
-    jobs[rkey] = {"status": "processing"}
+    jobs[rkey] = {"status": "processing", "t": time.time()}
+
+    def rebuild(pipe):
+        """Build into a temp folder while the old result keeps being served, then swap it in."""
+        tmp = f"{slug}__new"
+        shutil.rmtree(OUTPUT_DIR / tmp, ignore_errors=True)
+        pipe(lambda *a: None, tmp, PER_GROUP)
+        publish(tmp, slug)
 
     def runner():
         try:
@@ -352,7 +434,7 @@ def maybe_refresh(slug: str, make_pipeline) -> bool:
                 if newest > last + NEW_EPOCH_DAYS:
                     print(f"  New SPHEREx survey pass for {slug} (newest MJD {newest:.1f} > "
                           f"example {last:.1f}) -> rebuilding into cache")
-                    pipe(lambda *a: None, slug, PER_GROUP)
+                    rebuild(pipe)
                 write_example_check(slug, newest)
             elif info and info.get("fingerprint") == imgs.fingerprint and not old_code:
                 write_cache_info(slug, imgs.fingerprint, info.get("collection"),
@@ -360,11 +442,11 @@ def maybe_refresh(slug: str, make_pipeline) -> bool:
             else:
                 why = "science code changed" if old_code else f"new SPHEREx data ({imgs.fingerprint})"
                 print(f"  Rebuilding {slug}: {why}")
-                pipe(lambda *a: None, slug, PER_GROUP)
-            jobs[rkey] = {"status": "done"}
+                rebuild(pipe)
+            jobs[rkey] = {"status": "done", "t": time.time()}
         except Exception as e:  # noqa: BLE001
             print(f"  Refresh check for {slug} failed: {type(e).__name__}: {str(e)[:120]}")
-            jobs[rkey] = {"status": "error", "error": str(e)}
+            jobs[rkey] = {"status": "error", "error": str(e), "t": time.time()}
 
     executor.submit(runner)
     return True
@@ -444,7 +526,7 @@ def targets():
 
 
 @app.get("/api/sky")
-def sky(ra: str | None = None, dec: str | None = None,
+def sky(request: Request, ra: str | None = None, dec: str | None = None,
         target: str | None = Query(None, description="one of /api/targets keys"),
         fov: float = Query(3.0, gt=0, description="field of view, arcmin")):
     if fov > MAX_FOV_ARCMIN:
@@ -481,8 +563,12 @@ def sky(ra: str | None = None, dec: str | None = None,
         return {"status": "processing", "job": slug, "stage": "processing", "done": 0, "total": 0,
                 "preview": None}
     j = jobs.get(slug)
+    if j and j["status"] in ("queued", "processing"):
+        return {"status": j["status"], "job": slug}
     if j and j["status"] == "error":
         jobs.pop(slug)  # allow retry
+    if not target:
+        check_capacity(request)   # challenge targets are never rate limited
     resp = start_job(slug, make_pipeline())
     # Remember a precomputed result to fall back on if live data (IRSA) fails.
     fb = target
@@ -519,8 +605,8 @@ def status(job: str):
     return clean_json({"job": job, **j})
 
 
-@app.on_event("startup")
 def warmup():
+    """Run once at startup (see lifespan): build any challenge target that has no result yet."""
     if not WARMUP:
         return
     for key in fs.TARGETS:
