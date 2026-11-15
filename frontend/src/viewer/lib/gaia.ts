@@ -12,7 +12,7 @@ export function gaiaSource(g: GaiaValidation): string {
 }
 
 // Predicted sky position on a given date, moved from target_epoch with the proper motion.
-export function gaiaSkyAt(g: GaiaValidation | null | undefined, year: number): { ra: number; dec: number } | null {
+function gaiaSkyAt(g: GaiaValidation | null | undefined, year: number): { ra: number; dec: number } | null {
   if (!g || g.predicted_ra == null || g.predicted_dec == null || g.target_epoch == null) return null;
   const dt = year - g.target_epoch;
   const dec = g.predicted_dec + ((g.pmdec_masyr ?? 0) * dt) / 3.6e6;

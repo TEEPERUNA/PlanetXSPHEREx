@@ -40,7 +40,7 @@ export function asPoints(rows: SpectrumRow[]): SpectrumPoint[] {
 }
 
 // Share of measurements that are within 2 sigma of zero (0–1).
-export function noiseShare(rows: SpectrumRow[]): number {
+function noiseShare(rows: SpectrumRow[]): number {
   const usable = rows.filter((r) => Number.isFinite(r.err_mjy_sr) && r.err_mjy_sr > 0);
   if (usable.length === 0) return 0;
   return usable.filter((r) => Math.abs(r.flux_mjy_sr) < 2 * r.err_mjy_sr).length / usable.length;

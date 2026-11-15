@@ -22,7 +22,7 @@ type Mode = "average" | "all";
 
 // One colour per epoch, readable on light and dark backgrounds.
 const EPOCH_COLORS = ["#3b82f6", "#f59e0b", "#10b981", "#ec4899", "#8b5cf6", "#06b6d4", "#ef4444"];
-export const epochColor = (index: number) => EPOCH_COLORS[index % EPOCH_COLORS.length];
+const epochColor = (index: number) => EPOCH_COLORS[index % EPOCH_COLORS.length];
 
 // Drawing area in SVG units. The SVG scales to the container width.
 const W = 480;

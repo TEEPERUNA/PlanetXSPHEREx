@@ -6,7 +6,7 @@ export function joinUrl(baseUrl: string, path: string): string {
 }
 
 // Epoch number from a filename: "frames/D2/epoch4.png" -> 4.
-export function epochIndexFromPath(path: string): number | null {
+function epochIndexFromPath(path: string): number | null {
   const match = /epoch(\d+)\.png$/.exec(path);
   return match ? Number(match[1]) : null;
 }

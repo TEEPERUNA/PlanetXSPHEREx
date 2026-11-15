@@ -21,7 +21,7 @@ export interface StarPixel {
 }
 
 // One star moved from J2016.0 to `year` with its proper motion, as an image pixel.
-export function starPixelAt(star: GaiaStar, meta: Meta, year: number): { x: number; y: number } {
+function starPixelAt(star: GaiaStar, meta: Meta, year: number): { x: number; y: number } {
   const dt = year - GAIA_EPOCH;
   const dec = star.dec + ((star.pmdec ?? 0) * dt) / 3.6e6;
   const ra = star.ra + ((star.pmra ?? 0) * dt) / 3.6e6 / Math.cos((star.dec * Math.PI) / 180);

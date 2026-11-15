@@ -64,7 +64,6 @@ export function usePixelSpectrum(meta: Meta, baseUrl: string, pixel: Pixel | nul
       alive = false;
     };
     // files is derived from meta; key covers the pixel and the result
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, meta]);
 
   const ready = state !== null && state.key === key;

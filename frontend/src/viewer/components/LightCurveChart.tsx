@@ -13,8 +13,8 @@ type Scale = "relative" | "absolute";
 
 // Same detector colours as the science plots (blue → red with wavelength).
 const BAND_COLORS: Record<string, string> = {
-  D1: "#8b5cf6",
-  D2: "#3b82f6",
+  D1: "#38bdf8",
+  D2: "#6366f1",
   D3: "#10b981",
   D4: "#f59e0b",
   D5: "#f97316",

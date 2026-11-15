@@ -37,7 +37,7 @@ Try: http://localhost:8000/api/targets and http://localhost:8000/docs
 ```bash
 cd frontend && npm install && npm run dev
 ```
-Backend address: `VITE_API_BASE_URL` (default `http://localhost:8000`, see `frontend/.env.example`).
+Backend address: `VITE_API_BASE_URL`. Without it the app uses the deployed API; set it to `http://localhost:8000` for a local backend (see `frontend/.env.example`).
 
 ## Docker (deploy)
 ```bash

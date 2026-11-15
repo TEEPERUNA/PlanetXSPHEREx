@@ -14,22 +14,23 @@ from __future__ import annotations
 
 import json
 import os
+import math
+import re
 import shutil
 import sys
 import threading
+import time
+import traceback
 import urllib.parse
 import urllib.request
-import traceback
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Optional
+from typing import Literal
 
-import math
-import re
-import uuid
-from datetime import datetime, timezone
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -41,7 +42,6 @@ sys.path.insert(0, str(ROOT / "science"))
 import fetch_spherex as fs  # noqa: E402
 sys.path.insert(0, str(ROOT / "backend"))
 import fetch  # noqa: E402  fast S3 data access (backend/fetch.py)
-import time  # noqa: E402
 
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", ROOT / "output")).resolve()
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -128,8 +128,9 @@ def rate_limit(request: Request, bucket: str, limit: int, message: str):
         if len(hits) >= limit:
             raise HTTPException(429, message)
         hits.append(now)
-        if len(_hits) > 5000:
-            _hits.clear()
+        if len(_hits) > 5000:   # drop clients whose window has passed, keep the active ones
+            for k in [k for k, ts in _hits.items() if now - ts[-1] >= RATE_WINDOW_S]:
+                del _hits[k]
         _hits[key] = hits
 
 
@@ -243,16 +244,17 @@ def job_from_slug(job: str):
     return None
 
 
-def start_job(slug: str, work, preview: bool = True) -> dict:
+def start_job(slug: str, work, preview: bool = True, fallback: str | None = None) -> dict:
     """work(progress, out_slug, per_group) does one pipeline run.
-    With preview: a quick 1-image-per-group run first (slug__preview), then the full run."""
+    With preview: a quick 1-image-per-group run first (slug__preview), then the full run.
+    fallback: precomputed result to show if this run fails (set before the worker starts)."""
     with lock:
         j = jobs.get(slug)
         if j and j["status"] in ("queued", "processing"):
             return {"status": j["status"], "job": slug}
         prune_jobs()
         jobs[slug] = {"status": "queued", "done": 0, "total": 0, "stage": "queued",
-                      "error": None, "preview": None, "t": time.time()}
+                      "error": None, "preview": None, "fallback": fallback, "t": time.time()}
 
     def progress_for(stage_prefix):
         def progress(done, total, stage):
@@ -588,12 +590,9 @@ def sky(request: Request, ra: str | None = None, dec: str | None = None,
         jobs.pop(slug)  # allow retry
     if not target:
         check_capacity(request)   # challenge targets are never rate limited
-    resp = start_job(slug, make_pipeline())
-    # Remember a precomputed result to fall back on if live data (IRSA) fails.
-    fb = target
-    if fb and find_cached(fb) and slug in jobs:
-        jobs[slug]["fallback"] = fb
-    return resp
+    # A precomputed result to fall back on if live data (IRSA) fails.
+    fallback = target if target and find_cached(target) else None
+    return start_job(slug, make_pipeline(), fallback=fallback)
 
 
 @app.get("/api/status/{job}")
@@ -640,12 +639,12 @@ cand_lock = threading.Lock()
 class CandidateIn(BaseModel):
     ra: float = Field(..., ge=0, lt=360, description="RA of the moving object, degrees (ICRS)")
     dec: float = Field(..., ge=-90, le=90, description="Dec, degrees")
-    job: Optional[str] = Field(None, max_length=80, description="job id of the search it was seen in")
-    band: Optional[str] = Field(None, max_length=10, description="detector/band, e.g. 'D3'")
-    epoch: Optional[int] = Field(None, ge=0, le=1000, description="epoch index where it was clicked")
-    note: Optional[str] = Field(None, max_length=500, description="what the user saw")
-    name: Optional[str] = Field(None, max_length=40, description="optional nickname, shown publicly")
-    kind: Optional[str] = Field("moving", max_length=20, description="moving | faint | spectrum | other")
+    job: str | None = Field(None, max_length=80, description="job id of the search it was seen in")
+    band: str | None = Field(None, max_length=10, description="detector/band, e.g. 'D3'")
+    epoch: int | None = Field(None, ge=0, le=1000, description="epoch index where it was clicked")
+    note: str | None = Field(None, max_length=500, description="what the user saw")
+    name: str | None = Field(None, max_length=40, description="optional nickname, shown publicly")
+    kind: Literal["moving", "faint", "spectrum", "other"] | None = "moving"
 
 
 def _load_candidates() -> dict[str, dict]:
@@ -699,8 +698,8 @@ def report_candidate(body: CandidateIn, request: Request):
 
 
 @app.get("/api/candidates")
-def list_candidates(ra: Optional[float] = Query(None, ge=0, lt=360),
-                    dec: Optional[float] = Query(None, ge=-90, le=90),
+def list_candidates(ra: float | None = Query(None, ge=0, lt=360),
+                    dec: float | None = Query(None, ge=-90, le=90),
                     radius_arcmin: float = Query(10.0, gt=0, le=600),
                     limit: int = Query(200, ge=1, le=1000)):
     """All reports, newest first. With ra+dec: only reports within radius_arcmin of that point
@@ -810,17 +809,11 @@ def fetch_gaia(ra: float, dec: float, radius_arcsec: float) -> list[dict]:
 
 
 @app.get("/api/gaia")
-def gaia(ra: str | None = None, dec: str | None = None, radius: str | None = None):
+def gaia(ra_f: float = Query(..., alias="ra", ge=0, lt=360, description="degrees"),
+         dec_f: float = Query(..., alias="dec", ge=-90, le=90, description="degrees"),
+         rad_f: float = Query(..., alias="radius", gt=0, le=GAIA_MAX_RADIUS_ARCSEC, description="arcsec")):
     """Gaia DR3 stars within `radius` arcsec of ra/dec (degrees). Positions at J2016.0,
     brightest first, at most 2000. The viewer moves them to each SPHEREx epoch itself."""
-    try:
-        ra_f, dec_f, rad_f = float(ra), float(dec), float(radius)
-    except (TypeError, ValueError):
-        raise HTTPException(400, "give ra, dec (degrees) and radius (arcsec) as numbers")
-    if not (0 <= ra_f < 360 and -90 <= dec_f <= 90):
-        raise HTTPException(400, "ra must be 0..360 and dec -90..90 degrees")
-    if not 0 < rad_f <= GAIA_MAX_RADIUS_ARCSEC:
-        raise HTTPException(400, f"radius must be 0..{GAIA_MAX_RADIUS_ARCSEC:g} arcsec")
     key = f"ra{ra_f:.4f}_dec{dec_f:+.4f}_r{rad_f:.0f}"
     if key in _gaia_mem:
         return _gaia_mem[key]
@@ -849,6 +842,8 @@ def gaia(ra: str | None = None, dec: str | None = None, radius: str | None = Non
                 traceback.print_exc()
         if len(_gaia_mem) > 2000:
             _gaia_mem.clear()
+            with lock:
+                _gaia_locks.clear()   # one lock per field, pruned together with the answers
         _gaia_mem[key] = resp
         return resp
 

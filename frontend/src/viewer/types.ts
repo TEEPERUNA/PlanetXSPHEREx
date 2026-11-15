@@ -20,7 +20,7 @@ export interface BandOutput {
   gif?: string;
   diff?: string;
   fits?: string[]; // "epoch3_D2.fits": epoch stack, surface brightness (MJy/sr)
-  pixels?: string[]; // per-pixel layers SB, ZODI, SNR, WAVE, BW, DETX, DETY (planned, see plan.md)
+  pixels?: string[]; // "pixels/D2/epoch4.fits": per-pixel layers SB, ZODI, SNR, WAVE, BW, DETX, DETY, FLAGS
   combined?: string; // "combined_D2.png": coadded image of all epochs
   combined_fits?: string; // "combined_D2.fits": coadded FITS stack of all epochs
 }

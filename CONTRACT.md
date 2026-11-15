@@ -69,7 +69,7 @@ Query: `ra=<deg>&dec=<deg>&radius=<arcsec>` (radius max 900). Viewer sends `meta
 - Cached in memory and on disk forever (Gaia DR3 does not change). VizieR mirrors are tried in
   turn with a 10 s timeout each.
 
-Errors: `400` bad input, `503` `{"detail": "Gaia catalogue not reachable right now"}` → show only
+Errors: `422` bad input, `503` `{"detail": "Gaia catalogue not reachable right now"}` → show only
 the target star as before.
 
 ### Candidate reports: `POST /api/candidates`, `GET /api/candidates`, `GET /api/candidates/{id}`

@@ -176,11 +176,6 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
     setCompareOn((c) => !c);
   }
 
-  // Keeps the date on screen if the new band has it, otherwise the nearest one.
-  function changeBand(next: Band) {
-    setBand(next);
-  }
-
   useBlink(playing && canPlay, fps, () => step(1));
 
   if (frames.length === 0) {
@@ -286,7 +281,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         <PlaybackControls
           bands={bands}
           band={activeBand}
-          onBand={changeBand}
+          onBand={setBand}
           playing={playing}
           canPlay={canPlay}
           onTogglePlay={() => setPlaying((p) => !p)}
