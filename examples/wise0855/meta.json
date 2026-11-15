@@ -1,0 +1,259 @@
+{
+  "target": "WISE 0855-0714",
+  "ra_deg": 133.76678334989626,
+  "dec_deg": -7.2428158460448415,
+  "fov_arcmin": 3.0,
+  "pixel_scale_arcsec": 6.15,
+  "shape": [
+    31,
+    31
+  ],
+  "bands": [
+    "D1",
+    "D2",
+    "D3",
+    "D4",
+    "D5",
+    "D6"
+  ],
+  "detector_ranges_um": {
+    "D1": [
+      0.75,
+      1.09
+    ],
+    "D2": [
+      1.1,
+      1.62
+    ],
+    "D3": [
+      1.63,
+      2.41
+    ],
+    "D4": [
+      2.42,
+      3.82
+    ],
+    "D5": [
+      3.83,
+      4.41
+    ],
+    "D6": [
+      4.42,
+      5.0
+    ]
+  },
+  "epochs": [
+    {
+      "index": 0,
+      "mjd_mean": 60801.14008913333,
+      "n_images": 15,
+      "detectors": {
+        "D1": {
+          "n_images": 3,
+          "flagged_frac": 0.30796670630202144
+        },
+        "D2": {
+          "n_images": 3,
+          "flagged_frac": 0.3531510107015457
+        },
+        "D3": {
+          "n_images": 3,
+          "flagged_frac": 0.555687673404677
+        },
+        "D4": {
+          "n_images": 2,
+          "flagged_frac": 0.42984542211652793
+        },
+        "D5": {
+          "n_images": 2,
+          "flagged_frac": 0.31093935790725324
+        },
+        "D6": {
+          "n_images": 2,
+          "flagged_frac": 0.28240190249702735
+        }
+      },
+      "date": "2025-05-06"
+    },
+    {
+      "index": 1,
+      "mjd_mean": 60996.4377857857,
+      "n_images": 14,
+      "detectors": {
+        "D1": {
+          "n_images": 3,
+          "flagged_frac": 0.3032104637336504
+        },
+        "D2": {
+          "n_images": 2,
+          "flagged_frac": 0.35969084423305586
+        },
+        "D3": {
+          "n_images": 3,
+          "flagged_frac": 0.36226714229092344
+        },
+        "D4": {
+          "n_images": 1,
+          "flagged_frac": 0.4351961950059453
+        },
+        "D5": {
+          "n_images": 2,
+          "flagged_frac": 0.32520808561236625
+        },
+        "D6": {
+          "n_images": 3,
+          "flagged_frac": 0.29449068569163694
+        }
+      },
+      "date": "2025-11-17"
+    },
+    {
+      "index": 2,
+      "mjd_mean": 61162.389676312494,
+      "n_images": 16,
+      "detectors": {
+        "D1": {
+          "n_images": 2,
+          "flagged_frac": 0.2972651605231867
+        },
+        "D2": {
+          "n_images": 3,
+          "flagged_frac": 0.3614744351961951
+        },
+        "D3": {
+          "n_images": 2,
+          "flagged_frac": 0.35434007134363854
+        },
+        "D4": {
+          "n_images": 3,
+          "flagged_frac": 0.4304399524375743
+        },
+        "D5": {
+          "n_images": 3,
+          "flagged_frac": 0.3158937772493064
+        },
+        "D6": {
+          "n_images": 3,
+          "flagged_frac": 0.291319857312723
+        }
+      },
+      "date": "2026-05-02"
+    }
+  ],
+  "outputs": {
+    "D1": {
+      "frames": [
+        "frames/D1/epoch0.png",
+        "frames/D1/epoch1.png",
+        "frames/D1/epoch2.png"
+      ],
+      "gif": "blink_D1.gif",
+      "diff": "diff_D1.png"
+    },
+    "D2": {
+      "frames": [
+        "frames/D2/epoch0.png",
+        "frames/D2/epoch1.png",
+        "frames/D2/epoch2.png"
+      ],
+      "gif": "blink_D2.gif",
+      "diff": "diff_D2.png"
+    },
+    "D3": {
+      "frames": [
+        "frames/D3/epoch0.png",
+        "frames/D3/epoch1.png",
+        "frames/D3/epoch2.png"
+      ],
+      "gif": "blink_D3.gif",
+      "diff": "diff_D3.png"
+    },
+    "D4": {
+      "frames": [
+        "frames/D4/epoch0.png",
+        "frames/D4/epoch1.png",
+        "frames/D4/epoch2.png"
+      ],
+      "gif": "blink_D4.gif",
+      "diff": "diff_D4.png"
+    },
+    "D5": {
+      "frames": [
+        "frames/D5/epoch0.png",
+        "frames/D5/epoch1.png",
+        "frames/D5/epoch2.png"
+      ],
+      "gif": "blink_D5.gif",
+      "diff": "diff_D5.png"
+    },
+    "D6": {
+      "frames": [
+        "frames/D6/epoch0.png",
+        "frames/D6/epoch1.png",
+        "frames/D6/epoch2.png"
+      ],
+      "gif": "blink_D6.gif",
+      "diff": "diff_D6.png"
+    },
+    "ALL": {
+      "frames": [
+        "frames/ALL/epoch0.png",
+        "frames/ALL/epoch1.png",
+        "frames/ALL/epoch2.png"
+      ],
+      "gif": "blink_ALL.gif",
+      "diff": "diff_ALL.png"
+    }
+  },
+  "spectrum": "spectrum.csv",
+  "lightcurve": "lightcurve.csv",
+  "lightcurve_png": "lightcurve.png",
+  "light_curve": {
+    "is_variable": true,
+    "mean_flux": 0.092,
+    "std_flux": 0.078,
+    "amplitude_flux": 0.181,
+    "epochs": [
+      {
+        "epoch": 0,
+        "mjd": 60801.14,
+        "flux": 0.056,
+        "err": 0.003
+      },
+      {
+        "epoch": 1,
+        "mjd": 60996.44,
+        "flux": 0.02,
+        "err": 0.005
+      },
+      {
+        "epoch": 2,
+        "mjd": 61162.39,
+        "flux": 0.201,
+        "err": 0.003
+      }
+    ]
+  },
+  "gaia_validation": {
+    "status": "VALIDATED_NON_GAIA",
+    "gaia_dr3_source_id": null,
+    "target": "WISE 0855-0714",
+    "message": "WISE 0855 is a cold Y dwarf (T ~ 250 K) invisible in optical Gaia DR3. Astrometry verified via unWISE/CatWISE.",
+    "reference_epoch": "J2016.0",
+    "target_epoch": 2026.33,
+    "predicted_ra": 133.771642,
+    "predicted_dec": -7.243215,
+    "pmra_masyr": -8118.0,
+    "pmdec_masyr": 673.0,
+    "accumulated_shift_arcsec": 84.17,
+    "is_match": true
+  },
+  "versions": [
+    "7.0.5"
+  ],
+  "generated": "2026-11-14 11:12:48.162",
+  "pmra_masyr": -8118.0,
+  "pmdec_masyr": 673.0,
+  "propagated_to": 2026.87,
+  "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team"
+}
