@@ -360,32 +360,91 @@ def robust_norm(img: np.ndarray) -> np.ndarray:
     return (img - med) / (mad if mad > 0 else 1.0)
 
 
-def inpaint_nans(img: np.ndarray) -> np.ndarray:
+def repair_star_donuts(img: np.ndarray) -> np.ndarray:
     """
-    Inpaints isolated NaN pixels (saturated core or bad pixels in stellar core) for display PNGs.
-    Prevents false black holes in stellar cores when saturated pixels are converted to images.
+    Repairs stellar core saturation holes ('donuts'), NaN artifacts, and non-NaN flux dips.
+
+    1. Saturated core reconstruction: identifies connected NaN components. Border/sky NaNs outside
+       the field of view are filled with the median sky background, while enclosed saturated star
+       cores are filled with the peak boundary flux (preventing dark center holes).
+    2. Multi-threshold morphological hole filling: ensures any central crater, saturation
+       wrap-around, or zeroed core enclosed within bright stellar contours is elevated to its
+       enclosing contour level.
     """
-    if not np.isnan(img).any():
+    if img is None or img.size == 0:
         return img
+    out = np.copy(img).astype(np.float64)
+
+    # 1. Fill NaNs
+    nan_mask = np.isnan(out)
+    if np.any(nan_mask):
+        valid = out[~nan_mask]
+        if len(valid) == 0:
+            return np.zeros_like(out)
+        med_sky = float(np.median(valid))
+        mad_sky = float(np.median(np.abs(valid - med_sky))) * 1.4826
+        star_thresh = med_sky + 3.0 * (mad_sky if mad_sky > 0 else 1.0)
+        img_max = float(np.max(valid))
+
+        try:
+            from scipy.ndimage import label, binary_dilation
+            labeled_nans, num_nans = label(nan_mask, structure=np.ones((3, 3)))
+            for i in range(1, num_nans + 1):
+                comp = (labeled_nans == i)
+                touches_edge = bool(comp[0, :].any() or comp[-1, :].any() or comp[:, 0].any() or comp[:, -1].any())
+                dilated = binary_dilation(comp, structure=np.ones((3, 3)))
+                boundary = dilated & (~nan_mask)
+                bvals = out[boundary]
+                if len(bvals) == 0:
+                    out[comp] = med_sky
+                    continue
+                max_b = float(np.max(bvals))
+                # Saturated stellar core: interior cutout region with elevated boundary,
+                # or edge-touching source with high flux (> 50% of image peak)
+                is_saturated_core = (not touches_edge and max_b > star_thresh) or (
+                    touches_edge and max_b > 0.5 * img_max and max_b > star_thresh
+                )
+                if is_saturated_core:
+                    out[comp] = max_b
+                elif touches_edge:
+                    out[comp] = med_sky
+                else:
+                    out[comp] = float(np.median(bvals))
+        except Exception:
+            # Fallback if scipy labeling fails
+            out = np.nan_to_num(out, nan=med_sky)
+
+    # 2. Multi-threshold morphological hole filling (fixes non-NaN craters / wrap-around / zeros)
     try:
-        from astropy.convolution import interpolate_replace_nans, Gaussian2DKernel
-        if np.isnan(img).sum() < img.size * 0.9:
-            kernel = Gaussian2DKernel(x_stddev=1)
-            clean = interpolate_replace_nans(img, kernel)
-            med = float(np.nanmedian(clean)) if np.isfinite(np.nanmedian(clean)) else 0.0
-            return np.nan_to_num(clean, nan=med)
+        from scipy.ndimage import binary_fill_holes
+        med = float(np.median(out))
+        mad = float(np.median(np.abs(out - med))) * 1.4826
+        vmax = float(np.max(out))
+        low_t = med + 3.0 * (mad if mad > 0 else 1.0)
+        if vmax > low_t:
+            for t in np.linspace(low_t, vmax, 40):
+                mask = out >= t
+                if not np.any(mask):
+                    continue
+                holes = binary_fill_holes(mask) & (~mask)
+                if np.any(holes):
+                    out[holes] = t
     except Exception:
         pass
-    med = float(np.nanmedian(img)) if np.isfinite(np.nanmedian(img)) else 0.0
-    return np.nan_to_num(img, nan=med)
+
+    return out
+
+
+# Backward-compatible alias
+inpaint_nans = repair_star_donuts
 
 
 def stretch(img: np.ndarray, lo: float, hi: float, invert: bool = False, use_zscale: bool = False) -> np.ndarray:
     """
     Astronomical contrast stretch (asinh / ZScale) with optional negative-contrast mode.
-    Applies inpaint_nans interpolation so saturated pixels do not render as black center holes.
+    Applies repair_star_donuts so saturated pixels and craters do not render as dark/black center holes.
     """
-    clean = inpaint_nans(img)
+    clean = repair_star_donuts(img)
     if use_zscale:
         try:
             from astropy.visualization import ZScaleInterval
@@ -431,8 +490,10 @@ def to_png(arr8: np.ndarray, path: Path, scale: int, text: str | None = None,
 
 
 def diff_png(a: np.ndarray, b: np.ndarray, path: Path, scale: int, text: str):
-    """Computes and saves difference image (Delta I = b - a)."""
-    d = b - a
+    """Computes and saves difference image (Delta I = b - a) with donut artifact protection."""
+    clean_a = repair_star_donuts(a)
+    clean_b = repair_star_donuts(b)
+    d = clean_b - clean_a
     lim = np.nanpercentile(np.abs(d), 99.5) or 1.0
     arr = np.nan_to_num(np.clip((d / lim + 1) / 2, 0, 1) * 255, nan=127).astype(np.uint8)
     to_png(arr, path, scale, text)
@@ -549,10 +610,16 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
             fits.PrimaryHDU(st.astype(np.float32), header=w.to_header()).writeto(
                 out / f"epoch{e}_{b}.fits", overwrite=True)
         
-        # Combine all detectors (S/N-weighted)
+        # Combine all detectors (S/N-weighted, preserving NaNs where no detector has valid data)
         per = [robust_norm(stacks[(e, b)]) for b in args.bands if (e, b) in stacks]
         if per:
-            stacks[(e, "ALL")] = np.nansum(per, axis=0) / np.sqrt(len(per))
+            per_arr = np.array(per)
+            valid_mask = ~np.isnan(per_arr)
+            n_valid = np.sum(valid_mask, axis=0)
+            with np.errstate(invalid="ignore", divide="ignore"):
+                all_band = np.nansum(per_arr, axis=0) / np.sqrt(np.maximum(n_valid, 1))
+                all_band[n_valid == 0] = np.nan
+            stacks[(e, "ALL")] = all_band
             fits.PrimaryHDU(stacks[(e, "ALL")].astype(np.float32), header=w.to_header()).writeto(
                 out / f"epoch{e}_ALL.fits", overwrite=True)
         epochs_meta.append(em)
