@@ -84,6 +84,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const [compareOn, setCompareOn] = useState(false);
   const [compareA, setCompareA] = useState<number | null>(null); // dates (mjd), like anchorMjd
   const [compareB, setCompareB] = useState<number | null>(null);
+  const [reporting, setReporting] = useState(false); // candidate report form open
   const [pickPx, setPickPx] = useState<Pixel | null>(null); // pixel chosen for a candidate report
   const [candidates, setCandidates] = useState<Candidate[]>([]);
 
@@ -172,7 +173,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         filter={`brightness(${brightness}) contrast(${contrast})`}
         alt={`${meta.target}, ${activeBand}, ${frames[idx]?.epoch.date ?? ""}`}
         onHover={setHoverPx}
-        onPick={setPickPx}
+        onPick={reporting ? setPickPx : undefined}
         overlay={
           <>
             {hasGaia && showGaia && <GaiaOverlay meta={meta} epochs={bandEpochs} current={currentEpoch} />}
@@ -205,6 +206,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           loading={pixelInfo.loading}
         />
         <CandidateReport
+          open={reporting}
           pixel={pickPx}
           meta={meta}
           band={activeBand}
@@ -212,7 +214,11 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           job={job}
           count={candidates.length}
           onReported={(c) => setCandidates((cs) => [c, ...cs])}
-          onClose={() => setPickPx(null)}
+          onOpen={() => setReporting(true)}
+          onClose={() => {
+            setReporting(false);
+            setPickPx(null);
+          }}
         />
         {(showGaia || !hasGaia) && (
           <GaiaInfo meta={meta} epoch={diffOn ? (frames[frames.length - 1]?.epoch ?? null) : currentEpoch} showDiff={diffOn} />

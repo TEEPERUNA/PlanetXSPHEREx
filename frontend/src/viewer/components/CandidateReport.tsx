@@ -4,6 +4,7 @@ import { pixelToSky } from "../lib/skyCoords";
 import type { Band, Meta, Pixel } from "../types";
 
 interface Props {
+  open: boolean; // form shown; only then does clicking the image pick a pixel
   pixel: Pixel | null; // picked by clicking the image
   meta: Meta;
   band: Band;
@@ -11,7 +12,8 @@ interface Props {
   job?: string;
   count: number; // reports already in this field
   onReported: (c: Candidate) => void;
-  onClose: () => void; // unpicks the pixel
+  onOpen: () => void;
+  onClose: () => void; // hides the form and unpicks the pixel
 }
 
 const KINDS: { value: CandidateKind; label: string }[] = [
@@ -22,7 +24,7 @@ const KINDS: { value: CandidateKind; label: string }[] = [
 ];
 
 // "Report a candidate" form for the picked pixel.
-export function CandidateReport({ pixel, meta, band, epoch, job, count, onReported, onClose }: Props) {
+export function CandidateReport({ open, pixel, meta, band, epoch, job, count, onReported, onOpen, onClose }: Props) {
   const [kind, setKind] = useState<CandidateKind>("moving");
   const [note, setNote] = useState("");
   const [name, setName] = useState("");
@@ -31,11 +33,27 @@ export function CandidateReport({ pixel, meta, band, epoch, job, count, onReport
 
   const field = count === 1 ? "1 report in this field" : `${count} reports in this field`;
 
+  const message = result && <p className={result.ok ? "cand-form__ok" : "cand-form__err"}>{result.text}</p>;
+
+  if (!open) {
+    return (
+      <div className="cand-form">
+        <p className="cand-form__hint">Spot something moving? ({field})</p>
+        <button type="button" onClick={onOpen}>
+          Report
+        </button>
+        {message}
+      </div>
+    );
+  }
+
   if (!pixel) {
     return (
       <div className="cand-form">
-        <p className="cand-form__hint">Spot something moving? Click the image to report it. ({field})</p>
-        {result && <p className={result.ok ? "cand-form__ok" : "cand-form__err"}>{result.text}</p>}
+        <p className="cand-form__hint">Click the image to choose the spot to report.</p>
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
       </div>
     );
   }
@@ -91,7 +109,7 @@ export function CandidateReport({ pixel, meta, band, epoch, job, count, onReport
           Close
         </button>
       </div>
-      {result && <p className={result.ok ? "cand-form__ok" : "cand-form__err"}>{result.text}</p>}
+      {message}
     </form>
   );
 }
