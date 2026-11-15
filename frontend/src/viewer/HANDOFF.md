@@ -62,11 +62,13 @@ viewer/
 │   ├── GaiaOverlay.tsx       green circle + track dots (SVG)
 │   ├── GaiaInfo.tsx          text line that explains the circle
 │   ├── PlaybackControls.tsx  band, play/pause/step, speed, diff, Gaia, brightness, contrast
-│   ├── SpectrumChart.tsx     loads spectrum.csv and draws it
+│   ├── SpectrumChart.tsx     centre spectrum (spectrum.csv) or a clicked pixel's spectrum
+│   ├── LightCurveChart.tsx   target brightness over time, per band
 │   └── StatusView.tsx        empty / loading / error, and LoadingProgress
 ├── hooks/
 │   ├── useBlink.ts           interval timer for the animation
 │   ├── useGaiaField.ts       Gaia stars around the image from /api/gaia
+│   ├── usePixelSpectrum.ts   spectrum of a clicked pixel from the per-pixel files
 │   ├── useSources.ts         point sources in the epoch stack on screen
 │   └── usePixelValues.ts     loads the pixel FITS for the cursor info, hides filler layers
 └── lib/                      pure functions, no React, easy to test
@@ -79,6 +81,7 @@ viewer/
     ├── fits.ts               small FITS reader (pixel values under the cursor)
     ├── flags.ts              SPHEREx flag bits → names, unreliable or not, tooltip text
     ├── gaiaField.ts          field stars at a date, source detection, "no Gaia match"
+    ├── lightCurve.ts         meta.light_curve (both formats) → series per band
     └── stage.ts              backend stage name → user text
 ```
 
@@ -126,6 +129,18 @@ The spectrum keeps the old chart on screen until the new CSV has loaded, so the 
 - Detector ranges D1–D6 are shaded in the background.
 - The epoch on screen in the blink is highlighted and the others are dimmed, so brightness changes between epochs are easy to see.
 - The x axis is fitted to the data (about 0.75–5 µm). The y axis starts at 0 unless flux goes below it. Checked against all five challenge targets: every point fits.
+
+### Spectrum of a clicked pixel
+- Clicking the image (Juho's `onPick`, which also opens the candidate report) sets `spectrumPx`. `hooks/usePixelSpectrum.ts` reads every per-pixel file (`outputs[D1–D6].pixels`, ~60 kB each, cached) and takes, for that pixel: SB (flux), SB ÷ SNR (error) and WAVE (wavelength). The result is one point per detector and epoch, fed into `SpectrumChart` through its `pixel` prop; "Back to image centre" clears it.
+- This is coarser than the centre spectrum (`spectrum.csv` has one point per SPHEREx image). The per-pixel SB is a stack of several images, so its wavelength is that of one representative image.
+- When the WAVE layer is missing or filler (the precomputed examples), the wavelength is the middle of the detector range and the text says so.
+- Saturated core pixels are NaN and left out. The pixel stays fixed on the sky, so a fast star leaves it between epochs (Barnard's D5 value drops from 948 to 174 MJy/sr for that reason).
+- Only offered when the result has per-pixel files.
+
+### Light curve
+- `meta.light_curve` comes in two formats, and `lib/lightCurve.ts` `parseLightCurve()` reads both: per band (current science: `bands.D1.epochs[]`, `variable_bands`) and one series (older results: `epochs[]`, shown as "All detectors"). No light curve → no chart.
+- `components/LightCurveChart.tsx`: one line per band over time, error bars, detector colours as in the science plots. Default scale is relative (flux ÷ the band's mean, dashed line at 1.0), because bands differ a lot in brightness; "MJy/sr" shows absolute values. A vertical line marks the date on screen in the blink.
+- The headline uses science's own verdict (`is_variable`, `variable_bands`: std/mean > 15 % and amplitude > 2.5 × the mean error).
 
 ### Loading
 `describeStage` maps `queued`, `downloading`, `processing` to text and strips the `preview_` prefix. The bar shows a count only while `done < total`. When the backend sits at `processing 36/36` for minutes, the bar is indeterminate instead of stuck at full.
@@ -219,7 +234,7 @@ Integration (app side):
 - `state.ts` sends the preview as `kind: "done"` and does not use the `preview` field.
 - Target name and credit appear in both the app and the viewer.
 
-Not built: light curve (`lightcurve.csv`), free difference or sum of any two epochs (needs computing from the FITS stacks), zoom.
+Not built: free difference or sum of any two epochs (needs computing from the FITS stacks), zoom, a full-resolution spectrum of any pixel (needs a per-image "spectral cube" from science; the per-pixel files only give one point per detector and date).
 
 ## AI usage
 Parts of this code were written with the help of an AI assistant (Claude).

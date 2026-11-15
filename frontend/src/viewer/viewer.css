@@ -571,6 +571,45 @@
   border-radius: 50%;
 }
 
+/* Clicked-pixel spectrum: way back to the centre spectrum */
+.spectrum__back {
+  font-size: 0.8rem;
+}
+
+/* Light curve (shares the spectrum chart classes) */
+.lightcurve h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.lightcurve__verdict {
+  margin: 4px 0 0;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.lightcurve__verdict.is-variable {
+  color: #fbbf24;
+}
+
+/* Dashed line at 1.0 = the band's average */
+.lightcurve__mean {
+  stroke: currentColor;
+  stroke-dasharray: 4 3;
+  opacity: 0.35;
+}
+
+/* The date shown in the blink right now */
+.lightcurve__now {
+  stroke: var(--accent, currentColor);
+  stroke-width: 1.5;
+  opacity: 0.6;
+}
+
+.lightcurve__series:not(.is-variable) {
+  opacity: 0.75;
+}
+
 /* Info dropdowns (Controls info, Website info) */
 .info summary {
   display: flex;
