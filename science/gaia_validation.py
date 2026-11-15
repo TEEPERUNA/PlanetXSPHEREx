@@ -12,6 +12,7 @@ Validates celestial targets against Gaia DR3:
 """
 
 from typing import Dict, Any, Tuple, Optional
+import concurrent.futures as cf
 import numpy as np
 
 from astropy.coordinates import SkyCoord
@@ -45,32 +46,33 @@ def sanitize_for_json(obj: Any) -> Any:
 
 
 # Pre-computed Gaia DR3 ground-truth astrometry for the 5 challenge targets
+# Coordinates are referenced to Gaia DR3 epoch J2016.0
 KNOWN_TARGET_GAIA = {
     "barnard": {
         "name": "Barnard's Star",
-        "gaia_dr3_source_id": 4472832130942585856,
-        "ra_2016": 269.452075,
-        "dec_2016": 4.693392,
+        "gaia_dr3_source_id": 4472832130942575872,
+        "ra_2016": 269.448503,
+        "dec_2016": 4.739420,
         "pmra_masyr": -801.551,
         "pmdec_masyr": 10362.394,
-        "parallax_mas": 546.97,
+        "parallax_mas": 547.45,
         "phot_g_mean_mag": 8.19
     },
     "epsindib": {
         "name": "Epsilon Indi B",
-        "gaia_dr3_source_id": 6412595995574316544,  # Epsilon Indi A primary
-        "ra_2016": 331.0438,
-        "dec_2016": -56.7827,
-        "pmra_masyr": 3966.7,
-        "pmdec_masyr": -2536.2,
+        "gaia_dr3_source_id": 6412596012146801152,  # Epsilon Indi Ba (brown dwarf companion)
+        "ra_2016": 331.076453,
+        "dec_2016": -56.793812,
+        "pmra_masyr": 3981.98,
+        "pmdec_masyr": -2466.83,
         "parallax_mas": 275.8,
-        "phot_g_mean_mag": 4.69
+        "phot_g_mean_mag": 19.8
     },
     "wise0855": {
         "name": "WISE 0855-0714",
         "gaia_dr3_source_id": None,  # Ultra-cold Y dwarf (T~250K) invisible in optical Gaia
-        "ra_2016": 133.795129,
-        "dec_2016": -7.245147,
+        "ra_2016": 133.791492,
+        "dec_2016": -7.244848,
         "pmra_masyr": -8118.0,
         "pmdec_masyr": 673.0,
         "parallax_mas": 433.0,
@@ -90,8 +92,8 @@ KNOWN_TARGET_GAIA = {
     "rdra": {
         "name": "R Draconis",
         "gaia_dr3_source_id": 1646271926618580736,
-        "ra_2016": 246.661250,
-        "dec_2016": 66.752222,
+        "ra_2016": 248.167625,
+        "dec_2016": 66.754972,
         "pmra_masyr": 9.12,
         "pmdec_masyr": 12.44,
         "parallax_mas": 1.38,
@@ -111,10 +113,10 @@ def identify_benchmark_target(coord: SkyCoord, key_or_slug: Optional[str] = None
             if k in clean or clean.startswith(k):
                 return k
 
-    # Check by coordinate proximity (< 3.0 arcmin)
+    # Check by coordinate proximity (< 4.0 arcmin covers high-PM shifts from J2000 through J2026)
     for k, info in KNOWN_TARGET_GAIA.items():
         c_ref = SkyCoord(info["ra_2016"] * u.deg, info["dec_2016"] * u.deg, frame="icrs")
-        if coord.separation(c_ref).arcmin < 3.0:
+        if coord.separation(c_ref).arcmin < 4.0:
             return k
 
     return None

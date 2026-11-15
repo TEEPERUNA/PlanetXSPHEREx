@@ -102,6 +102,24 @@ BAND_COLORS = {
     "D6": "#ef4444",  # Red (4.42-5.00 µm)
 }
 
+# SPHEREx Level 2 bad-pixel flag bitmask (Table 16, SPHEREx Explanatory Supplement).
+# Excludes benign informational bits: Bit 12 (FULLSAMPLE, 4096) and Bit 22 (SOURCE, 4194304).
+BAD_PIXEL_MASK = (
+    (1 << 0)    # TRANSIENT (cosmic ray)
+    | (1 << 1)  # OVERFLOW (saturation)
+    | (1 << 2)  # SUR_ERROR
+    | (1 << 6)  # NONFUNC (dead pixel)
+    | (1 << 7)  # DICHROIC
+    | (1 << 9)  # MISSING_DATA
+    | (1 << 10) # HOT pixel
+    | (1 << 11) # COLD pixel
+    | (1 << 15) # NONLINEAR
+    | (1 << 17) # PERSIST
+    | (1 << 20) # OUTLIER
+    | (1 << 27) # BLOOM
+    | (1 << 28) # SNOWBALL
+)
+
 # Challenge benchmark targets. Simbad name is queried for coordinates and proper motion (J2000),
 # with fallback coordinates used if Simbad query fails.
 TARGETS = {
@@ -115,7 +133,7 @@ TARGETS = {
     "rwaur":    {"simbad": "RW Aur", "label": "RW Aurigae",
                  "fallback": (76.956250, 30.401111, 0.0, 0.0)},
     "rdra":     {"simbad": "R Dra", "label": "R Draconis",
-                 "fallback": (246.661250, 66.752222, 0.0, 0.0)},
+                 "fallback": (248.167625, 66.754972, 9.12, 12.44)},
 }
 
 EPOCH_GAP_DAYS = 30  # Gap in observations exceeding this triggers a new epoch
@@ -286,7 +304,8 @@ def parse_cutout_hdul(h, mjd: float, band: str, coord: SkyCoord,
         var = c.variance[yi - 1:yi + 2, xi - 1:xi + 2]
         c.center_flux = float(np.nanmean(ap))
         c.center_err = float(np.sqrt(np.nansum(var)) / 9)
-    c.flagged_frac = float(np.mean(c.flags != 0))
+    bad_pixels = (c.flags & BAD_PIXEL_MASK) != 0 if c.flags is not None else False
+    c.flagged_frac = float(np.mean(bad_pixels))
     return c
 
 
@@ -336,8 +355,8 @@ def target_wcs(coord: SkyCoord, size_deg: float) -> tuple[WCS, tuple[int, int]]:
 def reproject_one(c: Cutout, w: WCS, shape, mask_flags: bool) -> np.ndarray:
     from reproject import reproject_interp
     data = c.image.copy()
-    if mask_flags:
-        data[c.flags != 0] = np.nan
+    if mask_flags and c.flags is not None:
+        data[(c.flags & BAD_PIXEL_MASK) != 0] = np.nan
     out, _ = reproject_interp((data, c.wcs), w, shape_out=shape, order="bilinear")
     return out
 
@@ -710,6 +729,7 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
         "target": label, "ra_deg": coord.ra.deg, "dec_deg": coord.dec.deg,
         "fov_arcmin": args.size, "pixel_scale_arcsec": PIXEL_SCALE_ARCSEC,
         "shape": list(shape), "bands": args.bands, "detector_ranges_um": DETECTORS,
+        "inverted": bool(use_invert),
         "epochs": epochs_meta, "outputs": outputs, "spectrum": "spectrum.csv",
         "lightcurve": "lightcurve.csv",
         "lightcurve_png": "lightcurve.png",

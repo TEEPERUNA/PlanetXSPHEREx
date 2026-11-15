@@ -62,6 +62,7 @@ Static files listed in `meta.json`, e.g. `/api/files/barnard/frames/ALL/epoch0.p
   "shape": [31, 31],                          // pixels (height, width)
   "bands": ["D1","D2","D3","D4","D5","D6"],
   "detector_ranges_um": {"D1": [0.75, 1.09], ...},
+  "inverted": false,                          // true when negative-contrast mode is active (e.g. WISE 0855)
   "epochs": [
     {"index": 0, "date": "2025-05-06", "mjd_mean": 60801.0, "n_images": 18,
      "detectors": {"D1": {"n_images": 3, "flagged_frac": 0.02}, ...}}
@@ -96,26 +97,26 @@ Static files listed in `meta.json`, e.g. `/api/files/barnard/frames/ALL/epoch0.p
   },
   "gaia_validation": {
     "status": "CONFIRMED_MATCH",              // "CONFIRMED_MATCH" | "VALIDATED_NON_GAIA" | "NO_GAIA_MATCH"
-    "gaia_dr3_source_id": 4472832130942585856, // or null (e.g. wise0855 optical invisible)
+    "gaia_dr3_source_id": 4472832130942575872, // or null (e.g. wise0855 optical invisible)
     "target": "Barnard's Star",
     "target_key": "barnard",
     "message": "Vahvistettu Gaia DR3 -kohde (Barnard's Star). Ominaisliike projisoitu epookista J2016.0 vuoteen 2026.65.",
     "reference_epoch": "J2016.0",
     "target_epoch": 2026.65,
-    "predicted_ra": 269.449696,
-    "predicted_dec": 4.724044,
+    "predicted_ra": 269.446124,
+    "predicted_dec": 4.770075,
     "pixel_coords": {                         // calculated pixel coordinates in image
-      "canvas_x": 15.2,                       // top-left origin (for HTML5 Canvas)
-      "canvas_y": 14.8,
-      "wcs_x": 15.2,                          // bottom-left origin (FITS standard)
-      "wcs_y": 15.2
+      "canvas_x": 15.0,                       // top-left origin (for HTML5 Canvas)
+      "canvas_y": 15.0,
+      "wcs_x": 15.0,                          // bottom-left origin (FITS standard)
+      "wcs_y": 15.0
     },
     "pmra_masyr": -801.551,
     "pmdec_masyr": 10362.394,
-    "parallax_mas": 546.97,
+    "parallax_mas": 547.45,
     "phot_g_mean_mag": 8.19,
-    "accumulated_shift_arcsec": 110.68,
-    "residual_offset_arcsec": 168.487,
+    "accumulated_shift_arcsec": 110.69,
+    "residual_offset_arcsec": 2.279,
     "is_match": true
   },
   "pmra_masyr": -801.6, "pmdec_masyr": 10362.4, // only for named targets

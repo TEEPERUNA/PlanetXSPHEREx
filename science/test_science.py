@@ -42,12 +42,37 @@ def test_slug_and_target_identification():
     print("  ✓ Target identification works for standard slugs, FOV variants (epsindib_fov5), and coordinates!")
 
 def test_gaia_validation_with_slug_variants():
-    print("Testing Gaia DR3 validation with FOV slugs...")
-    coord_eps = SkyCoord(331.0438 * u.deg, -56.7827 * u.deg, frame="icrs")
-    res = validate_gaia(coord_eps, target_key="epsindib_fov5", target_epoch=2026.0)
+    print("Testing Gaia DR3 validation with FOV slugs and accurate J2016 positions...")
+    coord_eps = SkyCoord(331.097845 * u.deg, -56.801630 * u.deg, frame="icrs")
+    res = validate_gaia(coord_eps, target_key="epsindib_fov5", target_epoch=2026.74)
     assert res["is_match"] is True
     assert res["status"] == "CONFIRMED_MATCH"
-    print(f"  ✓ epsindib_fov5 correctly validated against Gaia: shift = {res['accumulated_shift_arcsec']}\"")
+    assert res["gaia_dr3_source_id"] == 6412596012146801152 # Eps Ind Ba brown dwarf companion
+    assert res["residual_offset_arcsec"] < 5.0, f"Eps Ind B offset too large: {res['residual_offset_arcsec']}\""
+    print(f"  ✓ epsindib_fov5 correctly validated: source_id={res['gaia_dr3_source_id']}, residual = {res['residual_offset_arcsec']}\" (< 5\")")
+
+    # Barnard's Star: must match and residual must be small (< 3"), NOT 172"
+    coord_b = SkyCoord(269.446080 * u.deg, 4.770707 * u.deg, frame="icrs")
+    res_b = validate_gaia(coord_b, target_key="barnard", target_epoch=2026.65)
+    assert res_b["is_match"] is True
+    assert res_b["status"] == "CONFIRMED_MATCH"
+    assert res_b["gaia_dr3_source_id"] == 4472832130942575872
+    assert res_b["residual_offset_arcsec"] < 5.0, f"Barnard offset too large: {res_b['residual_offset_arcsec']}\""
+    print(f"  ✓ Barnard's Star correctly validated: source_id={res_b['gaia_dr3_source_id']}, residual = {res_b['residual_offset_arcsec']}\" (< 5\")")
+
+def test_bad_pixel_flag_mask():
+    print("Testing SPHEREx bad-pixel flag bitmask (excluding FULLSAMPLE & SOURCE)...")
+    clean_flags = np.full((10, 10), 4096 | 4194304, dtype=np.int64) # Bit 12 and Bit 22
+    dirty_flags = clean_flags.copy()
+    dirty_flags[0, 0] |= 2  # OVERFLOW (saturation)
+    dirty_flags[1, 1] |= 64 # NONFUNC (dead pixel)
+    
+    old_frac = float(np.mean(dirty_flags != 0))
+    assert old_frac == 1.0, f"Expected 1.0, got {old_frac}"
+    
+    new_frac = float(np.mean((dirty_flags & fs.BAD_PIXEL_MASK) != 0))
+    assert new_frac == 0.02, f"Expected 0.02 (2%), got {new_frac}"
+    print("  ✓ BAD_PIXEL_MASK correctly ignores FULLSAMPLE and SOURCE bits (flagged_frac = 0.02 instead of 1.0)!")
 
 def test_per_band_lightcurve_barnard_scenario():
     print("Testing Per-Band Light Curve (Barnard's Star unequal detector scenario)...")
@@ -175,6 +200,10 @@ def test_run_with_preloaded_cutouts():
         )
         out_dir = fs.run(coord, "Test Star", "test_star", args, {}, cutouts=cutouts)
         assert (out_dir / "meta.json").exists()
+        import json
+        meta = json.loads((out_dir / "meta.json").read_text())
+        assert "inverted" in meta
+        assert meta["inverted"] is False
         assert (out_dir / "spectrum.csv").exists()
         assert (out_dir / "lightcurve.csv").exists()
         assert (out_dir / "frames" / "D1" / "epoch0.png").exists()
@@ -340,6 +369,7 @@ def test_stellar_donut_repair():
 if __name__ == "__main__":
     test_slug_and_target_identification()
     test_gaia_validation_with_slug_variants()
+    test_bad_pixel_flag_mask()
     test_per_band_lightcurve_barnard_scenario()
     test_per_band_lightcurve_variable_scenario()
     test_proper_motion_aperture_tracking()
