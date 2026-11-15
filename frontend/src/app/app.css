@@ -25,7 +25,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; line-height: 1.4; }
 
-.app { display: grid; gap: 16px; max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+.app { display: grid; gap: 16px; max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
 .app__header h1 { margin: 0; font-size: 1.75rem; letter-spacing: 0.02em; }
 .app__header p { margin: 4px 0 0; }
 .app h2 { margin: 0; font-size: 1.25rem; }
@@ -57,16 +57,46 @@ a.note { color: var(--accent); justify-self: start; }
 .app button[aria-pressed="true"], .app button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); outline: none; }
 .app button.primary { padding: 10px 20px; font-weight: 600; }
 .app :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.app .toggle { justify-self: start; }
 
 .pills { display: flex; flex-wrap: wrap; gap: 6px; }
 
-/* GIF */
-.gif { display: grid; gap: 10px; }
-.gif__frame { aspect-ratio: 1; background: #000; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.gif__frame img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
-
-/* The result heading and credit line already say this. */
-.app .viewer__title, .app .viewer__credit { display: none; }
 .app .viewer { max-width: none; }
 .app progress { accent-color: var(--accent); }
+
+/* Layout: image left, controls and data in .viewer__side (wrapper in viewer/Viewer.tsx). */
+.viewer__side { display: grid; gap: 12px; align-content: start; }
+
+@media (min-width: 900px) {
+  /* The last 1fr row takes the sidebar's height, so the rows on the left stay tight. */
+  .app .viewer:has(.viewer__side) {
+    grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: auto auto auto 1fr;
+    align-items: start; column-gap: 24px;
+  }
+  .app .viewer:has(.viewer__side) > :not(.viewer__side) { grid-column: 1; }
+  .viewer__side {
+    grid-column: 2; grid-row: 1 / -1;
+    position: sticky; top: 16px; max-height: calc(100dvh - 32px); overflow: auto;
+  }
+  .drawer-toggle, .drawer-backdrop { display: none; }
+}
+
+/* Mobile: the side panel is a drawer that slides in from the right. */
+@media (max-width: 899px) {
+  .viewer__side {
+    position: fixed; inset: 0 0 0 auto; z-index: 20; width: min(360px, 88vw);
+    padding: 16px 16px 80px; overflow: auto;
+    background: var(--surface); border-left: 1px solid var(--border);
+    transform: translateX(100%); visibility: hidden;
+    transition: transform 0.25s ease, visibility 0s linear 0.25s;
+  }
+  .result.is-open .viewer__side { transform: none; visibility: visible; transition: transform 0.25s ease; }
+  .app .drawer-backdrop {
+    position: fixed; inset: 0; z-index: 10; padding: 0;
+    background: rgb(0 0 0 / 0.5); border: 0; border-radius: 0;
+  }
+  .app .drawer-toggle { position: fixed; right: 16px; bottom: 16px; z-index: 30; box-shadow: 0 4px 16px rgb(0 0 0 / 0.4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viewer__side, .result.is-open .viewer__side { transition: none; }
+}

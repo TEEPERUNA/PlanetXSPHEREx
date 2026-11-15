@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Viewer } from "../viewer";
 import { searchFromUrl, useSky } from "../state";
-import { GifView } from "./GifView";
 import { SearchForm } from "./SearchForm";
 import "./app.css";
 
@@ -9,12 +8,23 @@ const initial = searchFromUrl();
 
 export function App() {
   const { status, setTarget } = useSky();
-  const [frames, setFrames] = useState(false);
+  const [open, setOpen] = useState(false);
 
   // A link with coordinates in the URL runs the search straight away.
   useEffect(() => {
     if (initial) setTarget(initial);
   }, [setTarget]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  // The image shown right now: the full result or the quick preview.
+  const result = status.kind === "done" ? status : status.kind === "loading" ? status.preview : undefined;
+  const gif = result?.meta.outputs.ALL?.gif;
 
   return (
     <main className="app">
@@ -23,20 +33,21 @@ export function App() {
         <p className="note">See how a patch of sky changes over time.</p>
       </header>
       <SearchForm initial={initial} onSearch={setTarget} />
-      {status.kind === "done" ? (
-        <section className="result card">
-          <h2>{status.meta.target}</h2>
-          <GifView key={status.baseUrl} meta={status.meta} baseUrl={status.baseUrl} />
-          <button className="toggle" aria-expanded={frames} onClick={() => setFrames(!frames)}>
-            {frames ? "Hide" : "Show"} frame-by-frame
+      {result && gif && (
+        <a className="note" href={result.baseUrl + gif} download>
+          Download GIF
+        </a>
+      )}
+      <section className={"result card" + (open ? " is-open" : "")}>
+        <Viewer status={status} />
+      </section>
+      {result && (
+        <>
+          {open && <button className="drawer-backdrop" aria-label="Close controls" onClick={() => setOpen(false)} />}
+          <button className="drawer-toggle primary" aria-expanded={open} onClick={() => setOpen(!open)}>
+            {open ? "Close" : "Controls"}
           </button>
-          {frames && <Viewer status={status} />}
-          <p className="note">{status.meta.credit}</p>
-        </section>
-      ) : (
-        <section className="result card">
-          <Viewer status={status} />
-        </section>
+        </>
       )}
     </main>
   );

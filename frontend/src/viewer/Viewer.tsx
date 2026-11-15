@@ -131,47 +131,49 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         }
       />
 
-      <EpochInfo frames={frames} frameIdx={idx} band={activeBand} showDiff={diffOn} />
-      <CursorInfo pixel={hoverPx} meta={meta} />
-      {(showGaia || !hasGaia) && (
-        <GaiaInfo meta={meta} epoch={diffOn ? (frames[frames.length - 1]?.epoch ?? null) : currentEpoch} showDiff={diffOn} />
-      )}
+      <div className="viewer__side">
+        <EpochInfo frames={frames} frameIdx={idx} band={activeBand} showDiff={diffOn} />
+        <CursorInfo pixel={hoverPx} meta={meta} />
+        {(showGaia || !hasGaia) && (
+          <GaiaInfo meta={meta} epoch={diffOn ? (frames[frames.length - 1]?.epoch ?? null) : currentEpoch} showDiff={diffOn} />
+        )}
 
-      <PlaybackControls
-        bands={bands}
-        band={activeBand}
-        onBand={changeBand}
-        playing={playing}
-        canPlay={canPlay}
-        onTogglePlay={() => setPlaying((p) => !p)}
-        onStep={(delta) => {
-          setPlaying(false); // stepping means the user wants to look closely
-          step(delta);
-        }}
-        fps={fps}
-        onFps={setFps}
-        hasDiff={diffSrc !== null}
-        showDiff={diffOn}
-        onToggleDiff={() => setShowDiff((d) => !d)}
-        hasGaia={hasGaia}
-        showGaia={showGaia}
-        onToggleGaia={() => setShowGaia((s) => !s)}
-        brightness={brightness}
-        onBrightness={setBrightness}
-        contrast={contrast}
-        onContrast={setContrast}
-      />
-
-      {meta.spectrum && (
-        <SpectrumChart
-          url={joinUrl(baseUrl, meta.spectrum)}
-          epochs={meta.epochs}
-          ranges={meta.detector_ranges_um}
-          highlightEpoch={diffOn ? undefined : frames[idx]?.epoch.index}
+        <PlaybackControls
+          bands={bands}
+          band={activeBand}
+          onBand={changeBand}
+          playing={playing}
+          canPlay={canPlay}
+          onTogglePlay={() => setPlaying((p) => !p)}
+          onStep={(delta) => {
+            setPlaying(false); // stepping means the user wants to look closely
+            step(delta);
+          }}
+          fps={fps}
+          onFps={setFps}
+          hasDiff={diffSrc !== null}
+          showDiff={diffOn}
+          onToggleDiff={() => setShowDiff((d) => !d)}
+          hasGaia={hasGaia}
+          showGaia={showGaia}
+          onToggleGaia={() => setShowGaia((s) => !s)}
+          brightness={brightness}
+          onBrightness={setBrightness}
+          contrast={contrast}
+          onContrast={setContrast}
         />
-      )}
 
-      {meta.credit && <p className="viewer__credit">Data: {meta.credit}</p>}
+        {meta.spectrum && (
+          <SpectrumChart
+            url={joinUrl(baseUrl, meta.spectrum)}
+            epochs={meta.epochs}
+            ranges={meta.detector_ranges_um}
+            highlightEpoch={diffOn ? undefined : frames[idx]?.epoch.index}
+          />
+        )}
+
+        {meta.credit && <p className="viewer__credit">Data: {meta.credit}</p>}
+      </div>
     </div>
   );
 }
