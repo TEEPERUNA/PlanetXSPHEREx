@@ -1,0 +1,279 @@
+/* demo/beyond: THE SHIP – the whole page as a starship bridge.
+   Loaded after beyond.css. Hull, telemetry, radar, warp, arrival and boot screen. */
+
+/* Ship wording only with FX on */
+.label-ship, .ship-label { display: none; }
+.fx .label-ship { display: inline; }
+.fx .label-normal { display: none; }
+.fx .ship-label {
+  display: block;
+  grid-column: 1 / -1;
+  margin: 0;
+  font: 600 0.7rem var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-shadow: 0 0 8px rgb(34 211 238 / 0.6);
+}
+.fx .ship-label::before { content: "◆ "; }
+.fx .viewer__side::before {
+  content: "◆ Science station";
+  font: 600 0.7rem var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-shadow: 0 0 8px rgb(34 211 238 / 0.6);
+}
+.fx .viewer__title::before {
+  content: "Viewscreen · ";
+  font: 500 0.75rem var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  vertical-align: middle;
+}
+
+/* ---------- Telemetry bar ---------- */
+.telemetry {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  background: rgb(34 211 238 / 0.22);
+  border: 1px solid rgb(34 211 238 / 0.35);
+  border-radius: var(--radius);
+  box-shadow: 0 0 30px rgb(34 211 238 / 0.12), inset 0 0 20px rgb(34 211 238 / 0.06);
+}
+.telemetry__cell {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 12px;
+  background: rgb(8 10 14 / 0.88);
+}
+.telemetry__label {
+  font: 500 0.62rem var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.telemetry__value {
+  overflow: hidden;
+  font: 500 0.85rem var(--mono);
+  color: #a5f3fc;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 8px rgb(34 211 238 / 0.5);
+}
+.telemetry__cell.is-linked .telemetry__value { color: #4ade80; text-shadow: 0 0 8px rgb(74 222 128 / 0.6); }
+.telemetry__cell.is-acquiring .telemetry__value,
+.telemetry__cell.is-backup .telemetry__value { color: #fbbf24; text-shadow: 0 0 8px rgb(251 191 36 / 0.6); }
+.telemetry__cell.is-lost .telemetry__value { color: #f87171; text-shadow: 0 0 8px rgb(248 113 113 / 0.6); }
+.telemetry__cell.is-warp .telemetry__value { color: #c4b5fd; text-shadow: 0 0 10px rgb(167 139 250 / 0.9); }
+
+/* ---------- Nav console: search + radar ---------- */
+.ship__console { display: grid; gap: clamp(16px, 1.5vw, 28px); }
+@media (min-width: 1100px) {
+  .ship__console { grid-template-columns: minmax(0, 1fr) clamp(220px, 17vw, 300px); align-items: stretch; }
+}
+
+.radar {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  justify-items: center;
+  padding: 12px 14px;
+  background: rgb(8 10 14 / 0.75);
+  border: 1px solid rgb(34 211 238 / 0.35);
+  border-radius: var(--radius);
+  box-shadow: 0 0 30px rgb(34 211 238 / 0.1), inset 0 0 30px rgb(34 211 238 / 0.06);
+}
+.radar__title, .radar__hint {
+  margin: 0;
+  justify-self: start;
+  font: 600 0.7rem var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.radar__title::before { content: "◆ "; }
+.radar__hint {
+  justify-self: center;
+  font-weight: 400;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  text-transform: none;
+  text-align: center;
+}
+.radar svg { width: 100%; max-width: 240px; height: auto; overflow: visible; }
+.radar__rim { stroke: rgb(34 211 238 / 0.55); stroke-width: 1; }
+.radar__ring { fill: none; stroke: rgb(34 211 238 / 0.16); stroke-width: 0.7; }
+.radar__equator { fill: none; stroke: rgb(34 211 238 / 0.4); stroke-width: 0.8; stroke-dasharray: 2 3; }
+.radar__label { fill: var(--muted); font: 7px var(--mono); }
+.radar__sweep { transform-box: view-box; transform-origin: 100px 100px; }
+.radar__blip { cursor: pointer; outline: none; }
+.radar__hit { fill: transparent; }
+.radar__dot { fill: #fde68a; filter: drop-shadow(0 0 3px #fde68a); }
+.radar__name { fill: var(--text); font: 600 7px var(--sans); opacity: 0.75; pointer-events: none; }
+.radar__blip:hover .radar__dot, .radar__blip:focus-visible .radar__dot { fill: #fff; }
+.radar__blip:hover .radar__name, .radar__blip:focus-visible .radar__name { opacity: 1; fill: #fff; }
+.radar__blip.is-active .radar__dot { fill: var(--accent); filter: drop-shadow(0 0 5px var(--accent)); }
+.radar__blip.is-active .radar__name { fill: var(--accent); opacity: 1; }
+.radar__here { fill: none; stroke: #4ade80; stroke-width: 1.4; filter: drop-shadow(0 0 3px #4ade80); }
+
+/* ---------- Hull: cockpit window frame (desktop) ---------- */
+.ship__hull { position: fixed; inset: 0; z-index: 3; pointer-events: none; }
+.ship__strut, .ship__rail { position: absolute; display: block; }
+.ship__strut {
+  width: 76px;
+  height: 76px;
+  background: linear-gradient(135deg, #2a313c, #0e1116 60%);
+  box-shadow: 0 0 12px rgb(34 211 238 / 0.25);
+}
+/* A diagonal window strut across each corner */
+.ship__strut--tl { top: 0; left: 0; clip-path: polygon(0 34%, 34% 0, 52% 0, 0 52%); }
+.ship__strut--tr { top: 0; right: 0; clip-path: polygon(66% 0, 100% 34%, 100% 52%, 48% 0); }
+.ship__strut--bl { bottom: 0; left: 0; clip-path: polygon(0 48%, 52% 100%, 34% 100%, 0 66%); }
+.ship__strut--br { bottom: 0; right: 0; clip-path: polygon(100% 48%, 100% 66%, 66% 100%, 48% 100%); }
+.ship__rail {
+  top: 76px;
+  bottom: 76px;
+  width: 8px;
+  background:
+    radial-gradient(circle, #22d3ee 0 1.6px, transparent 2.4px) center top / 8px 46px repeat-y,
+    linear-gradient(90deg, #0e1116, #262c36, #0e1116);
+  opacity: 0.85;
+}
+.ship__rail--l { left: 0; border-right: 1px solid rgb(34 211 238 / 0.3); }
+.ship__rail--r { right: 0; border-left: 1px solid rgb(34 211 238 / 0.3); }
+@media (max-width: 899px) { .ship__hull { display: none; } }
+
+/* ---------- Warp overlay + arrival ---------- */
+.ship__warp {
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 45%, rgb(34 211 238 / 0.14) 75%, rgb(167 139 250 / 0.3));
+}
+.ship__warp span {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font: 800 clamp(1.4rem, 4vw, 3.2rem) "Orbitron", var(--sans);
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: #e0f2fe;
+  text-shadow: 0 0 18px #22d3ee, 0 0 40px #a78bfa;
+  white-space: nowrap;
+}
+.ship__arrived {
+  position: fixed;
+  top: 38%;
+  left: 50%;
+  z-index: 5;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 18px 40px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: rgb(4 6 10 / 0.7);
+  border: 1px solid rgb(34 211 238 / 0.6);
+  border-radius: 12px;
+  box-shadow: 0 0 40px rgb(34 211 238 / 0.45);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+}
+.ship__arrived-label {
+  font: 600 0.75rem var(--mono);
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: #4ade80;
+  text-shadow: 0 0 10px #4ade80;
+}
+.ship__arrived-name {
+  font: 800 clamp(1.2rem, 3vw, 2.2rem) "Orbitron", var(--sans);
+  letter-spacing: 0.08em;
+  color: #fff;
+  text-shadow: 0 0 20px #22d3ee;
+}
+
+/* ---------- Boot screen ---------- */
+.boot {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(circle at 50% 40%, #071318, #020306 70%);
+  cursor: pointer;
+}
+.boot__screen {
+  width: min(680px, 100%);
+  font: 500 clamp(0.75rem, 1.6vw, 1rem) / 1.9 var(--mono);
+  color: #67e8f9;
+  text-shadow: 0 0 8px rgb(34 211 238 / 0.7);
+}
+.boot__screen p { margin: 0; min-height: 1.9em; white-space: pre-wrap; }
+.boot__screen p.boot__final { margin-top: 12px; font-weight: 700; color: #fff; text-shadow: 0 0 14px #22d3ee; }
+.boot__cursor { display: inline-block; width: 0.6em; height: 1.1em; margin-left: 2px; background: #67e8f9; vertical-align: text-bottom; }
+.boot__skip {
+  position: absolute;
+  bottom: 24px;
+  margin: 0;
+  font: 0.75rem var(--mono);
+  color: var(--muted);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* ---------- Motion ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .radar__sweep { animation: fx-radar 4s linear infinite; }
+  @keyframes fx-radar { to { transform: rotate(360deg); } }
+  .radar__blip.is-active .radar__dot { animation: fx-blip 1.2s ease-in-out infinite; }
+  @keyframes fx-blip { 50% { filter: drop-shadow(0 0 10px var(--accent)); } }
+  .radar__here { transform-box: fill-box; transform-origin: center; animation: fx-ping 1.8s ease-out infinite; }
+
+  .ship__rail { animation: fx-rail 2.4s steps(2) infinite; }
+  @keyframes fx-rail { 50% { opacity: 0.55; } }
+
+  .telemetry__cell.is-acquiring .telemetry__value,
+  .telemetry__cell.is-warp .telemetry__value { animation: fx-blink 0.8s steps(2) infinite; }
+  @keyframes fx-blink { 50% { opacity: 0.35; } }
+
+  /* Warp: hull shudder (desktop), pulsing edges, glitching title */
+  @media (min-width: 900px) {
+    .ship.is-warp .app { animation: fx-shake 0.16s linear infinite; }
+  }
+  @keyframes fx-shake {
+    0%, 100% { transform: translate(0, 0); }
+    25% { transform: translate(-1px, 1px); }
+    50% { transform: translate(1px, 0); }
+    75% { transform: translate(0, -1px); }
+  }
+  .ship__warp { animation: fx-warp-glow 0.9s ease-in-out infinite alternate; }
+  @keyframes fx-warp-glow { from { opacity: 0.6; } to { opacity: 1; } }
+  .ship__warp span { animation: fx-glitch 1.4s infinite, fx-warp-in 0.6s ease-out; }
+  @keyframes fx-warp-in { from { letter-spacing: 1.2em; opacity: 0; } }
+
+  .ship__arrived { animation: fx-arrive 2.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+  @keyframes fx-arrive {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(1.4); filter: blur(8px); }
+    12% { opacity: 1; transform: translate(-50%, -50%) scale(1); filter: none; }
+    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -60%) scale(0.96); }
+  }
+
+  .boot__cursor { animation: fx-blink 0.9s steps(2) infinite; }
+  .boot { animation: fx-boot-in 0.3s ease-out; }
+  @keyframes fx-boot-in { from { opacity: 0; } }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ship__arrived { opacity: 1; }
+}

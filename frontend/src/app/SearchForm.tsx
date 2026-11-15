@@ -39,6 +39,8 @@ export function SearchForm({ initial, onSearch }: Props) {
 
   return (
     <form className="search card" onSubmit={submit}>
+      {/* demo/beyond: console heading, shown only with FX on */}
+      <p className="ship-label">Nav computer · set course</p>
       <div className="search__coords">
         <label>
           Right Ascension
@@ -77,12 +79,16 @@ export function SearchForm({ initial, onSearch }: Props) {
           </select>
         </label>
         <button type="submit" className="primary">
-          Show sky
+          <span className="label-normal">Show sky</span>
+          <span className="label-ship">Engage</span>
         </button>
       </div>
       {targets.length > 0 && (
         <div className="search__targets">
-          <span className="note">Try a target</span>
+          <span className="note">
+            <span className="label-normal">Try a target</span>
+            <span className="label-ship">Destinations</span>
+          </span>
           <div className="pills">
             {targets.map((t) => (
               <button key={t.key} type="button" aria-pressed={t.key === active} onClick={() => pick(t)}>
