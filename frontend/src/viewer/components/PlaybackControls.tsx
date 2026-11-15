@@ -17,6 +17,10 @@ interface Props {
   showDiff: boolean;
   onToggleDiff: () => void;
 
+  hasDeep: boolean; // the band has a combined (deep) image of all epochs
+  showDeep: boolean;
+  onToggleDeep: () => void;
+
   hasGaia: boolean; // false when there is nothing from Gaia to draw on the image
   showGaia: boolean;
   onToggleGaia: () => void;
@@ -90,6 +94,18 @@ export function PlaybackControls(p: Props) {
         >
           Difference image
         </button>
+
+        {p.hasDeep && (
+          <button
+            type="button"
+            onClick={p.onToggleDeep}
+            aria-pressed={p.showDeep}
+            className={p.showDeep ? "is-active" : undefined}
+            title="All epochs added together: faint sources show up"
+          >
+            Deep image
+          </button>
+        )}
 
         {p.hasGaia && (
           <button

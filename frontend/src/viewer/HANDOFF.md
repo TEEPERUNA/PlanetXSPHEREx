@@ -130,6 +130,11 @@ The spectrum keeps the old chart on screen until the new CSV has loaded, so the 
 - The epoch on screen in the blink is highlighted and the others are dimmed, so brightness changes between epochs are easy to see.
 - The x axis is fitted to the data (about 0.75–5 µm). The y axis starts at 0 unless flux goes below it. Checked against all five challenge targets: every point fits.
 
+### Deep image
+- "Deep image" shows `outputs[band].combined` (science adds all epochs of the band together). It works like the difference image: one fixed image instead of the epochs (`stillOn`), so playback and compare are off, and the two buttons switch each other off.
+- Source detection then runs on `combined_fits` (`useSources(..., stackPath)`), which is deeper, so fainter sources without a Gaia star get an orange square. Gaia field stars are drawn at the middle epoch; the target ring shows the start (dashed) and end (solid) of its path, because a moving star is smeared in the sum.
+- The button only appears when the band has a combined image.
+
 ### Spectrum of a clicked pixel
 - Clicking the image (Juho's `onPick`, which also opens the candidate report) sets `spectrumPx`. `hooks/usePixelSpectrum.ts` reads every per-pixel file (`outputs[D1–D6].pixels`, ~60 kB each, cached) and takes, for that pixel: SB (flux), SB ÷ SNR (error) and WAVE (wavelength). The result is one point per detector and epoch, fed into `SpectrumChart` through its `pixel` prop; "Back to image centre" clears it.
 - This is coarser than the centre spectrum (`spectrum.csv` has one point per SPHEREx image). The per-pixel SB is a stack of several images, so its wavelength is that of one representative image.
