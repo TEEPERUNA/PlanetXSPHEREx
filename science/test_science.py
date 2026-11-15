@@ -364,6 +364,19 @@ def test_stellar_donut_repair():
     # The center pixel of the difference should be a smooth dipole or flat, not a neutral gray hole
     assert diff_path.exists()
 
+    # 5. Edge NaNs bordering high flux (e.g. Epsilon Indi B scenario) must stay neutral sky, not bright white
+    edge_bright_img = synthetic.copy()
+    edge_bright_img[0:5, 0:5] = np.nan
+    repaired_edge = fs.repair_star_donuts(edge_bright_img)
+    assert np.all(repaired_edge[0:5, 0:5] < 10.0), f"Edge NaNs bordering star were filled with bright flux: {repaired_edge[0:5, 0:5]}"
+
+    # In diff_png, edge NaNs must be rendered as neutral gray (127)
+    diff_edge_path = Path("/tmp/test_diff_edge.png")
+    fs.diff_png(edge_bright_img, synthetic, diff_edge_path, scale=1, text="")
+    diff_edge_arr = np.array(Image.open(diff_edge_path).convert("L"))
+    # In PIL image with flipud, FITS row 0:5 is bottom rows -5:
+    assert np.all(diff_edge_arr[-5:, 0:5] == 127), f"Edge NaNs did not render as neutral gray 127 in diff_png: {diff_edge_arr[-5:, 0:5]}"
+
     print("  ✓ Stellar donuts successfully eliminated across NaNs, non-NaN craters, and stretch rendering!")
 
 def test_multi_layer_pixel_cube():

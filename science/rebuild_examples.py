@@ -54,6 +54,7 @@ def rebuild_target(target_dir: Path):
     is_rdra = (slug == "rdra")
     use_invert = is_wise0855
     meta["inverted"] = bool(use_invert)
+    meta["glare_suppressed"] = bool(is_epsindib)
 
     # 1. Discover target WCS from existing stacks
     w = None
