@@ -17,13 +17,16 @@ export function SearchForm({ initial, onSearch }: Props) {
 
   // Presets are optional: if the backend is down the form still works.
   useEffect(() => {
-    getTargets().then(setTargets).catch(() => {});
+    getTargets()
+      .then(setTargets)
+      .catch(() => {});
   }, []);
 
   function submit(e: FormEvent) {
     e.preventDefault();
+    // A picked target stays the search until RA/Dec are edited.
+    if (active) return onSearch({ target: active, fov });
     if (!ra.trim() || !dec.trim()) return;
-    setActive(null);
     onSearch({ ra: ra.trim(), dec: dec.trim(), fov });
   }
 
@@ -39,11 +42,27 @@ export function SearchForm({ initial, onSearch }: Props) {
       <div className="search__coords">
         <label>
           Right Ascension
-          <input value={ra} onChange={(e) => setRa(e.target.value)} placeholder="133.795 or 08h55m10.8s" required />
+          <input
+            value={ra}
+            onChange={(e) => {
+              setRa(e.target.value);
+              setActive(null);
+            }}
+            placeholder="133.795 or 08h55m10.8s"
+            required={!active}
+          />
         </label>
         <label>
           Declination
-          <input value={dec} onChange={(e) => setDec(e.target.value)} placeholder="-7.245 or -7d14m42s" required />
+          <input
+            value={dec}
+            onChange={(e) => {
+              setDec(e.target.value);
+              setActive(null);
+            }}
+            placeholder="-7.245 or -7d14m42s"
+            required={!active}
+          />
         </label>
       </div>
       <div className="search__row">

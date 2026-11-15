@@ -17,6 +17,7 @@ import "./viewer.css";
 
 interface ViewerProps {
   status: ViewerStatus;
+  onRetry?: () => void; // shows a Try again button on errors
 }
 
 // Same position = same key, so preview -> full result keeps band, frame and filters.
@@ -26,7 +27,7 @@ function viewKey(meta: Meta): string {
 }
 
 // Public component. The app passes the status, the viewer shows it.
-export function Viewer({ status }: ViewerProps) {
+export function Viewer({ status, onRetry }: ViewerProps) {
   if (status.kind === "done") {
     return <LoadedViewer key={viewKey(status.meta)} meta={status.meta} baseUrl={status.baseUrl} />;
   }
@@ -51,7 +52,7 @@ export function Viewer({ status }: ViewerProps) {
 
   return (
     <div className="viewer">
-      <StatusView status={status} />
+      <StatusView status={status} onRetry={onRetry} />
     </div>
   );
 }

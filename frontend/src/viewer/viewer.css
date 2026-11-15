@@ -102,10 +102,13 @@
   opacity: 0.8;
 }
 
+/* min-height: the far-from-centre sentence comes and goes per epoch;
+   room for 4 lines keeps the controls below from jumping during playback */
 .viewer__gaia {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+  min-height: 5.2rem;
   margin: 0;
   font-size: 0.85rem;
   opacity: 0.85;
@@ -115,6 +118,7 @@
   flex: none;
   width: 10px;
   height: 10px;
+  margin-top: 0.3em; /* level with the first text line */
   border: 2px solid #22c55e;
   border-radius: 50%;
 }
@@ -260,7 +264,7 @@
 .spectrum h3 {
   margin: 0 0 6px;
   color: var(--muted, inherit);
-  font-size: 11px;
+  font-size: 0.75rem;
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -459,4 +463,9 @@
   .info summary::after {
     transition: none;
   }
+}
+
+.status__retry {
+  justify-self: center;
+  margin-top: 6px;
 }

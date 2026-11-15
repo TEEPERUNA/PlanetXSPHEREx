@@ -26,7 +26,7 @@ async function saveGif(e: MouseEvent<HTMLAnchorElement>) {
 }
 
 export function App() {
-  const { status, setTarget } = useSky();
+  const { status, setTarget, retry, info } = useSky();
   const [open, setOpen] = useState(false);
 
   // A link with coordinates in the URL runs the search straight away.
@@ -44,13 +44,14 @@ export function App() {
   // The image shown right now: the full result or the quick preview.
   const result = status.kind === "done" ? status : status.kind === "loading" ? status.preview : undefined;
   const gif = result?.meta.outputs.ALL?.gif;
+  const fov = result ? Math.round((result.meta.shape[1] * result.meta.pixel_scale_arcsec) / 60) : 3;
 
   return (
     <main className="app">
       <header className="app__header">
         <h1>
           <span className="app__mark" aria-hidden="true" />
-          SPHEREx Sky
+          STARx Viewer
         </h1>
         {result && gif && (
           <a className="app__download" href={result.baseUrl + gif} download onClick={saveGif}>
@@ -59,8 +60,21 @@ export function App() {
         )}
       </header>
       <SearchForm initial={initial} onSearch={setTarget} />
+      {info.fallback ? (
+        <div className="banner banner--warn" role="status">
+          <div>
+            <p className="banner__title">Live data unavailable – showing precomputed {fov}′ view</p>
+            {info.note && <p>{info.note}</p>}
+          </div>
+          <button type="button" onClick={retry}>
+            Try again
+          </button>
+        </div>
+      ) : (
+        info.note && <p className="banner note">{info.note}</p>
+      )}
       <section className={"result card" + (open ? " is-open" : "")}>
-        <Viewer status={status} />
+        <Viewer status={status} onRetry={retry} />
       </section>
       {result && (
         <>
