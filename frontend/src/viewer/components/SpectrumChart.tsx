@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type PointerEvent } from "react";
 import { formatTick, linearScale, niceAxis } from "../lib/chartScale";
 import { parseSpectrum, type SpectrumRow } from "../lib/parseSpectrum";
+import { asPoints, averageByDetector, isMostlyNoise, type SpectrumPoint } from "../lib/spectrumStats";
 import type { Detector, Epoch } from "../types";
 
 interface Props {
@@ -10,20 +11,24 @@ interface Props {
   highlightEpoch?: number; // epoch shown in the blink right now
 }
 
+type Mode = "average" | "all";
+
 // One colour per epoch, readable on light and dark backgrounds.
 const EPOCH_COLORS = ["#3b82f6", "#f59e0b", "#10b981", "#ec4899", "#8b5cf6", "#06b6d4", "#ef4444"];
 export const epochColor = (index: number) => EPOCH_COLORS[index % EPOCH_COLORS.length];
 
 // Drawing area in SVG units. The SVG scales to the container width.
 const W = 480;
-const H = 280;
-const M = { left: 52, right: 12, top: 22, bottom: 40 };
+const H = 290;
+const M = { left: 52, right: 12, top: 22, bottom: 50 };
 
 // Spectrum: x = wavelength, y = flux, error bars, colour by epoch.
+// Default view: one averaged point per detector and date, joined by a line.
 export function SpectrumChart({ url, epochs, ranges, highlightEpoch }: Props) {
   const [rows, setRows] = useState<SpectrumRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hover, setHover] = useState<SpectrumRow | null>(null);
+  const [hover, setHover] = useState<SpectrumPoint | null>(null);
+  const [mode, setMode] = useState<Mode>("average");
 
   // Load the CSV. Cancel if the target changes before it arrives.
   useEffect(() => {
@@ -46,13 +51,18 @@ export function SpectrumChart({ url, epochs, ranges, highlightEpoch }: Props) {
     return () => controller.abort();
   }, [url]);
 
-  // Axes from the data. x covers all detectors, y starts at 0 unless flux goes below it.
+  const points = useMemo(() => (rows ? (mode === "average" ? averageByDetector(rows) : asPoints(rows)) : []), [rows, mode]);
+  const noisy = useMemo(() => (rows ? isMostlyNoise(rows) : false), [rows]);
+
+  // Axes from all measurements, so switching views keeps the same scale.
+  // x covers all detectors, y starts at 0 unless flux goes below it.
   const chart = useMemo(() => {
     if (!rows || rows.length === 0) return null;
     const bandEdges = Object.values(ranges ?? {}).flatMap((range) => range ?? []);
     const xs = [...rows.map((r) => r.wavelength_um), ...bandEdges];
-    const lows = rows.map((r) => r.flux_mjy_sr - (Number.isFinite(r.err_mjy_sr) ? r.err_mjy_sr : 0));
-    const highs = rows.map((r) => r.flux_mjy_sr + (Number.isFinite(r.err_mjy_sr) ? r.err_mjy_sr : 0));
+    const errOf = (r: SpectrumRow) => (Number.isFinite(r.err_mjy_sr) ? r.err_mjy_sr : 0);
+    const lows = rows.map((r) => r.flux_mjy_sr - errOf(r));
+    const highs = rows.map((r) => r.flux_mjy_sr + errOf(r));
 
     // x: tight to the data (0.75–5 µm), round ticks only inside it.
     const xMin = Math.min(...xs) - 0.05;
@@ -69,49 +79,80 @@ export function SpectrumChart({ url, epochs, ranges, highlightEpoch }: Props) {
   }, [rows, ranges]);
 
   const dateOf = (index: number) => epochs.find((e) => e.index === index)?.date ?? `epoch ${index}`;
-  const epochsInData = useMemo(() => [...new Set((rows ?? []).map((r) => r.epoch))].sort((a, b) => a - b), [rows]);
+  const epochsInData = useMemo(() => [...new Set(points.map((r) => r.epoch))].sort((a, b) => a - b), [points]);
+
+  // Highlighted epoch last, so it sits on top.
+  const epochOrder = useMemo(
+    () =>
+      highlightEpoch === undefined
+        ? epochsInData
+        : [...epochsInData.filter((e) => e !== highlightEpoch), ...epochsInData.filter((e) => e === highlightEpoch)],
+    [epochsInData, highlightEpoch],
+  );
 
   // Nearest point to the pointer, within 24 SVG units.
   function handlePointer(e: PointerEvent<SVGSVGElement>) {
-    if (!rows || !chart) return;
+    if (!chart) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const px = ((e.clientX - rect.left) / rect.width) * W;
     const py = ((e.clientY - rect.top) / rect.height) * H;
-    let best: SpectrumRow | null = null;
+    let best: SpectrumPoint | null = null;
     let bestDist = 24 * 24;
-    for (const r of rows) {
-      const dx = chart.sx(r.wavelength_um) - px;
-      const dy = chart.sy(r.flux_mjy_sr) - py;
+    for (const p of points) {
+      const dx = chart.sx(p.wavelength_um) - px;
+      const dy = chart.sy(p.flux_mjy_sr) - py;
       const d = dx * dx + dy * dy;
       if (d < bestDist) {
         bestDist = d;
-        best = r;
+        best = p;
       }
     }
     setHover(best);
   }
 
-  // Highlighted epoch is drawn last so it sits on top.
-  const ordered = useMemo(() => {
-    if (!rows) return [];
-    if (highlightEpoch === undefined) return rows;
-    return [...rows.filter((r) => r.epoch !== highlightEpoch), ...rows.filter((r) => r.epoch === highlightEpoch)];
-  }, [rows, highlightEpoch]);
+  function readout(p: SpectrumPoint): string {
+    const what = mode === "average" ? `${p.detector} average of ${p.count}` : p.detector;
+    return `${what} · ${p.wavelength_um.toFixed(3)} µm · ${formatTick(p.flux_mjy_sr)} ± ${formatTick(p.err_mjy_sr)} MJy/sr · ${dateOf(p.epoch)}`;
+  }
 
   return (
     <section className="spectrum">
-      <h3>Spectrum</h3>
+      <div className="spectrum__head">
+        <h3>Spectrum</h3>
+        {rows && rows.length > 0 && (
+          <div className="spectrum__modes" role="group" aria-label="Spectrum view">
+            <button type="button" aria-pressed={mode === "average"} className={mode === "average" ? "is-active" : undefined} onClick={() => setMode("average")}>
+              Average per detector
+            </button>
+            <button type="button" aria-pressed={mode === "all"} className={mode === "all" ? "is-active" : undefined} onClick={() => setMode("all")}>
+              All measurements
+            </button>
+          </div>
+        )}
+      </div>
+
       {error && <p className="spectrum__note">Could not load the spectrum ({error}).</p>}
       {!error && !rows && <p className="spectrum__note">Loading spectrum…</p>}
       {rows && rows.length === 0 && <p className="spectrum__note">No spectrum measurements for this position.</p>}
 
       {chart && (
         <>
+          <p className="spectrum__intro">
+            How bright the object at the image centre is at each wavelength. Higher = brighter. One colour per date:
+            if the {mode === "average" ? "lines" : "dots"} of two dates differ, the object changed.
+          </p>
+
+          {noisy && (
+            <p className="spectrum__warning" role="note">
+              The object is too faint for a reliable spectrum: most measurements are within their error of zero.
+            </p>
+          )}
+
           <svg
             className="spectrum__chart"
             viewBox={`0 0 ${W} ${H}`}
             role="img"
-            aria-label={`Spectrum of the image centre: ${rows!.length} measurements from ${epochsInData.length} epochs`}
+            aria-label={`Spectrum of the image centre: ${rows!.length} measurements from ${epochsInData.length} dates`}
             onPointerMove={handlePointer}
             onPointerDown={handlePointer}
             onPointerLeave={(e) => e.pointerType === "mouse" && setHover(null)}
@@ -153,35 +194,64 @@ export function SpectrumChart({ url, epochs, ranges, highlightEpoch }: Props) {
             {/* Axes */}
             <line className="spectrum__axis" x1={M.left} x2={W - M.right} y1={H - M.bottom} y2={H - M.bottom} />
             <line className="spectrum__axis" x1={M.left} x2={M.left} y1={M.top} y2={H - M.bottom} />
-            <text className="spectrum__title" x={(M.left + W - M.right) / 2} y={H - 6} textAnchor="middle">
+            <text className="spectrum__title" x={(M.left + W - M.right) / 2} y={H - 18} textAnchor="middle">
               Wavelength (µm)
+            </text>
+            <text className="spectrum__hint" x={M.left} y={H - 4} textAnchor="start">
+              ← shorter: hot stars
+            </text>
+            <text className="spectrum__hint" x={W - M.right} y={H - 4} textAnchor="end">
+              longer: cool objects, dust →
             </text>
             <text
               className="spectrum__title"
               transform={`translate(13 ${(M.top + H - M.bottom) / 2}) rotate(-90)`}
               textAnchor="middle"
             >
-              Flux (MJy/sr)
+              Brightness (MJy/sr)
             </text>
 
-            {/* Points with error bars */}
-            {ordered.map((r, i) => {
-              const x = chart.sx(r.wavelength_um);
-              const y = chart.sy(r.flux_mjy_sr);
-              const err = Number.isFinite(r.err_mjy_sr) ? r.err_mjy_sr : 0;
-              const dim = highlightEpoch !== undefined && r.epoch !== highlightEpoch;
+            {/* One group per date: line (average view), error bars, dots */}
+            {epochOrder.map((epoch) => {
+              const ps = points.filter((p) => p.epoch === epoch);
+              const dim = highlightEpoch !== undefined && epoch !== highlightEpoch;
               return (
-                <g key={i} className={dim ? "spectrum__point is-dim" : "spectrum__point"} style={{ color: epochColor(r.epoch) }}>
-                  {err > 0 && (
-                    <line x1={x} x2={x} y1={chart.sy(r.flux_mjy_sr - err)} y2={chart.sy(r.flux_mjy_sr + err)} stroke="currentColor" />
+                <g key={epoch} className={dim ? "spectrum__epoch is-dim" : "spectrum__epoch"} style={{ color: epochColor(epoch) }}>
+                  {mode === "average" && ps.length > 1 && (
+                    <polyline
+                      className="spectrum__line"
+                      points={ps.map((p) => `${chart.sx(p.wavelength_um)},${chart.sy(p.flux_mjy_sr)}`).join(" ")}
+                    />
                   )}
-                  <circle cx={x} cy={y} r={hover === r ? 4.5 : 3} fill="currentColor" />
+                  {ps.map((p, i) => {
+                    const x = chart.sx(p.wavelength_um);
+                    const err = Number.isFinite(p.err_mjy_sr) ? p.err_mjy_sr : 0;
+                    return (
+                      <g key={i}>
+                        {err > 0 && (
+                          <line
+                            className="spectrum__err"
+                            x1={x}
+                            x2={x}
+                            y1={chart.sy(p.flux_mjy_sr - err)}
+                            y2={chart.sy(p.flux_mjy_sr + err)}
+                          />
+                        )}
+                        <circle
+                          cx={x}
+                          cy={chart.sy(p.flux_mjy_sr)}
+                          r={hover === p ? 5 : mode === "average" ? 3.5 : 3}
+                          fill="currentColor"
+                        />
+                      </g>
+                    );
+                  })}
                 </g>
               );
             })}
           </svg>
 
-          {/* Legend: one colour per epoch */}
+          {/* Legend: one colour per date */}
           <ul className="spectrum__legend">
             {epochsInData.map((e) => (
               <li key={e} className={e === highlightEpoch ? "is-current" : undefined}>
@@ -192,9 +262,7 @@ export function SpectrumChart({ url, epochs, ranges, highlightEpoch }: Props) {
           </ul>
 
           <p className="spectrum__readout">
-            {hover
-              ? `${hover.detector} · ${hover.wavelength_um.toFixed(3)} µm · ${formatTick(hover.flux_mjy_sr)} ± ${formatTick(hover.err_mjy_sr)} MJy/sr · ${dateOf(hover.epoch)}`
-              : "Point at a dot to see its value. Measured at the image centre."}
+            {hover ? readout(hover) : "Point at a dot to see its value."}
           </p>
         </>
       )}
