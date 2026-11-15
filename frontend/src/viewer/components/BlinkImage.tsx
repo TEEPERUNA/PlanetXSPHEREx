@@ -9,21 +9,31 @@ interface Props {
   filter: string; // CSS filter for brightness and contrast
   alt: string;
   onHover: (pixel: Pixel | null) => void;
+  onPick?: (pixel: Pixel) => void; // click or tap: pins the pixel, e.g. for a report
   overlay?: ReactNode; // SVG content drawn on top, in SPHEREx pixel units
 }
 
 // Image stack + SVG overlay.
 // All frames stay in the DOM and only one is visible, so the blink never waits for loading.
-export function BlinkImage({ srcs, activeIdx, diffSrc, shape, filter, alt, onHover, overlay }: Props) {
+export function BlinkImage({ srcs, activeIdx, diffSrc, shape, filter, alt, onHover, onPick, overlay }: Props) {
   const [height, width] = shape;
 
   // Screen position -> SPHEREx pixel.
-  function handlePointer(e: PointerEvent<HTMLDivElement>) {
+  function pixelAt(e: PointerEvent<HTMLDivElement>): Pixel | null {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.floor(((e.clientX - rect.left) / rect.width) * width);
     const y = Math.floor(((e.clientY - rect.top) / rect.height) * height);
-    const inside = x >= 0 && x < width && y >= 0 && y < height;
-    onHover(inside ? { x, y } : null);
+    return x >= 0 && x < width && y >= 0 && y < height ? { x, y } : null;
+  }
+
+  function handlePointer(e: PointerEvent<HTMLDivElement>) {
+    onHover(pixelAt(e));
+  }
+
+  function handleDown(e: PointerEvent<HTMLDivElement>) {
+    const p = pixelAt(e);
+    onHover(p);
+    if (p) onPick?.(p);
   }
 
   // Keep the last tap visible on touch screens.
@@ -35,7 +45,7 @@ export function BlinkImage({ srcs, activeIdx, diffSrc, shape, filter, alt, onHov
     <div
       className="blink"
       onPointerMove={handlePointer}
-      onPointerDown={handlePointer}
+      onPointerDown={handleDown}
       onPointerLeave={handleLeave}
     >
       {srcs.map((src, i) => {

@@ -1,5 +1,8 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { getCandidates, type Candidate } from "../api";
 import { BlinkImage } from "./components/BlinkImage";
+import { CandidateOverlay } from "./components/CandidateOverlay";
+import { CandidateReport } from "./components/CandidateReport";
 import { CursorInfo } from "./components/CursorInfo";
 import { EpochInfo } from "./components/EpochInfo";
 import { GaiaInfo } from "./components/GaiaInfo";
@@ -81,6 +84,20 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const [compareOn, setCompareOn] = useState(false);
   const [compareA, setCompareA] = useState<number | null>(null); // dates (mjd), like anchorMjd
   const [compareB, setCompareB] = useState<number | null>(null);
+  const [pickPx, setPickPx] = useState<Pixel | null>(null); // pixel chosen for a candidate report
+  const [candidates, setCandidates] = useState<Candidate[]>([]);
+
+  // Community reports in this field. Optional extra, so a failed request just shows none.
+  const { ra_deg, dec_deg } = meta;
+  const radius = ((Math.max(...meta.shape) * meta.pixel_scale_arcsec) / 60) * 0.75; // ≈ half the diagonal, arcmin
+  useEffect(() => {
+    const ctl = new AbortController();
+    getCandidates(ra_deg, dec_deg, radius, ctl.signal)
+      .then((r) => setCandidates(r.candidates))
+      .catch(() => {});
+    return () => ctl.abort();
+  }, [ra_deg, dec_deg, radius]);
+  const job = baseUrl.match(/\/files\/([^/]+)/)?.[1]; // ".../api/files/<job>/"
 
   // The full result can have other bands and epochs than the preview.
   const activeBand: Band = bands.includes(band) ? band : (bands[0] ?? "ALL");
@@ -155,8 +172,12 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         filter={`brightness(${brightness}) contrast(${contrast})`}
         alt={`${meta.target}, ${activeBand}, ${frames[idx]?.epoch.date ?? ""}`}
         onHover={setHoverPx}
+        onPick={setPickPx}
         overlay={
-          hasGaia && showGaia ? <GaiaOverlay meta={meta} epochs={bandEpochs} current={currentEpoch} /> : null
+          <>
+            {hasGaia && showGaia && <GaiaOverlay meta={meta} epochs={bandEpochs} current={currentEpoch} />}
+            <CandidateOverlay meta={meta} candidates={candidates} picked={pickPx} />
+          </>
         }
       />
 
@@ -176,6 +197,15 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           band={activeBand}
           values={pixelInfo.values}
           loading={pixelInfo.loading}
+        />
+        <CandidateReport
+          pixel={pickPx}
+          meta={meta}
+          band={activeBand}
+          epoch={currentEpoch?.index ?? null}
+          job={job}
+          count={candidates.length}
+          onReported={(c) => setCandidates((cs) => [c, ...cs])}
         />
         {(showGaia || !hasGaia) && (
           <GaiaInfo meta={meta} epoch={diffOn ? (frames[frames.length - 1]?.epoch ?? null) : currentEpoch} showDiff={diffOn} />

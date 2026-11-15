@@ -110,6 +110,46 @@
   opacity: 0.8;
 }
 
+/* Community candidate reports (magenta, apart from the green Gaia marks) */
+.cand__mark,
+.cand__pick {
+  fill: none;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.cand__mark {
+  stroke: #e879f9;
+}
+
+.cand__pick {
+  stroke: #fff;
+  stroke-dasharray: 3 2;
+}
+
+.cand-form {
+  display: grid;
+  gap: 6px;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.cand-form p {
+  margin: 0;
+}
+
+.cand-form__hint {
+  opacity: 0.85;
+}
+
+.cand-form__ok {
+  color: #22c55e;
+}
+
+.cand-form__err {
+  color: #f87171;
+}
+
 /* min-height: the far-from-centre sentence comes and goes per epoch;
    room for 4 lines keeps the controls below from jumping during playback */
 .viewer__gaia {
