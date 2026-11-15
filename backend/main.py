@@ -291,6 +291,30 @@ def maybe_refresh(slug: str, make_pipeline) -> bool:
     return True
 
 
+def matching_target(c) -> str | None:
+    """Challenge target whose position is within 2 arcmin of c (J2000 catalogue position or the
+    proper-motion-corrected centre of its cached result), else None."""
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+    for key, t in fs.TARGETS.items():
+        points = [t["fallback"][:2]]
+        hit = find_cached(key)
+        if hit and hit[0].get("ra_deg") is not None:
+            points.append((hit[0]["ra_deg"], hit[0]["dec_deg"]))
+        for ra, dec in points:
+            if c.separation(SkyCoord(ra * u.deg, dec * u.deg)).arcmin < 2.0:
+                return key
+    return None
+
+
+def fallback_response(slug: str, key: str, reason: str) -> dict:
+    """Precomputed challenge-target result used when live data is not available."""
+    resp = done_response(key)
+    resp["requested_job"] = slug
+    resp["note"] = reason
+    return resp
+
+
 def target_job(key: str, fov: float):
     slug = key if fov == 3.0 else f"{key}_fov{fov:g}"
 
@@ -346,6 +370,10 @@ def sky(ra: str | None = None, dec: str | None = None,
         except Exception:  # noqa: BLE001
             raise HTTPException(400, "could not parse ra/dec")
         slug, make_pipeline = coord_job(c, fov)
+        # Coordinates of a challenge target at the default FOV -> use its precomputed result.
+        key = matching_target(c)
+        if key and fov == 3.0 and not find_cached(slug) and find_cached(key):
+            return fallback_response(slug, key, f"Matched challenge target '{key}'.")
     else:
         raise HTTPException(400, "give either target or ra+dec")
 
@@ -356,7 +384,12 @@ def sky(ra: str | None = None, dec: str | None = None,
     j = jobs.get(slug)
     if j and j["status"] == "error":
         jobs.pop(slug)  # allow retry
-    return start_job(slug, make_pipeline())
+    resp = start_job(slug, make_pipeline())
+    # Remember a precomputed result to fall back on if live data (IRSA) fails.
+    fb = target if target else (matching_target(c) if ra is not None else None)
+    if fb and find_cached(fb) and slug in jobs:
+        jobs[slug]["fallback"] = fb
+    return resp
 
 
 @app.get("/api/status/{job}")
@@ -376,6 +409,11 @@ def status(job: str):
         resp = start_job(slug, make_pipeline())
         resp["note"] = "The server restarted, so this search was started again."
         return resp
+    fb = j.get("fallback")
+    if j.get("status") == "error" and fb and find_cached(fb):
+        return fallback_response(job, fb, "Live SPHEREx data is not available right now "
+                                 f"({j.get('error')}). Showing the precomputed result for this "
+                                 "target with the default 3 arcmin field of view.")
     return clean_json({"job": job, **j})
 
 
