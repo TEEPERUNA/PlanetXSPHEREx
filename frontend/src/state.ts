@@ -1,6 +1,6 @@
 // Shared app state: the current search, its URL and the polling for the result.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { fullUrl, getStatus, startSky, type Search } from "./api";
+import { fullUrl, getStatus, startSky, type Search, type SkyResponse } from "./api";
 import type { ViewerStatus } from "./viewer";
 
 const POLL_MS = 2000;
@@ -32,18 +32,34 @@ const sleep = (ms: number, signal: AbortSignal) =>
     });
   });
 
-// setTarget starts a search; a new one cancels the previous polling.
+// Backend remarks about the result: fallback to precomputed data, or a plain note.
+export interface SkyInfo {
+  fallback: boolean;
+  note: string | null;
+}
+
+const NO_INFO: SkyInfo = { fallback: false, note: null };
+
+// setTarget starts a search; a new one cancels the previous polling. retry runs the last one again.
 export function useSky() {
   const [status, setStatus] = useState<ViewerStatus>({ kind: "empty" });
+  const [info, setInfo] = useState<SkyInfo>(NO_INFO);
   const abort = useRef<AbortController | null>(null);
+  const last = useRef<Search | null>(null);
 
   const setTarget = useCallback(async (search: Search) => {
     abort.current?.abort();
     const ctl = (abort.current = new AbortController());
+    last.current = search;
     writeUrl(search);
     setStatus({ kind: "loading", stage: "queued", done: 0, total: 0 });
+    setInfo(NO_INFO);
+    // Polls can omit the note, so keep the last one seen.
+    const remember = (r: SkyResponse) =>
+      setInfo((i) => ({ fallback: r.fallback ?? i.fallback, note: r.note ?? i.note }));
     try {
       let res = await startSky(search, ctl.signal);
+      remember(res);
       while (res.status !== "done") {
         if (res.status === "error") throw new Error(res.error ?? "Unknown error");
         const p = res.preview;
@@ -59,6 +75,7 @@ export function useSky() {
           await sleep(POLL_MS, ctl.signal);
           try {
             res = await getStatus(res.job, ctl.signal);
+            remember(res);
             break;
           } catch (e) {
             if ((e as Error).name === "AbortError" || tries >= MAX_POLL_FAILS) throw e;
@@ -72,7 +89,11 @@ export function useSky() {
     }
   }, []);
 
+  const retry = useCallback(() => {
+    if (last.current) setTarget(last.current);
+  }, [setTarget]);
+
   useEffect(() => () => abort.current?.abort(), []);
 
-  return { status, setTarget };
+  return { status, setTarget, retry, info };
 }

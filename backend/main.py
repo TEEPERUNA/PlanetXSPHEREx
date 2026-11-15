@@ -86,11 +86,15 @@ def find_cached(slug: str):
     Looks in OUTPUT_DIR first, then the precomputed examples/ folder in the repo."""
     for folder, prefix in ((OUTPUT_DIR, "/api/files"), (EXAMPLES_DIR, "/api/examples")):
         p = folder / slug / "meta.json"
-        if p.exists():
+        if not p.exists():
+            continue
+        for attempt in range(2):
             try:
                 return clean_json(json.loads(p.read_text())), f"{prefix}/{slug}/"
-            except Exception:  # noqa: BLE001  half-written file
-                return None
+            except Exception:  # noqa: BLE001  half-written (being rebuilt) or broken file
+                if attempt == 0:
+                    time.sleep(0.2)
+        # broken file here -> try the next location (examples/)
     return None
 
 
@@ -103,7 +107,11 @@ def done_response(slug: str) -> dict:
     meta, base = find_cached(slug)
     info = read_cache_info(slug) or {}
     return {"status": "done", "job": slug, "base_url": base, "meta": meta,
-            "data_release": info.get("collection"), "timing": info.get("timing")}
+            "precomputed": base.startswith("/api/examples/"),   # bundled challenge-target result
+            "fallback": False,                                   # True = not what was asked for
+            "note": None,
+            "data_release": info.get("collection"), "timing": info.get("timing"),
+            "science_version": info.get("code_version")}
 
 
 def friendly_error(e: Exception) -> str:
@@ -125,17 +133,21 @@ def friendly_error(e: Exception) -> str:
 def job_from_slug(job: str):
     """Rebuild a job from its id, e.g. after a server restart lost the in-memory job list.
     'barnard', 'barnard_fov4', 'ra133.7950_dec-7.2450_fov3' (and '__preview' suffix)."""
+    num = r"\d+(?:\.\d+)?"
     base = job.removesuffix("__preview")
-    m = re.fullmatch(r"ra([0-9.]+)_dec([+-][0-9.]+)_fov([0-9.]+)", base)
+    m = re.fullmatch(rf"ra({num})_dec([+-]{num})_fov({num})", base)
     if m:
         ra, dec, fov = float(m[1]), float(m[2]), float(m[3])
-        if fov > MAX_FOV_ARCMIN:
+        if not (0 <= ra < 360 and -90 <= dec <= 90 and 0 < fov <= MAX_FOV_ARCMIN):
             return None
         c = fs.parse_coord(str(ra), str(dec))
         return coord_job(c, fov)
-    m = re.fullmatch(r"([a-z0-9]+?)(?:_fov([0-9.]+))?", base)
+    m = re.fullmatch(rf"([a-z0-9]+?)(?:_fov({num}))?", base)
     if m and m[1] in fs.TARGETS:
-        return target_job(m[1], float(m[2]) if m[2] else 3.0)
+        fov = float(m[2]) if m[2] else 3.0
+        if not 0 < fov <= MAX_FOV_ARCMIN:
+            return None
+        return target_job(m[1], fov)
     return None
 
 
@@ -243,12 +255,29 @@ def cache_info_path(slug: str) -> Path:
     return OUTPUT_DIR / slug / "cache.json"
 
 
+def _science_version() -> str:
+    """Short hash of the science code. When Emil changes the processing, cached results made
+    with older code are rebuilt in the background (examples/ excluded, Emil rebuilds those)."""
+    import hashlib
+    h = hashlib.sha1()
+    for name in ("fetch_spherex.py", "gaia_validation.py"):
+        p = ROOT / "science" / name
+        if p.exists():
+            h.update(p.read_bytes().replace(b"\r\n", b"\n"))
+    return h.hexdigest()[:10]
+
+
+SCIENCE_VERSION = _science_version()
+NEW_EPOCH_DAYS = float(os.environ.get("NEW_EPOCH_DAYS", "30"))  # newer images than this = new data
+
+
 def write_cache_info(slug: str, fingerprint, collection, source: str, timing: dict | None = None):
     p = cache_info_path(slug)
     if p.parent.exists():
         old = read_cache_info(slug) or {}
         p.write_text(json.dumps({"fingerprint": fingerprint, "collection": collection,
                                  "source": source, "checked_at": time.time(),
+                                 "code_version": SCIENCE_VERSION,
                                  "timing": timing or old.get("timing")}))
 
 
@@ -259,32 +288,82 @@ def read_cache_info(slug: str):
         return None
 
 
+def _check_path(slug: str) -> Path:
+    return OUTPUT_DIR / "_checks" / f"{slug}.json"
+
+
+def read_example_check(slug: str):
+    try:
+        return json.loads(_check_path(slug).read_text())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def write_example_check(slug: str, newest_mjd):
+    p = _check_path(slug)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"checked_at": time.time(), "newest_irsa_mjd": newest_mjd}))
+
+
+def refresh_running(slug: str) -> bool:
+    return jobs.get(f"{slug}__refresh", {}).get("status") == "processing"
+
+
 def maybe_refresh(slug: str, make_pipeline) -> bool:
-    """Stale-while-revalidate: the cached result is returned right away; if it is older than
-    CACHE_TTL_HOURS we check IRSA for new SPHEREx data in the background and rebuild if needed.
-    Returns True if a refresh is running."""
+    """Stale-while-revalidate: the cached result is always returned right away; a light
+    background check then decides whether it must be rebuilt. Returns True if a check runs.
+
+    - Results in the cache (OUTPUT_DIR): rebuilt if IRSA has new images (fingerprint changed)
+      or if they were made with older science code. Checked at most every CACHE_TTL_HOURS.
+    - Precomputed examples/ (challenge targets): only rebuilt if IRSA has images more than
+      NEW_EPOCH_DAYS newer than the example's last epoch (= a new SPHEREx survey pass).
+      The rebuilt result goes to the cache and then takes priority over the example.
+    """
     rkey = f"{slug}__refresh"
     if jobs.get(rkey, {}).get("status") == "processing":
         return True
     if jobs.get(slug, {}).get("status") in ("queued", "processing"):
         return False
-    info = read_cache_info(slug)
-    if info and time.time() - info.get("checked_at", 0) < CACHE_TTL_HOURS * 3600:
+    hit = find_cached(slug)
+    if not hit:
         return False
+    meta, base = hit
+    ttl = CACHE_TTL_HOURS * 3600
+    from_examples = base.startswith("/api/examples/")
+    if from_examples:
+        chk = read_example_check(slug)
+        if chk and time.time() - chk.get("checked_at", 0) < ttl:
+            return False
+        info, old_code = None, False
+    else:
+        info = read_cache_info(slug)
+        old_code = bool(info) and info.get("code_version") not in (None, SCIENCE_VERSION)
+        if info and not old_code and time.time() - info.get("checked_at", 0) < ttl:
+            return False
     jobs[rkey] = {"status": "processing"}
 
     def runner():
         try:
             pipe = make_pipeline()
-            new_fp = pipe.images().fingerprint
-            if info and info.get("fingerprint") == new_fp:
-                write_cache_info(slug, new_fp, info.get("collection"), info.get("source", "s3"))
+            imgs = pipe.images()                     # one light IRSA query
+            if from_examples:
+                newest = float(imgs.table["mjd"].max())
+                last = max((e.get("mjd_mean") or 0) for e in meta.get("epochs", [])) or 0
+                if newest > last + NEW_EPOCH_DAYS:
+                    print(f"  New SPHEREx survey pass for {slug} (newest MJD {newest:.1f} > "
+                          f"example {last:.1f}) -> rebuilding into cache")
+                    pipe(lambda *a: None, slug, PER_GROUP)
+                write_example_check(slug, newest)
+            elif info and info.get("fingerprint") == imgs.fingerprint and not old_code:
+                write_cache_info(slug, imgs.fingerprint, info.get("collection"),
+                                 info.get("source", "s3"))
             else:
-                print(f"  New SPHEREx data for {slug} ({new_fp}) -> rebuilding")
+                why = "science code changed" if old_code else f"new SPHEREx data ({imgs.fingerprint})"
+                print(f"  Rebuilding {slug}: {why}")
                 pipe(lambda *a: None, slug, PER_GROUP)
             jobs[rkey] = {"status": "done"}
         except Exception as e:  # noqa: BLE001
-            traceback.print_exc()
+            print(f"  Refresh check for {slug} failed: {type(e).__name__}: {str(e)[:120]}")
             jobs[rkey] = {"status": "error", "error": str(e)}
 
     executor.submit(runner)
@@ -311,6 +390,7 @@ def fallback_response(slug: str, key: str, reason: str) -> dict:
     """Precomputed challenge-target result used when live data is not available."""
     resp = done_response(key)
     resp["requested_job"] = slug
+    resp["fallback"] = True
     resp["note"] = reason
     return resp
 
@@ -337,8 +417,9 @@ def coord_job(c, fov: float):
 async def unhandled_error(request: Request, exc: Exception):
     """Return the real error as JSON *with* CORS headers, so the browser shows the message
     instead of a bare 'Failed to fetch'."""
-    traceback.print_exception(exc)
-    return JSONResponse(status_code=500, content={"detail": f"{type(exc).__name__}: {exc}"},
+    traceback.print_exception(exc)   # full details go to the Cloud Run logs only
+    return JSONResponse(status_code=500,
+                        content={"detail": "Internal server error. Please try again in a moment."},
                         headers={"Access-Control-Allow-Origin": "*"})
 
 
@@ -349,8 +430,17 @@ def health():
 
 @app.get("/api/targets")
 def targets():
-    return [{"key": k, "label": v["label"], "ra": v["fallback"][0], "dec": v["fallback"][1],
-             "cached": cached_meta(k) is not None} for k, v in fs.TARGETS.items()]
+    """Challenge targets. ra/dec = today's position (proper motion applied) when a result exists,
+    otherwise the catalogue position. Search by "key" to always get the moving star centred."""
+    out = []
+    for k, v in fs.TARGETS.items():
+        meta = cached_meta(k)
+        ra, dec = v["fallback"][0], v["fallback"][1]
+        if meta and meta.get("ra_deg") is not None and meta.get("dec_deg") is not None:
+            ra, dec = meta["ra_deg"], meta["dec_deg"]
+        out.append({"key": k, "label": v["label"], "ra": round(ra, 6), "dec": round(dec, 6),
+                    "cached": meta is not None})
+    return out
 
 
 @app.get("/api/sky")
@@ -369,24 +459,33 @@ def sky(ra: str | None = None, dec: str | None = None,
             c = fs.parse_coord(ra, dec)
         except Exception:  # noqa: BLE001
             raise HTTPException(400, "could not parse ra/dec")
-        slug, make_pipeline = coord_job(c, fov)
-        # Coordinates of a challenge target at the default FOV -> use its precomputed result.
+        # Coordinates of a challenge target (any FOV, J2000 or today's position) -> search it as
+        # that target, so the moving star is centred at today's position, not 26 years ago.
         key = matching_target(c)
-        if key and fov == 3.0 and not find_cached(slug) and find_cached(key):
-            return fallback_response(slug, key, f"Matched challenge target '{key}'.")
+        if key:
+            target = key
+            slug, make_pipeline = target_job(key, fov)
+        else:
+            slug, make_pipeline = coord_job(c, fov)
     else:
         raise HTTPException(400, "give either target or ra+dec")
 
     if find_cached(slug):
         resp = done_response(slug)
         resp["refreshing"] = maybe_refresh(slug, make_pipeline)
+        if ra is not None and target:
+            resp["note"] = f"Coordinates matched challenge target '{target}'."
         return resp
+    if refresh_running(slug):
+        # A background rebuild is writing this result right now; don't start a second one.
+        return {"status": "processing", "job": slug, "stage": "processing", "done": 0, "total": 0,
+                "preview": None}
     j = jobs.get(slug)
     if j and j["status"] == "error":
         jobs.pop(slug)  # allow retry
     resp = start_job(slug, make_pipeline())
     # Remember a precomputed result to fall back on if live data (IRSA) fails.
-    fb = target if target else (matching_target(c) if ra is not None else None)
+    fb = target
     if fb and find_cached(fb) and slug in jobs:
         jobs[slug]["fallback"] = fb
     return resp
@@ -397,6 +496,9 @@ def status(job: str):
     if find_cached(job):
         return done_response(job)
     j = jobs.get(job)
+    if not j and refresh_running(job):
+        return {"job": job, "status": "processing", "stage": "processing", "done": 0, "total": 0,
+                "preview": None}
     if not j:
         # The server may have restarted (deploy, crash) and lost its in-memory job list.
         # Job ids encode the request, so start it again instead of failing.

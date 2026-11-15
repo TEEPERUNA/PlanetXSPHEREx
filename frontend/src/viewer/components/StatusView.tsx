@@ -25,10 +25,11 @@ export function LoadingProgress({ stage, done, total }: ProgressProps) {
 
 interface Props {
   status: Exclude<ViewerStatus, { kind: "done" }>;
+  onRetry?: () => void;
 }
 
 // Empty, loading and error states.
-export function StatusView({ status }: Props) {
+export function StatusView({ status, onRetry }: Props) {
   if (status.kind === "empty") {
     return (
       <div className="status">
@@ -56,6 +57,11 @@ export function StatusView({ status }: Props) {
     <div className="status status--error" role="alert">
       <p>Could not load images.</p>
       <p className="status__message">{status.message}</p>
+      {onRetry && (
+        <button type="button" className="primary status__retry" onClick={onRetry}>
+          Try again
+        </button>
+      )}
     </div>
   );
 }

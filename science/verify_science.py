@@ -116,6 +116,8 @@ def verify_pillar_2_faint_targets():
     assert (e_dir / "meta.json").exists()
     diff_eps = e_dir / "diff_ALL.png"
     assert diff_eps.exists()
+    meta_eps = json.loads((e_dir / "meta.json").read_text())
+    assert meta_eps.get("glare_suppressed") is True, f"glare_suppressed not True in {meta_eps}"
     print_check(
         "Epsilon Indi B Glare Suppression",
         "Spatial unsharp masking (high-pass filter) successfully suppresses primary star halo (V~4.7), isolating brown dwarf companion"
@@ -214,8 +216,9 @@ def verify_pillar_5_contract_compliance():
     
     required_top_keys = [
         "target", "ra_deg", "dec_deg", "fov_arcmin", "pixel_scale_arcsec",
-        "shape", "bands", "detector_ranges_um", "epochs", "outputs",
-        "spectrum", "lightcurve", "light_curve", "gaia_validation", "propagated_to"
+        "shape", "bands", "detector_ranges_um", "inverted", "glare_suppressed",
+        "epochs", "outputs", "spectrum", "lightcurve", "light_curve",
+        "gaia_validation", "propagated_to"
     ]
 
     all_files_exist = True

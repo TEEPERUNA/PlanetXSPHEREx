@@ -329,5 +329,6 @@
   "pmdec_masyr": 673.0,
   "propagated_to": 2026.87,
   "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team",
-  "inverted": true
+  "inverted": true,
+  "glare_suppressed": false
 }

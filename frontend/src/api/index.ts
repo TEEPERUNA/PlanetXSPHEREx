@@ -29,6 +29,9 @@ export interface SkyResponse {
   total?: number;
   error?: string | null;
   preview?: { base_url: string; meta: Meta } | null;
+  precomputed?: boolean; // bundled challenge-target result
+  fallback?: boolean; // true = live data failed, this is the precomputed result instead
+  note?: string | null;
 }
 
 // base_url from the API is relative ("/api/files/<job>/"), images need the full address.

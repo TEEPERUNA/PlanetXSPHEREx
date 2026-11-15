@@ -45,7 +45,7 @@ PlanetXSPHEREx/
 │   ├── meta.json .......... describes every other file (paths, epochs, bands)
 │   ├── frames/<band>/epochN.png ... blink frames ───┐
 │   ├── diff_<band>.png ............ difference ─────┤
-│   ├── blink_<band>.gif ........... ready-made GIFs │  → app/GifView
+│   ├── blink_<band>.gif ........... ready-made GIFs │  → App "Download GIF" link
 │   ├── spectrum.csv ............... spectrum ───────┤
 │   └── epochN_<band>.fits ......... raw float data  │  (not listed in meta.json yet)
 │                                                    │
@@ -54,10 +54,9 @@ PlanetXSPHEREx/
 │   ├── .env.example ... optional VITE_API_BASE_URL; default is the deployed API
 │   └── src/                                         │
 │       ├── app/  (Juho)                             │
-│       │     App ......... page layout: header, search, GIF result, frame-by-frame toggle
+│       │     App ......... layout: search on top, viewer image left, sidebar right (drawer + Controls button on mobile)
 │       │     SearchForm .. RA/Dec, preset targets (fill RA/Dec), FOV
-│       │     GifView ..... server GIF per band + download link
-│       │     app.css ..... theme (dark, light via prefers-color-scheme), styles viewer buttons too
+│       │     app.css ..... theme (dark, light via prefers-color-scheme), two-column layout, drawer; styles viewer buttons too
 │       │     PLAN.md ..... copy of PROJECT_PLAN.md
 │       │     → state.ts  setTarget(search)          │
 │       ├── state.ts ......... shared: current search, URL sync, polling (useSky, retries failed polls)
@@ -69,6 +68,7 @@ PlanetXSPHEREx/
 │           │     ← meta.gaia_validation (science/gaia_validation.py) for the Gaia circles
 │           ├── index.ts ............ only entry point → Viewer, Meta, Result, ViewerStatus
 │           ├── Viewer.tsx .......... picks empty/loading/preview/done; LoadedViewer owns the state
+│           │     .viewer__side wraps everything below the image (app/ lays it out as the sidebar)
 │           │     → components/*, hooks/useBlink, lib/frames, lib/gaia, viewer.css
 │           ├── types.ts ............ Meta ≈ meta.json in CONTRACT.md (+ gaia_validation, detector ranges)
 │           ├── viewer.css .......... all viewer styles (SVG overlay z-index keeps Gaia circles on top)

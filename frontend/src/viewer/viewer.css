@@ -18,13 +18,28 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Long readouts wrap instead of widening the sidebar */
+.viewer__info,
+.viewer__cursor,
+.viewer__gaia,
+.spectrum__readout {
+  overflow-wrap: anywhere;
+}
+
+/* Readouts in mono so numbers line up */
+.viewer__info,
+.viewer__cursor,
+.spectrum__readout {
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 0.8rem;
+}
+
 .viewer__cursor {
   display: grid;
   gap: 2px;
   min-height: 4.5em; /* room for three lines, so the page does not jump */
   margin: 0;
-  opacity: 0.8;
-  font-variant-numeric: tabular-nums;
+  color: var(--muted, inherit);
 }
 
 .viewer__cursor p {
@@ -32,8 +47,7 @@
 }
 
 .viewer__cursor-note {
-  font-size: 0.85rem;
-  opacity: 0.8;
+  font-family: var(--sans, inherit);
 }
 
 .viewer__credit {
@@ -48,6 +62,10 @@
   aspect-ratio: 1;
   max-width: 100%;
   background: #000;
+  border: 1px solid var(--border, #222);
+  border-radius: var(--radius, 8px);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgb(0 0 0 / 0.5);
   touch-action: none; /* taps go to the viewer, not page scroll */
   cursor: crosshair;
 }
@@ -92,10 +110,13 @@
   opacity: 0.8;
 }
 
+/* min-height: the far-from-centre sentence comes and goes per epoch;
+   room for 4 lines keeps the controls below from jumping during playback */
 .viewer__gaia {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
+  min-height: 5.2rem;
   margin: 0;
   font-size: 0.85rem;
   opacity: 0.85;
@@ -105,6 +126,7 @@
   flex: none;
   width: 10px;
   height: 10px;
+  margin-top: 0.3em; /* level with the first text line */
   border: 2px solid #22c55e;
   border-radius: 50%;
 }
@@ -125,25 +147,93 @@
 .controls__slider {
   display: grid;
   gap: 2px;
-  font-size: 0.85rem;
 }
 
-.controls button.is-active {
-  font-weight: 700;
-  outline: 2px solid currentColor;
+/* Prev / play / next as one joined group */
+.controls__transport {
+  display: flex;
+}
+
+/* .controls prefix: app.css rounds every .app button and loads after this file */
+.controls .controls__transport button {
+  border-radius: 0;
+}
+
+.controls .controls__transport button + button {
+  margin-left: -1px;
+}
+
+.controls .controls__transport button:first-child {
+  border-radius: 999px 0 0 999px;
+}
+
+.controls .controls__transport button:last-child {
+  border-radius: 0 999px 999px 0;
+}
+
+.controls .controls__transport button:nth-child(2) {
+  min-width: 72px;
+}
+
+/* Focus ring inside the group so it does not stick out as a pill */
+.controls .controls__transport button:focus-visible {
+  position: relative;
+  outline-offset: -3px;
+}
+
+.controls__slider {
+  flex: 1;
+  min-width: 100px;
+  color: var(--muted, inherit);
+  font-family: var(--mono, inherit);
+  font-size: 0.75rem;
+}
+
+.controls__slider input {
+  width: 100%;
 }
 
 /* Status */
+/* Empty, loading, error: a dark frame with a faint star field. */
 .status {
   display: grid;
-  gap: 8px;
-  padding: 24px;
+  place-content: center;
+  gap: 10px;
+  min-height: min(60vh, 520px);
+  padding: 32px 24px;
   text-align: center;
+  border: 1px solid var(--border, #222);
+  border-radius: var(--radius, 8px);
+  background:
+    radial-gradient(1px 1px at 12% 22%, #fff8, transparent 60%),
+    radial-gradient(1px 1px at 78% 14%, #fff6, transparent 60%),
+    radial-gradient(1.5px 1.5px at 64% 72%, #fff7, transparent 60%),
+    radial-gradient(1px 1px at 28% 84%, #fff5, transparent 60%),
+    radial-gradient(1px 1px at 90% 58%, #fff6, transparent 60%),
+    radial-gradient(1.5px 1.5px at 42% 38%, #b0f0ffaa, transparent 60%),
+    radial-gradient(1px 1px at 6% 64%, #fff4, transparent 60%),
+    radial-gradient(600px 300px at 50% 50%, rgb(34 211 238 / 0.06), transparent 70%),
+    #050607;
+}
+
+.status p {
+  margin: 0;
+}
+
+.status .progress {
+  width: min(320px, 100%);
+  justify-self: center;
 }
 
 .status--error .status__message,
 .status__hint {
-  opacity: 0.8;
+  color: var(--muted, inherit);
+  font-size: 0.85rem;
+}
+
+.status--error > p:first-child {
+  color: var(--danger, #f66);
+  font-weight: 600;
 }
 
 /* Progress (loading state and preview notice) */
@@ -154,6 +244,8 @@
 
 .progress__label {
   margin: 0;
+  font-family: var(--mono, inherit);
+  font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -165,9 +257,10 @@
 .viewer__notice {
   display: grid;
   gap: 6px;
-  padding: 8px 12px;
-  border: 1px dashed currentColor;
-  border-radius: 6px;
+  padding: 10px 14px;
+  background: var(--accent-soft, transparent);
+  border: 1px solid rgb(34 211 238 / 0.35);
+  border-radius: 8px;
   font-size: 0.9rem;
 }
 
@@ -177,8 +270,12 @@
 
 /* Spectrum */
 .spectrum h3 {
-  margin: 0 0 4px;
-  font-size: 1rem;
+  margin: 0 0 6px;
+  color: var(--muted, inherit);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .spectrum__note,
@@ -219,7 +316,8 @@
 .spectrum__bandlabel,
 .spectrum__title {
   fill: currentColor;
-  font-size: 11px;
+  font-family: var(--mono, inherit);
+  font-size: 10px;
 }
 
 .spectrum__tick,
@@ -242,6 +340,7 @@
 
 .spectrum__modes {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -317,4 +416,65 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+/* Info dropdowns (Controls info, Website info) */
+.info summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.info summary::-webkit-details-marker {
+  display: none;
+}
+
+.info summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--muted, currentColor);
+  border-bottom: 2px solid var(--muted, currentColor);
+  transform: rotate(45deg);
+  transition: transform 0.15s;
+}
+
+.info[open] summary::after {
+  transform: rotate(-135deg);
+}
+
+.info summary:hover {
+  color: var(--accent, inherit);
+}
+
+.info p,
+.info dl {
+  margin: 0 0 10px;
+  color: var(--muted, inherit);
+  font-size: 0.85rem;
+}
+
+.info dt {
+  margin-top: 8px;
+  color: var(--text, inherit);
+  font-weight: 600;
+}
+
+.info dd {
+  margin: 2px 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .info summary::after {
+    transition: none;
+  }
+}
+
+.status__retry {
+  justify-self: center;
+  margin-top: 6px;
 }

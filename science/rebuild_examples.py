@@ -54,6 +54,7 @@ def rebuild_target(target_dir: Path):
     is_rdra = (slug == "rdra")
     use_invert = is_wise0855
     meta["inverted"] = bool(use_invert)
+    meta["glare_suppressed"] = bool(is_epsindib)
 
     # 1. Discover target WCS from existing stacks
     w = None
@@ -195,9 +196,9 @@ def rebuild_target(target_dir: Path):
     print(f"  ✓ Rebuilt {len(all_bands_to_process)} bands, {n_pixels_created} pixel cubes, updated meta.json")
 
     if is_rdra:
-        print("  ⚠️  HUOM (R Dra): Kuvat ja pikselit päivitetty olemassa olevista pinoista,")
-        print("      mutta vanhat leikkaukset oli rajattu pre-J2000 koordinaateilla.")
-        print("      Kun IRSA palaa, aja täysi haku:")
+        print("  ⚠️  NOTE (R Dra): Images and pixel cubes updated from existing stacks,")
+        print("      but original cutouts were fetched with pre-J2000 coordinates.")
+        print("      When IRSA service is back online, re-run full fetch:")
         print("      python science/fetch_spherex.py --target rdra --out examples")
 
 

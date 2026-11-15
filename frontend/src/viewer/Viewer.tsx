@@ -4,6 +4,7 @@ import { CursorInfo } from "./components/CursorInfo";
 import { EpochInfo } from "./components/EpochInfo";
 import { GaiaInfo } from "./components/GaiaInfo";
 import { GaiaOverlay } from "./components/GaiaOverlay";
+import { InfoPanels } from "./components/InfoPanels";
 import { PlaybackControls } from "./components/PlaybackControls";
 import { SpectrumChart } from "./components/SpectrumChart";
 import { LoadingProgress, StatusView } from "./components/StatusView";
@@ -16,6 +17,7 @@ import "./viewer.css";
 
 interface ViewerProps {
   status: ViewerStatus;
+  onRetry?: () => void; // shows a Try again button on errors
 }
 
 // Same search = same key, so preview -> full result keeps band, date and filters.
@@ -27,7 +29,7 @@ function viewKey(meta: Meta): string {
 }
 
 // Public component. The app passes the status, the viewer shows it.
-export function Viewer({ status }: ViewerProps) {
+export function Viewer({ status, onRetry }: ViewerProps) {
   if (status.kind === "done") {
     return <LoadedViewer key={viewKey(status.meta)} meta={status.meta} baseUrl={status.baseUrl} />;
   }
@@ -52,7 +54,7 @@ export function Viewer({ status }: ViewerProps) {
 
   return (
     <div className="viewer">
-      <StatusView status={status} />
+      <StatusView status={status} onRetry={onRetry} />
     </div>
   );
 }
@@ -139,53 +141,57 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         }
       />
 
-      <EpochInfo frames={frames} frameIdx={idx} band={activeBand} showDiff={diffOn} />
-      <CursorInfo
-        pixel={hoverPx}
-        meta={meta}
-        band={activeBand}
-        values={pixelInfo.values}
-        loading={pixelInfo.loading}
-      />
-      {(showGaia || !hasGaia) && (
-        <GaiaInfo meta={meta} epoch={diffOn ? (frames[frames.length - 1]?.epoch ?? null) : currentEpoch} showDiff={diffOn} />
-      )}
-
-      <PlaybackControls
-        bands={bands}
-        band={activeBand}
-        onBand={changeBand}
-        playing={playing}
-        canPlay={canPlay}
-        onTogglePlay={() => setPlaying((p) => !p)}
-        onStep={(delta) => {
-          setPlaying(false); // stepping means the user wants to look closely
-          step(delta);
-        }}
-        fps={fps}
-        onFps={setFps}
-        hasDiff={diffSrc !== null}
-        showDiff={diffOn}
-        onToggleDiff={() => setShowDiff((d) => !d)}
-        hasGaia={hasGaia}
-        showGaia={showGaia}
-        onToggleGaia={() => setShowGaia((s) => !s)}
-        brightness={brightness}
-        onBrightness={setBrightness}
-        contrast={contrast}
-        onContrast={setContrast}
-      />
-
-      {meta.spectrum && (
-        <SpectrumChart
-          url={joinUrl(baseUrl, meta.spectrum)}
-          epochs={meta.epochs}
-          ranges={meta.detector_ranges_um}
-          highlightEpoch={diffOn ? undefined : frames[idx]?.epoch.index}
+      <div className="viewer__side">
+        <EpochInfo frames={frames} frameIdx={idx} band={activeBand} showDiff={diffOn} />
+        <CursorInfo
+          pixel={hoverPx}
+          meta={meta}
+          band={activeBand}
+          values={pixelInfo.values}
+          loading={pixelInfo.loading}
         />
-      )}
+        {(showGaia || !hasGaia) && (
+          <GaiaInfo meta={meta} epoch={diffOn ? (frames[frames.length - 1]?.epoch ?? null) : currentEpoch} showDiff={diffOn} />
+        )}
 
-      {meta.credit && <p className="viewer__credit">Data: {meta.credit}</p>}
+        <PlaybackControls
+          bands={bands}
+          band={activeBand}
+          onBand={changeBand}
+          playing={playing}
+          canPlay={canPlay}
+          onTogglePlay={() => setPlaying((p) => !p)}
+          onStep={(delta) => {
+            setPlaying(false); // stepping means the user wants to look closely
+            step(delta);
+          }}
+          fps={fps}
+          onFps={setFps}
+          hasDiff={diffSrc !== null}
+          showDiff={diffOn}
+          onToggleDiff={() => setShowDiff((d) => !d)}
+          hasGaia={hasGaia}
+          showGaia={showGaia}
+          onToggleGaia={() => setShowGaia((s) => !s)}
+          brightness={brightness}
+          onBrightness={setBrightness}
+          contrast={contrast}
+          onContrast={setContrast}
+        />
+
+        {meta.spectrum && (
+          <SpectrumChart
+            url={joinUrl(baseUrl, meta.spectrum)}
+            epochs={meta.epochs}
+            ranges={meta.detector_ranges_um}
+            highlightEpoch={diffOn ? undefined : frames[idx]?.epoch.index}
+          />
+        )}
+
+        {meta.credit && <p className="viewer__credit">Data: {meta.credit}</p>}
+
+        <InfoPanels />
+      </div>
     </div>
   );
 }
