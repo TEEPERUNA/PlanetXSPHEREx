@@ -911,6 +911,11 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
                     }
         except Exception as e:
             print(f"  Gaia validation skipped: {e}")
+            gaia_meta = {
+                "status": "QUERY_ERROR",
+                "message": f"Gaia lookup could not be executed: {e}",
+                "is_match": False
+            }
 
     # PNG frames, GIF and difference image per detector, common stretch across all epochs
     scale = max(1, 400 // shape[0])
