@@ -33,7 +33,6 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: system
 .card { display: grid; gap: 12px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; }
 .note { margin: 0; color: var(--muted); font-size: 13px; }
 a.note { color: var(--accent); justify-self: start; }
-.banner { margin: 0; padding: 8px 12px; border-radius: 8px; background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--text); font-size: 14px; }
 
 /* Form */
 .search label { display: grid; gap: 4px; font-size: 14px; color: var(--muted); }
@@ -67,7 +66,7 @@ a.note { color: var(--accent); justify-self: start; }
 .gif__frame { aspect-ratio: 1; background: #000; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
 .gif__frame img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
 
-/* The result heading already names the target. */
-.app .viewer__title { display: none; }
+/* The result heading and credit line already say this. */
+.app .viewer__title, .app .viewer__credit { display: none; }
 .app .viewer { max-width: none; }
 .app progress { accent-color: var(--accent); }

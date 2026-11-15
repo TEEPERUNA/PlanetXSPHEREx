@@ -1,7 +1,7 @@
 // Talks to the backend (see CONTRACT.md). The only place that knows the API address.
 import type { Meta } from "../viewer";
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "https://planetx-api-38053485414.us-east4.run.app";
 
 export interface Target {
   key: string;

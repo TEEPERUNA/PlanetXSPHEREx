@@ -35,26 +35,25 @@ const sleep = (ms: number, signal: AbortSignal) =>
 // setTarget starts a search; a new one cancels the previous polling.
 export function useSky() {
   const [status, setStatus] = useState<ViewerStatus>({ kind: "empty" });
-  const [isPreview, setIsPreview] = useState(false);
   const abort = useRef<AbortController | null>(null);
 
   const setTarget = useCallback(async (search: Search) => {
     abort.current?.abort();
     const ctl = (abort.current = new AbortController());
     writeUrl(search);
-    setIsPreview(false);
     setStatus({ kind: "loading", stage: "queued", done: 0, total: 0 });
     try {
       let res = await startSky(search, ctl.signal);
       while (res.status !== "done") {
         if (res.status === "error") throw new Error(res.error ?? "Unknown error");
         const p = res.preview;
-        if (p) {
-          setIsPreview(true);
-          setStatus({ kind: "done", meta: p.meta, baseUrl: fullUrl(p.base_url) });
-        } else {
-          setStatus({ kind: "loading", stage: res.stage ?? "queued", done: res.done ?? 0, total: res.total ?? 0 });
-        }
+        setStatus({
+          kind: "loading",
+          stage: res.stage ?? "queued",
+          done: res.done ?? 0,
+          total: res.total ?? 0,
+          preview: p ? { meta: p.meta, baseUrl: fullUrl(p.base_url) } : undefined,
+        });
         // The server can go quiet for a minute while the job keeps running, so one failed poll is not fatal.
         for (let tries = 1; ; tries++) {
           await sleep(POLL_MS, ctl.signal);
@@ -66,16 +65,14 @@ export function useSky() {
           }
         }
       }
-      setIsPreview(false);
       setStatus({ kind: "done", meta: res.meta!, baseUrl: fullUrl(res.base_url!) });
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
-      setIsPreview(false);
       setStatus({ kind: "error", message: (e as Error).message });
     }
   }, []);
 
   useEffect(() => () => abort.current?.abort(), []);
 
-  return { status, isPreview, setTarget };
+  return { status, setTarget };
 }

@@ -61,12 +61,28 @@ def _s3_path(raw) -> str | None:
         return None
 
 
+SIA_ATTEMPTS = int(os.environ.get("SIA_ATTEMPTS", "4"))
+
+
+def _query_sia(coord: SkyCoord, coll: str):
+    """IRSA SIA with retries: IRSA sometimes answers 502/503 for a few seconds under load."""
+    from astroquery.ipac.irsa import Irsa
+    for attempt in range(1, SIA_ATTEMPTS + 1):
+        try:
+            return Irsa.query_sia(pos=(coord, 1 * u.arcsec), collection=coll)
+        except Exception as e:  # noqa: BLE001
+            if attempt == SIA_ATTEMPTS:
+                raise
+            wait = 2 ** attempt
+            print(f"  IRSA SIA failed ({type(e).__name__}: {str(e)[:80]}), retry {attempt} in {wait} s")
+            time.sleep(wait)
+
+
 def find_images(coord: SkyCoord, bands: list[str] | None = None) -> ImageList:
     """IRSA SIA search: all SPHEREx images whose footprint contains the position."""
-    from astroquery.ipac.irsa import Irsa
     bands = bands or list(fs.DETECTORS)
     for coll in COLLECTIONS:
-        res = Irsa.query_sia(pos=(coord, 1 * u.arcsec), collection=coll)
+        res = _query_sia(coord, coll)
         tab = res.to_table() if hasattr(res, "to_table") else res
         if len(tab) == 0:
             continue

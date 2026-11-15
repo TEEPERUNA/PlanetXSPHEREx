@@ -121,13 +121,15 @@ viewer/
 │   ├── SpectrumChart.tsx # SVG-kaavio: virhepalkit, värit epookin mukaan, D1–D6
 │   └── StatusView.tsx    # tyhjä, lataus, virhe
 ├── hooks/
-│   └── useBlink.ts       # toiston ajastus
+│   ├── useBlink.ts       # toiston ajastus
+│   └── usePixelValues.ts # hiiren pikselin arvot FITS-tiedostoista
 └── lib/
     ├── frames.ts         # kuvat kaistalle, epookin numero tiedostonimestä
     ├── skyCoords.ts      # pikseli → RA/Dec
     ├── parseSpectrum.ts  # spectrum.csv → rivit
     ├── chartScale.ts     # akselit ja asteikot käsin piirrettyyn kaavioon
     ├── gaia.ts           # Gaia-ennuste epookin päivämäärälle → pikseli
+    ├── fits.ts           # pieni FITS-lukija (ei kirjastoa)
     └── stage.ts          # backendin vaiheen nimi → teksti käyttäjälle
 ```
 
@@ -213,6 +215,23 @@ Juhon frontend on branchissa `front-end`. Viewer kääntyy sen kanssa (React 19,
 
 Jokaisen vaiheen jälkeen tehdään commit (`feat(viewer): …`) ja merge mainiin. Mainin pitää aina buildata.
 
+### Pikselin tiedot hiiren kohdalla (cursor info)
+
+Toive: RA/Dec, surface brightness, zodi, signal-to-noise, aallonpituus ± kaistanleveys ja pikseli alkuperäisellä ilmaisimella.
+
+| Tieto | Tila | Lähde |
+|---|---|---|
+| RA, Dec | ✅ valmis | laskettu `meta.json`:sta |
+| Surface brightness (MJy/sr) | ✅ valmis D1–D6:lle | epookkipino `outputs[band].fits` (Emilin nykyinen tuloste) |
+| Zodi, S/N, λ ± kaistanleveys, ilmaisimen x/y | 🟡 viewer valmis, odottaa Emilin dataa | uusi tiedosto `outputs[band].pixels` |
+
+- ALL-kaistalla ei näytetä arvoja, koska pino on normalisoitu yli ilmaisimien. Viewer kehottaa valitsemaan D1–D6.
+- Tiedosto ladataan vasta, kun hiiri on kuvan päällä, ja kukin tiedosto vain kerran (noin 9 kt per epookki ja kaista).
+- Tarkistettu: Barnardin D1 epookki 0 keskipikseli on 87,3 MJy/sr, ja spektrin vastaava mittaus 86,4 MJy/sr.
+- Erotuskuvan aikana arvoja ei näytetä, koska kuva ei ole yksi epookki.
+
+**Pyydetty Emililtä (vaihe 2):** jokaiselle epookille ja kaistalle tiedosto, esimerkiksi `pixels/D3/epoch0.fits`, samalla 31×31-ruudukolla kuin PNG. Kerrokset (EXTNAME): `SB`, `ZODI`, `SNR`, `WAVE`, `BW`, `DETX` ja `DETY`. Lisäksi `meta.json`:iin `outputs[band].pixels: [...]`. Aallonpituus ja ilmaisinpikseli ovat eri jokaisessa yksittäisessä kuvassa, joten ne otetaan yhdestä edustavasta kuvasta. Pinossa niillä ei ole yhtä oikeaa arvoa.
+
 ## 7. Yhteensopivuus Emilin datan kanssa
 
 Tarkistettu `fetch_spherex.py`:n tuottamaa `meta.json`:ia vasten (14.11.2026).
@@ -240,7 +259,11 @@ Tarkistettu `fetch_spherex.py`:n tuottamaa `meta.json`:ia vasten (14.11.2026).
 - [ ] Viewerin paikka sivulla ja toiminta mobiilissa (Juho).
 - [x] Spektrikaavio: piirretty SVG:llä, ei kirjastoa.
 - [ ] Gaia-ennusteet eivät osu kuvan keskelle (Emil). Barnardilla ennuste on 172″ keskeltä ja kuvan ulkopuolella, vaikka liikettä on vain noin 5″ ennusteen ja kuvan ajanhetken välillä. Epsilon Indi B:llä poikkeama on 78″, ja `gaia_dr3_source_id` on koodin kommentin mukaan Epsilon Indi A:n. Silti molemmat ovat `CONFIRMED_MATCH`. RW Aur ja R Dra osuvat keskelle, ja WISE 0855:llä (CatWISE) poikkeama on 17″.
-- [ ] R Draconiksen spektrin vuo on lähes nolla (−0,0…0,1 MJy/sr), vaikka kohde on kirkas Mira-muuttuja. Kyllästyminen? (Emil)
+- [x] R Draconiksen spektrin vuo oli lähes nolla. Syy: kohteen koordinaatit olivat väärin (RA 246.66° → oikea 248.17°), eli kuvat oli otettu väärästä kohdasta. Korjattu kohdelistassa 15.11. Tarkistetaan, kun uusi tulos on rakennettu.
+- [x] `flagged_frac` laskee nyt vain oikeat virhebitit (`BAD_PIXEL_MASK`).
+- [x] Spektrin mittausalue seuraa nyt liikkuvaa tähteä jokaisen kuvan päivämäärän mukaan (Emil).
+- [ ] Pikselikerrokset cursor infoa varten: `outputs[band].pixels` (Emil, ks. kohta "Pikselin tiedot hiiren kohdalla").
+- [ ] Julkaistun API:n välimuisti tyhjeni uudelleenjulkaisussa, eikä mikään kohde toimi, kun IRSA on alhaalla. `examples/` on `.dockerignore`:ssa, joten varareittikään ei toimi (Erik).
 - [ ] Gaia-sijainnit: Emililtä uutena `meta.json`-avaimena (katso `science/gaia_validation.py`) vai suoraan Gaiasta?
 - [x] CORS backendissä (Erik): kaikki osoitteet sallittu.
 - [ ] `api/` tekee `baseUrl`:sta täydellisen osoitteen ja välittää `preview`-kentän (Juho).
