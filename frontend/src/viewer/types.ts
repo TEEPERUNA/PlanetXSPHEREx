@@ -19,6 +19,8 @@ export interface BandOutput {
   frames: string[]; // "frames/D2/epoch4.png", relative to baseUrl
   gif?: string;
   diff?: string;
+  fits?: string[]; // "epoch3_D2.fits": epoch stack, surface brightness (MJy/sr)
+  pixels?: string[]; // per-pixel layers SB, ZODI, SNR, WAVE, BW, DETX, DETY (planned, see plan.md)
 }
 
 // Science's position check against Gaia DR3 (or CatWISE for objects Gaia cannot see).

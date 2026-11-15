@@ -19,7 +19,20 @@
 }
 
 .viewer__cursor {
-  min-height: 1.5em; /* no jump when the text changes */
+  display: grid;
+  gap: 2px;
+  min-height: 4.5em; /* room for three lines, so the page does not jump */
+  margin: 0;
+  opacity: 0.8;
+  font-variant-numeric: tabular-nums;
+}
+
+.viewer__cursor p {
+  margin: 0;
+}
+
+.viewer__cursor-note {
+  font-size: 0.85rem;
   opacity: 0.8;
 }
 
