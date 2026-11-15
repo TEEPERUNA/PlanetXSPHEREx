@@ -81,13 +81,15 @@ PlanetXSPHEREx/
 │           │   ├── PlaybackControls.tsx  no dependencies
 │           │   ├── SpectrumChart.tsx ... spectrum.csv → lib/parseSpectrum, lib/chartScale (SVG, no library)
 │           │   └── StatusView.tsx ...... empty / loading / error + LoadingProgress → lib/stage
-│           ├── hooks/useBlink.ts
+│           ├── hooks/useBlink.ts, hooks/usePixelValues.ts (pixel values under the cursor)
 │           ├── lib/ ......... pure functions, no React
 │           │   ├── frames.ts      epochN.png → meta.epochs[N]
 │           │   ├── skyCoords.ts   pixel ↔ RA/Dec
 │           │   ├── gaia.ts        Gaia prediction moved to each epoch's date → pixel
 │           │   ├── parseSpectrum.ts
 │           │   ├── chartScale.ts  axes and scales for SpectrumChart
+│           │   ├── spectrumStats.ts averages per detector, noise check
+│           │   ├── fits.ts        small FITS reader → pixels/<band>/epochN.fits
 │           │   └── stage.ts       backend stage → text for the user
 │           ├── HANDOFF.md ....... technical handoff: how the viewer works
 │           ├── plan.md .......... working plan and open issues (Finnish)

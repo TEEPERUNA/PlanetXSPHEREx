@@ -65,13 +65,16 @@ viewer/
 │   ├── SpectrumChart.tsx     loads spectrum.csv and draws it
 │   └── StatusView.tsx        empty / loading / error, and LoadingProgress
 ├── hooks/
-│   └── useBlink.ts           interval timer for the animation
+│   ├── useBlink.ts           interval timer for the animation
+│   └── usePixelValues.ts     loads the pixel FITS for the cursor info, hides filler layers
 └── lib/                      pure functions, no React, easy to test
     ├── frames.ts             frames of a band; epoch number from the filename
     ├── skyCoords.ts          pixel ↔ RA/Dec
     ├── gaia.ts               Gaia prediction moved to each epoch's date
     ├── parseSpectrum.ts      spectrum.csv → rows
     ├── chartScale.ts         axis ranges and ticks for the chart
+    ├── spectrumStats.ts      averages per detector, noise check
+    ├── fits.ts               small FITS reader (pixel values under the cursor)
     └── stage.ts              backend stage name → user text
 ```
 
@@ -98,7 +101,9 @@ If the new result lacks the selected band or frame, the viewer falls back to the
 - The SVG layer has `position: relative; z-index: 1`. **Do not remove it:** images with a CSS `filter` get their own layer and would otherwise paint over the circles.
 
 ### Spectrum
-- One point per SPHEREx image, measured at the image centre (3 × 3 px). x = wavelength (µm), y = surface brightness (MJy/sr), with error bars, one colour per epoch.
+- One measurement per SPHEREx image, at the image centre (3 × 3 px). x = wavelength (µm), y = surface brightness (MJy/sr), with error bars, one colour per epoch.
+- Default view "Average per detector" (`lib/spectrumStats.ts`): one point per detector and date (mean, error of the mean), joined by a line, so the shape and any change between dates are easy to see. "All measurements" shows every point.
+- A plain-language intro sits above the chart, with hints under the x axis. A warning appears when at least 60 % of points are within 2σ of zero.
 - Detector ranges D1–D6 are shaded in the background.
 - The epoch on screen in the blink is highlighted and the others are dimmed, so brightness changes between epochs are easy to see.
 - The x axis is fitted to the data (about 0.75–5 µm). The y axis starts at 0 unless flux goes below it. Checked against all five challenge targets: every point fits.

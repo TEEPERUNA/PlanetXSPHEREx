@@ -128,6 +128,7 @@ viewer/
     ├── skyCoords.ts      # pikseli → RA/Dec
     ├── parseSpectrum.ts  # spectrum.csv → rivit
     ├── chartScale.ts     # akselit ja asteikot käsin piirrettyyn kaavioon
+    ├── spectrumStats.ts  # keskiarvot ilmaisimittain, kohinan tunnistus
     ├── gaia.ts           # Gaia-ennuste epookin päivämäärälle → pikseli
     ├── fits.ts           # pieni FITS-lukija (ei kirjastoa)
     └── stage.ts          # backendin vaiheen nimi → teksti käyttäjälle
@@ -187,6 +188,8 @@ import { Viewer, type ViewerStatus } from "../viewer";
 - Ilmaisinalueet D1–D6 näkyvät taustalla vuorottaisina raitoina.
 - Blinkissä näkyvän epookin pisteet korostetaan ja muut himmennetään. Erotuskuvan aikana kaikki näkyvät tasavahvoina.
 - Hiiri tai napautus näyttää lähimmän pisteen arvon.
+- **Helppolukuisuus (15.11.):** oletusnäkymä on "Average per detector": yksi keskiarvopiste per ilmaisin ja päivä, ja saman päivän pisteet yhdistetään viivalla. Muodon ja muutokset näkee viivoista. Kytkimellä saa näkyviin kaikki mittaukset. Kaavion yläpuolella on selkokielinen selitys, x-akselin alla vihjeet "shorter: hot stars" ja "longer: cool objects, dust", ja y-akselin nimi on "Brightness".
+- Varoitus "too faint for a reliable spectrum" näytetään, jos vähintään 60 % mittauksista on alle 2σ nollasta. Esimerkkikohteilla se ei laukea, koska pienetkin vuot (WISE 0855, R Dra) ovat ilmoitettuihin virheisiin nähden merkitseviä.
 - Akselit tarkistettu kaikilla 5 kohteella: jokainen piste virhepalkkeineen mahtuu piirtoalueelle.
 
 Juhon frontend on branchissa `front-end`. Viewer kääntyy sen kanssa (React 19, TypeScript 7, Vite 8).
