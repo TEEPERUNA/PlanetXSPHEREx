@@ -7,6 +7,38 @@ interface Props {
   showDiff: boolean;
 }
 
+interface FieldProps {
+  status: "loading" | "ok" | "error";
+  onImage: number; // Gaia stars on the image at the date on screen
+  truncated: boolean; // the backend returned only the brightest stars
+  lonely: number; // bright sources without a Gaia star
+  date: string | null;
+}
+
+// One line about the Gaia field stars and the sources Gaia does not list.
+export function GaiaFieldInfo({ status, onImage: count, truncated, lonely, date }: FieldProps) {
+  if (status === "loading") return <p className="viewer__gaia">Loading Gaia stars for this field…</p>;
+  if (status === "error") return <p className="viewer__gaia">Gaia field stars are not available right now.</p>;
+  if (count === 0) return <p className="viewer__gaia">No Gaia DR3 stars in this field.</p>;
+  return (
+    <p className="viewer__gaia">
+      <span className="viewer__gaia-key viewer__gaia-key--field" aria-hidden="true" />
+      <span>
+        {count} Gaia DR3 stars on the image{date ? ` on ${date}` : ""}
+        {truncated ? " (the brightest in this area)" : ""}.{" "}
+        {lonely > 0 ? (
+          <>
+            <span className="viewer__nomatch-key" aria-hidden="true" />
+            {lonely} bright {lonely === 1 ? "source has" : "sources have"} no Gaia star: seen in infrared, not by Gaia.
+          </>
+        ) : (
+          "Every bright source has a Gaia star."
+        )}
+      </span>
+    </p>
+  );
+}
+
 // One line under the image that explains the green circle.
 export function GaiaInfo({ meta, epoch, showDiff }: Props) {
   const g = meta.gaia_validation;

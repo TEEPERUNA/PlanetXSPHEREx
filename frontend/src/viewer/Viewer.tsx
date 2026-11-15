@@ -5,16 +5,19 @@ import { CandidateOverlay } from "./components/CandidateOverlay";
 import { CandidateReport } from "./components/CandidateReport";
 import { CursorInfo } from "./components/CursorInfo";
 import { EpochInfo } from "./components/EpochInfo";
-import { GaiaInfo } from "./components/GaiaInfo";
+import { GaiaFieldInfo, GaiaInfo } from "./components/GaiaInfo";
 import { GaiaOverlay } from "./components/GaiaOverlay";
 import { InfoPanels } from "./components/InfoPanels";
 import { PlaybackControls } from "./components/PlaybackControls";
 import { SpectrumChart } from "./components/SpectrumChart";
 import { LoadingProgress, StatusView } from "./components/StatusView";
 import { useBlink } from "./hooks/useBlink";
+import { useGaiaField } from "./hooks/useGaiaField";
 import { usePixelValues } from "./hooks/usePixelValues";
+import { useSources } from "./hooks/useSources";
 import { availableBands, framesFor, joinUrl, nearestFrame } from "./lib/frames";
 import { gaiaPixelAt, mjdToYear, onImage } from "./lib/gaia";
+import { describeStar, nearestStar, starsOnImage, withoutGaia } from "./lib/gaiaField";
 import type { Band, Meta, Pixel, ViewerStatus } from "./types";
 import "./viewer.css";
 
@@ -127,6 +130,20 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   });
   const currentEpoch = diffOn ? null : (frames[idx]?.epoch ?? null);
 
+  // All Gaia stars in the field, moved to the date on screen (last epoch in diff mode),
+  // and the bright sources in that image that Gaia does not list.
+  const gaiaField = useGaiaField(meta);
+  const fieldEpoch = currentEpoch ?? frames[frames.length - 1]?.epoch ?? null;
+  const fieldStars = useMemo(
+    () => (fieldEpoch ? starsOnImage(gaiaField.stars, meta, mjdToYear(fieldEpoch.mjd_mean)) : []),
+    [gaiaField.stars, meta, fieldEpoch],
+  );
+  const sources = useSources(meta, baseUrl, activeBand, fieldEpoch?.index ?? null);
+  // Only when the field came back with stars: an empty or failed query would flag everything.
+  const lonely = gaiaField.status === "ok" && fieldStars.length > 0 ? withoutGaia(sources, fieldStars) : [];
+  const hoverStar = hoverPx ? nearestStar(fieldStars, hoverPx.x, hoverPx.y) : null;
+  const showGaiaButton = hasGaia || fieldStars.length > 0;
+
   // Values of the pixel under the cursor, for the epoch on screen.
   const pixelInfo = usePixelValues(meta, baseUrl, activeBand, currentEpoch?.index ?? null, hoverPx);
 
@@ -175,7 +192,9 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         onPick={setPickPx}
         overlay={
           <>
-            {hasGaia && showGaia && <GaiaOverlay meta={meta} epochs={bandEpochs} current={currentEpoch} />}
+            {showGaiaButton && showGaia && (
+              <GaiaOverlay meta={meta} epochs={bandEpochs} current={currentEpoch} field={fieldStars} lonely={lonely} />
+            )}
             <CandidateOverlay meta={meta} candidates={candidates} picked={pickPx} />
           </>
         }
@@ -203,6 +222,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           band={activeBand}
           values={pixelInfo.values}
           loading={pixelInfo.loading}
+          gaiaNote={showGaia && hoverStar ? describeStar(hoverStar.star) : null}
         />
         <CandidateReport
           pixel={pickPx}
@@ -216,6 +236,15 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         />
         {(showGaia || !hasGaia) && (
           <GaiaInfo meta={meta} epoch={diffOn ? (frames[frames.length - 1]?.epoch ?? null) : currentEpoch} showDiff={diffOn} />
+        )}
+        {showGaia && (
+          <GaiaFieldInfo
+            status={gaiaField.status}
+            onImage={fieldStars.length}
+            truncated={gaiaField.truncated}
+            lonely={lonely.length}
+            date={fieldEpoch?.date ?? null}
+          />
         )}
 
         <PlaybackControls
@@ -234,7 +263,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           hasDiff={diffSrc !== null}
           showDiff={diffOn}
           onToggleDiff={() => setShowDiff((d) => !d)}
-          hasGaia={hasGaia}
+          hasGaia={showGaiaButton}
           showGaia={showGaia}
           onToggleGaia={() => setShowGaia((s) => !s)}
           dates={frames.map((f) => ({ mjd: f.epoch.mjd_mean, date: f.epoch.date }))}
