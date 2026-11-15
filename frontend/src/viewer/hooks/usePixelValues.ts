@@ -25,6 +25,35 @@ const LAYERS: Record<string, keyof PixelValues> = {
   DETY: "detY",
 };
 
+// A layer with the same value in every pixel is a filler, not data
+// (science writes defaults when the raw images were not available).
+// Real wavelength, detector and zodi maps always vary across the image.
+function isFiller(img: FitsImage): boolean {
+  let first: number | undefined;
+  for (const v of img.data) {
+    if (!Number.isFinite(v)) continue;
+    if (first === undefined) first = v;
+    else if (v !== first) return false;
+  }
+  return true;
+}
+
+// Science's fallback detector grid when the raw image is missing: DETX = offset + x
+// (DETY = offset + row), i.e. exactly one detector pixel per image pixel, no rotation.
+// A real SPHEREx image is rotated against the sky, so real maps never look like this.
+function isFallbackDetector(img: FitsImage): boolean {
+  if (img.name !== "DETX" && img.name !== "DETY") return false;
+  let offset: number | undefined;
+  for (let i = 0; i < img.data.length; i++) {
+    const pos = img.name === "DETX" ? i % img.width : Math.floor(i / img.width);
+    const d = img.data[i] - pos;
+    if (!Number.isFinite(d)) continue;
+    if (offset === undefined) offset = d;
+    else if (Math.abs(d - offset) > 1e-3) return false;
+  }
+  return true;
+}
+
 // One download per file, shared by every viewer on the page.
 const cache = new Map<string, Promise<FitsImage[]>>();
 
@@ -36,7 +65,9 @@ function loadFits(url: string): Promise<FitsImage[]> {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.arrayBuffer();
       })
-      .then(readFits);
+      .then((buffer) =>
+        readFits(buffer).filter((img) => img.name === "SB" || (!isFiller(img) && !isFallbackDetector(img))),
+      );
     promise.catch(() => cache.delete(url)); // allow a retry later
     cache.set(url, promise);
   }
