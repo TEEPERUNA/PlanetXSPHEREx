@@ -243,6 +243,17 @@ def verify_pillar_5_contract_compliance():
                 if not (t_dir / f_fits).exists():
                     all_files_exist = False
                     missing_files.append(str(t_dir / f_fits))
+            for p_fits in out_data.get("pixels", []):
+                p_file = t_dir / p_fits
+                if not p_file.exists():
+                    all_files_exist = False
+                    missing_files.append(str(p_file))
+                else:
+                    with fits.open(p_file) as hp:
+                        for ext in ["SB", "ZODI", "SNR", "WAVE", "BW", "DETX", "DETY"]:
+                            if ext not in hp:
+                                all_files_exist = False
+                                missing_files.append(f"{p_fits}: missing layer {ext}")
             if "gif" in out_data and not (t_dir / out_data["gif"]).exists():
                 all_files_exist = False
                 missing_files.append(str(t_dir / out_data["gif"]))

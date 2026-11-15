@@ -77,6 +77,7 @@ Static files listed in `meta.json`, e.g. `/api/files/barnard/frames/ALL/epoch0.p
     "D1": {
       "frames": ["frames/D1/epoch0.png", "frames/D1/epoch1.png"],
       "fits": ["epoch0_D1.fits", "epoch1_D1.fits"],
+      "pixels": ["pixels/D1/epoch0.fits", "pixels/D1/epoch1.fits"], // multi-layer pixel cubes
       "gif": "blink_D1.gif",
       "diff": "diff_D1.png"
     }
@@ -142,6 +143,17 @@ Multi-epoch time-series photometric measurements grouped strictly by detector ba
 
 ## FITS files (`outputs[band].fits`)
 Raw scientific calibrated float32 FITS images (`epoch{e}_{band}.fits`, `epoch{e}_ALL.fits`) registered to the tangent plane with standard WCS headers. Available via `/api/files/{job}/epoch{e}_{band}.fits`.
+
+## Multi-Layer Pixel Cubes (`outputs[band].pixels`)
+Available per epoch and detector band D1–D6 via `/api/files/{job}/pixels/{band}/epoch{e}.fits`.
+Multi-Extension FITS (MEF) cubes registered onto the same 31×31 tangent-plane grid (same WCS as the stacks and PNGs), containing 7 float32 layers (accessible by extension name `EXTNAME`):
+- `SB`: Surface Brightness (`IMAGE - ZODI`, MJy/sr), identical to the epoch stack.
+- `ZODI`: Model zodiacal light foreground (MJy/sr).
+- `SNR`: Signal-to-noise ratio per pixel (`SB / \sqrt{VARIANCE}`).
+- `WAVE`: Central wavelength in $\mu\text{m}$ per pixel (from spectral WCS "W").
+- `BW`: Bandpass bandwidth in $\mu\text{m}$ per pixel (from spectral WCS "W").
+- `DETX`: Physical detector pixel X coordinate (0–2039) on the SPHEREx focal plane array.
+- `DETY`: Physical detector pixel Y coordinate (0–2039) on the SPHEREx focal plane array.
 
 ## Rules
 - Science (`science/`) may add new keys to `meta.json`, but must not rename or remove existing keys.
