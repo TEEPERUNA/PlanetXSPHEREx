@@ -4,6 +4,7 @@ import { fullUrl, getStatus, startSky, type Search } from "./api";
 import type { ViewerStatus } from "./viewer";
 
 const POLL_MS = 2000;
+const MAX_POLL_FAILS = 5;
 
 export const DEFAULT_FOV = 3;
 
@@ -54,8 +55,16 @@ export function useSky() {
         } else {
           setStatus({ kind: "loading", stage: res.stage ?? "queued", done: res.done ?? 0, total: res.total ?? 0 });
         }
-        await sleep(POLL_MS, ctl.signal);
-        res = await getStatus(res.job, ctl.signal);
+        // The server can go quiet for a minute while the job keeps running, so one failed poll is not fatal.
+        for (let tries = 1; ; tries++) {
+          await sleep(POLL_MS, ctl.signal);
+          try {
+            res = await getStatus(res.job, ctl.signal);
+            break;
+          } catch (e) {
+            if ((e as Error).name === "AbortError" || tries >= MAX_POLL_FAILS) throw e;
+          }
+        }
       }
       setIsPreview(false);
       setStatus({ kind: "done", meta: res.meta!, baseUrl: fullUrl(res.base_url!) });

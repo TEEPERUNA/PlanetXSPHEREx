@@ -17,14 +17,19 @@ export function GifView({ meta, baseUrl }: Props) {
   if (!gif) return <p className="note">No GIF available for this result.</p>;
   return (
     <div className="gif">
-      <div className="bands">
+      <div className="pills" role="group" aria-label="Detector band">
         {bands.map((b) => (
-          <button key={b} className={b === band ? "on" : ""} onClick={() => setBand(b)}>
+          <button key={b} aria-pressed={b === band} onClick={() => setBand(b)}>
             {b}
           </button>
         ))}
       </div>
-      <img src={baseUrl + gif} alt={`${meta.target}, band ${band}, over time`} />
+      <div className="gif__frame">
+        <img src={baseUrl + gif} alt={`${meta.target}, band ${band}, over time`} />
+      </div>
+      <a className="note" href={baseUrl + gif} download>
+        Download GIF
+      </a>
     </div>
   );
 }
