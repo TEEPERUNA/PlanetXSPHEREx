@@ -747,8 +747,8 @@ GAIA_MIRRORS = [m.strip() for m in os.environ.get(
     "https://vizier.cfa.harvard.edu,https://vizier.cds.unistra.fr,https://vizier.iucaa.in,"
     "https://vizier.nao.ac.jp").split(",") if m.strip()]
 GAIA_TIMEOUT_S = float(os.environ.get("GAIA_TIMEOUT_S", "10"))
-GAIA_MAX_STARS = 500
-GAIA_MAX_RADIUS_ARCSEC = 600.0
+GAIA_MAX_STARS = 2000            # brightest first; enough that faint field stars are not missed
+GAIA_MAX_RADIUS_ARCSEC = 900.0   # covers the corners of a 20 arcmin field (half diagonal ~850")
 GAIA_DIR = OUTPUT_DIR / "_gaia"
 _gaia_mem: dict[str, dict] = {}
 _gaia_locks: dict[str, threading.Lock] = {}
@@ -812,7 +812,7 @@ def fetch_gaia(ra: float, dec: float, radius_arcsec: float) -> list[dict]:
 @app.get("/api/gaia")
 def gaia(ra: str | None = None, dec: str | None = None, radius: str | None = None):
     """Gaia DR3 stars within `radius` arcsec of ra/dec (degrees). Positions at J2016.0,
-    brightest first, at most 500. The viewer moves them to each SPHEREx epoch itself."""
+    brightest first, at most 2000. The viewer moves them to each SPHEREx epoch itself."""
     try:
         ra_f, dec_f, rad_f = float(ra), float(dec), float(radius)
     except (TypeError, ValueError):

@@ -29,7 +29,7 @@ Every merge to `main` redeploys – avoid many merges right before or during jud
 7. HTTP `429` (too many new searches / reports from one IP) and `503` (server busy) also have a `detail` text – show it.
 8. Masked images: add `mask_flags=true` to `/api/sky`; the job id ends in `_mask`.
 9. Candidate reports: `POST` / `GET /api/candidates`, see [`CANDIDATES.md`](CANDIDATES.md).
-10. Gaia field stars: `GET /api/gaia?ra=&dec=&radius=<arcsec, max 600>` → J2016.0 positions + proper motions, brightest first; `503` = catalogue unreachable, show only the target star.
+10. Gaia field stars: `GET /api/gaia?ra=&dec=&radius=<arcsec, max 900>` → J2016.0 positions + proper motions, brightest first; `503` = catalogue unreachable, show only the target star.
 11. `VITE_API_BASE_URL` defaults to the Cloud Run URL; set it to `http://localhost:8000` only to test a local backend.
 
 ## Run locally
@@ -71,7 +71,7 @@ Useful: `WARMUP=0` (don't compute targets on start), `FETCH_MODE=irsa` (test the
 | `/api/status/ra1.2.3_dec+1_fov3` | 404 |
 | `/api/sky?target=barnard&mask_flags=true` | job `barnard_mask`, then `done` |
 | `/api/gaia?ra=269.4461&dec=4.7707&radius=130` | ~330 stars, first = Barnard (`g` 8.19, `pmdec` ≈ 10362) |
-| `/api/gaia?ra=1&dec=1&radius=700` | 400 |
+| `/api/gaia?ra=1&dec=1&radius=1000` | 400 |
 | `POST /api/candidates` `{"ra":269.45,"dec":4.69}` | 201, `near_challenge_target: "barnard"` |
 | `GET /api/candidates` | `{count, candidates}` |
 

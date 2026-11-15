@@ -64,7 +64,7 @@ Pipeline (class in main.py), one run:
 | `GET /api/status/{job}` | Progress (`stage`, `done`, `total`, `preview`), error, or the finished result |
 | `GET /api/files/{job}/{path}` | Files from the cache (bucket) |
 | `GET /api/examples/{job}/{path}` | Files from the bundled precomputed results |
-| `GET /api/gaia?ra=&dec=&radius=` | Gaia DR3 stars around a position (J2016.0, brightest first, max 500), cached forever |
+| `GET /api/gaia?ra=&dec=&radius=` | Gaia DR3 stars around a position (J2016.0, brightest first, max 2000, radius max 900″), cached forever |
 | `POST /api/candidates` | Store a community candidate report |
 | `GET /api/candidates[?ra=&dec=&radius_arcmin=]` | Reports, newest first, optionally only one field |
 | `GET /api/candidates/{id}` · `DELETE …` | One report · delete (admin token) |
