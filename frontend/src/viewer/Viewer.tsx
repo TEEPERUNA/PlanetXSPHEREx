@@ -78,16 +78,29 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const [contrast, setContrast] = useState(1);
   const [hoverPx, setHoverPx] = useState<Pixel | null>(null);
   const [showGaia, setShowGaia] = useState(true);
+  const [compareOn, setCompareOn] = useState(false);
+  const [compareA, setCompareA] = useState<number | null>(null); // dates (mjd), like anchorMjd
+  const [compareB, setCompareB] = useState<number | null>(null);
 
   // The full result can have other bands and epochs than the preview.
   const activeBand: Band = bands.includes(band) ? band : (bands[0] ?? "ALL");
   const frames = useMemo(() => framesFor(meta, activeBand, baseUrl), [meta, activeBand, baseUrl]);
-  const idx = nearestFrame(frames, anchorMjd);
 
   const diffPath = meta.outputs[activeBand]?.diff;
   const diffSrc = diffPath ? joinUrl(baseUrl, diffPath) : null;
   const diffOn = showDiff && diffSrc !== null;
-  const canPlay = frames.length > 1 && !diffOn;
+
+  // Compare mode: blink only between date A (default first) and date B (default last).
+  const ia = nearestFrame(frames, compareA ?? frames[0]?.epoch.mjd_mean ?? null);
+  const ib = nearestFrame(frames, compareB ?? frames[frames.length - 1]?.epoch.mjd_mean ?? null);
+  const canCompare = frames.length > 1 && !diffOn;
+  const compareActive = compareOn && canCompare;
+  const playFrames = compareActive ? [...new Set([ia, ib])].sort((x, y) => x - y).map((i) => frames[i]) : frames;
+
+  // Position in the played list, and in the full list (for the image stack and info).
+  const playIdx = nearestFrame(playFrames, anchorMjd);
+  const idx = Math.max(0, frames.indexOf(playFrames[playIdx]));
+  const canPlay = playFrames.length > 1 && !diffOn;
 
   // Gaia button only when the predicted position lands on the image for some epoch.
   const bandEpochs = frames.map((f) => f.epoch);
@@ -102,9 +115,15 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
 
   // Move forward or back, wrapping around. Stores the date, not the position.
   function step(delta: number) {
-    if (frames.length === 0) return;
-    const next = (idx + delta + frames.length) % frames.length;
-    setAnchorMjd(frames[next].epoch.mjd_mean);
+    if (playFrames.length === 0) return;
+    const next = (playIdx + delta + playFrames.length) % playFrames.length;
+    setAnchorMjd(playFrames[next].epoch.mjd_mean);
+  }
+
+  // Turning compare on starts at date A.
+  function toggleCompare() {
+    if (!compareOn && frames[ia]) setAnchorMjd(frames[ia].epoch.mjd_mean);
+    setCompareOn((c) => !c);
   }
 
   // Keeps the date on screen if the new band has it, otherwise the nearest one.
@@ -143,6 +162,14 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
 
       <div className="viewer__side">
         <EpochInfo frames={frames} frameIdx={idx} band={activeBand} showDiff={diffOn} />
+        {compareActive && (
+          <p className="viewer__compare">
+            Comparing{" "}
+            <strong className={idx === ia ? "is-current" : undefined}>A {frames[ia].epoch.date}</strong> ↔{" "}
+            <strong className={idx === ib ? "is-current" : undefined}>B {frames[ib].epoch.date}</strong>
+            {ia === ib && " (pick two different dates)"}
+          </p>
+        )}
         <CursorInfo
           pixel={hoverPx}
           meta={meta}
@@ -173,6 +200,20 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           hasGaia={hasGaia}
           showGaia={showGaia}
           onToggleGaia={() => setShowGaia((s) => !s)}
+          dates={frames.map((f) => ({ mjd: f.epoch.mjd_mean, date: f.epoch.date }))}
+          compareOn={compareActive}
+          canCompare={canCompare}
+          onToggleCompare={toggleCompare}
+          compareA={frames[ia]?.epoch.mjd_mean ?? 0}
+          compareB={frames[ib]?.epoch.mjd_mean ?? 0}
+          onCompareA={(mjd) => {
+            setCompareA(mjd);
+            setAnchorMjd(mjd);
+          }}
+          onCompareB={(mjd) => {
+            setCompareB(mjd);
+            setAnchorMjd(mjd);
+          }}
           brightness={brightness}
           onBrightness={setBrightness}
           contrast={contrast}

@@ -85,6 +85,9 @@ viewer/
 - All frames of the band are in the DOM at once, stacked in one CSS grid cell. Only one has `visibility: visible`. Switching frames never waits for a download.
 - `useBlink(playing, fps, onTick)` runs a `setInterval`. Stepping by hand pauses playback.
 
+### Compare two dates
+"Compare two dates" turns the blink into a classic blink comparator: it alternates only between date A and date B (defaults: first and last). A and B are stored as dates (`compareA`, `compareB`, mjd) and resolved with `nearestFrame()`, so they survive band changes and the preview → full switch. Internally `playFrames` is the played list (all frames, or just A and B); `playIdx` is the position in it and `idx` the position in the full list used by the image stack and the info lines. Not available in diff mode.
+
 ### Keeping state between results
 `LoadedViewer` gets `key = target|shape` (the target name is unique per search, the shape changes with the field of view). The preview and the full result of the same search share the key, so band, date and sliders survive the switch. A new search gets a new key, and React starts the component fresh. The exact RA/Dec is not part of the key, because a moving star's position can differ slightly between runs.
 
@@ -134,7 +137,7 @@ Integration (app side):
 - `state.ts` sends the preview as `kind: "done"` and does not use the `preview` field.
 - Target name and credit appear in both the app and the viewer.
 
-Not built: light curve (`lightcurve.csv`), pixel flux readout (needs FITS data), zoom.
+Not built: light curve (`lightcurve.csv`), contamination flags in the UI (the `flagged_frac` values are still implausibly high, 0.2–1.0, so they are not shown until science confirms them), free difference or sum of any two epochs (needs computing from the FITS stacks), zoom.
 
 ## AI usage
 Parts of this code were written with the help of an AI assistant (Claude).
