@@ -10,10 +10,12 @@ Tests:
 """
 
 import sys
+import json
 from pathlib import Path
 import numpy as np
 from astropy.coordinates import SkyCoord
 import astropy.units as u
+from astropy.io import fits
 
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -473,6 +475,37 @@ def test_multi_layer_pixel_cube():
 
     print("  ✓ Multi-layer pixel cubes correctly generated with all 7 float32 layers (SB, ZODI, SNR, WAVE, BW, DETX, DETY)!")
 
+def test_combined_coadd_images():
+    print("Testing Combined Coadd Images across all epochs per detector...")
+    import json
+    import tempfile
+    from types import SimpleNamespace
+    coord = SkyCoord(269.452 * u.deg, 4.693 * u.deg, frame="icrs")
+    w, shape = fs.target_wcs(coord, 3.0 / 60.0)
+    img1 = np.ones(shape, dtype=np.float32) * 10.0
+    img2 = np.ones(shape, dtype=np.float32) * 20.0
+    c1 = fs.Cutout(mjd=60800.0, band="D1", image=img1, wcs=w, x0=1000.0, y0=1000.0, wavelength_um=0.9)
+    c2 = fs.Cutout(mjd=60950.0, band="D1", image=img2, wcs=w, x0=1000.0, y0=1000.0, wavelength_um=0.9)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        args = SimpleNamespace(
+            size=3.0, bands=["D1"], max=0, per_group=0, workers=2,
+            mask_flags=False, lo=1.0, hi=99.7, frame_ms=600, out=tmpdir,
+            show_gaia=False, invert=False, skip_gaia=True
+        )
+        out_dir = fs.run(coord, "Test Star", "test_star", args, {}, cutouts=[c1, c2])
+        meta = json.loads((out_dir / "meta.json").read_text())
+        assert "combined" in meta["outputs"]["D1"], "combined key missing in D1 outputs"
+        assert "combined_fits" in meta["outputs"]["D1"], "combined_fits key missing in D1 outputs"
+        assert (out_dir / "combined_D1.png").exists(), "combined_D1.png missing"
+        assert (out_dir / "combined_D1.fits").exists(), "combined_D1.fits missing"
+        assert (out_dir / "combined_ALL.fits").exists(), "combined_ALL.fits missing"
+        assert (out_dir / "combined_ALL.png").exists(), "combined_ALL.png missing"
+        with fits.open(out_dir / "combined_D1.fits") as h:
+            assert h[0].data.shape == shape
+            assert np.allclose(h[0].data, 15.0, atol=1e-3)
+    print("  ✓ Combined coadd images per detector correctly computed and saved as FITS and PNG!")
+
 if __name__ == "__main__":
     test_slug_and_target_identification()
     test_gaia_validation_with_slug_variants()
@@ -486,4 +519,5 @@ if __name__ == "__main__":
     test_gaia_timeout_and_skip_flag()
     test_stellar_donut_repair()
     test_multi_layer_pixel_cube()
+    test_combined_coadd_images()
     print("\nALL EXPANDED SCIENCE TESTS PASSED!")

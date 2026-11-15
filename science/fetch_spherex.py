@@ -903,6 +903,7 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
 
     # Stacking: epoch x detector -> median
     stacks: dict[tuple[int, str], np.ndarray] = {}
+    all_band_imgs: dict[str, list[np.ndarray]] = {b: [] for b in args.bands}
     epochs_meta = []
     for e in range(n_ep):
         sel = [c for c, l in zip(cutouts, ep_labels) if l == e]
@@ -917,6 +918,8 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
             # Epsilon Indi B special processing: suppress primary star halo
             if is_epsindib:
                 imgs = [suppress_stellar_glare(im) for im in imgs]
+
+            all_band_imgs[b].extend(imgs)
 
             st = np.nanmedian(np.stack(imgs), axis=0)
             stacks[(e, b)] = st
@@ -940,6 +943,30 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
             fits.PrimaryHDU(stacks[(e, "ALL")].astype(np.float32), header=w.to_header()).writeto(
                 out / f"epoch{e}_ALL.fits", overwrite=True)
         epochs_meta.append(em)
+
+    # Deep coadded stacks across all epochs per detector
+    combined_stacks: dict[str, np.ndarray] = {}
+    for b in args.bands:
+        if all_band_imgs[b]:
+            st_comb = np.nanmedian(np.stack(all_band_imgs[b]), axis=0)
+            st_comb = repair_star_donuts(st_comb)
+            combined_stacks[b] = st_comb
+            fits.PrimaryHDU(st_comb.astype(np.float32), header=w.to_header()).writeto(
+                out / f"combined_{b}.fits", overwrite=True)
+
+    # Deep coadd across all detectors and all epochs
+    per_comb = [robust_norm(combined_stacks[b]) for b in args.bands if b in combined_stacks]
+    if per_comb:
+        per_comb_arr = np.array(per_comb)
+        valid_comb_mask = ~np.isnan(per_comb_arr)
+        n_valid_comb = np.sum(valid_comb_mask, axis=0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            comb_all = np.nansum(per_comb_arr, axis=0) / np.sqrt(np.maximum(n_valid_comb, 1))
+            comb_all[n_valid_comb == 0] = np.nan
+        comb_all = repair_star_donuts(comb_all)
+        combined_stacks["ALL"] = comb_all
+        fits.PrimaryHDU(comb_all.astype(np.float32), header=w.to_header()).writeto(
+            out / "combined_ALL.fits", overwrite=True)
 
     # Validate Gaia DR3 position and compute pixel coordinates
     gaia_meta = None
@@ -1006,6 +1033,17 @@ def run(coord: SkyCoord, label: str, slug: str, args, extra: dict,
             pixel_files = [f"pixels/{b}/epoch{e}.fits" for e in range(n_ep) if (e, b) in stacks]
             if pixel_files:
                 files["pixels"] = pixel_files
+
+        # Combined image across all epochs for this detector
+        if b in combined_stacks:
+            comb_img = combined_stacks[b]
+            p_comb = out / f"combined_{b}.png"
+            to_png(stretch(comb_img, lo, hi, invert=use_invert), p_comb, scale,
+                   f"{label} {b}  All Epochs ({len(ims)} ep)")
+            (out / "frames" / b / "combined.png").write_bytes(p_comb.read_bytes())
+            files["combined"] = f"combined_{b}.png"
+            files["combined_fits"] = f"combined_{b}.fits"
+
         if len(pil) > 1:
             pil[0].save(out / f"blink_{b}.gif", save_all=True, append_images=pil[1:],
                         duration=args.frame_ms, loop=0)

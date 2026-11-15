@@ -108,6 +108,33 @@ def rebuild_target(target_dir: Path):
                 except Exception:
                     pass
 
+    # 2c. Deep coadded stacks across all epochs per detector
+    combined_stacks: dict[str, np.ndarray] = {}
+    for b in bands:
+        band_epoch_stacks = [stacks[(e, b)] for e in range(n_ep) if (e, b) in stacks]
+        if band_epoch_stacks:
+            comb_st = np.nanmedian(np.stack(band_epoch_stacks), axis=0)
+            comb_st = fs.repair_star_donuts(comb_st)
+            combined_stacks[b] = comb_st
+            fits.PrimaryHDU(comb_st.astype(np.float32), header=w.to_header()).writeto(
+                target_dir / f"combined_{b}.fits", overwrite=True
+            )
+
+    # Deep coadd across all detectors and all epochs
+    per_comb = [fs.robust_norm(combined_stacks[b]) for b in bands if b in combined_stacks]
+    if per_comb:
+        per_comb_arr = np.array(per_comb)
+        valid_comb_mask = ~np.isnan(per_comb_arr)
+        n_valid_comb = np.sum(valid_comb_mask, axis=0)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            comb_all = np.nansum(per_comb_arr, axis=0) / np.sqrt(np.maximum(n_valid_comb, 1))
+            comb_all[n_valid_comb == 0] = np.nan
+        comb_all = fs.repair_star_donuts(comb_all)
+        combined_stacks["ALL"] = comb_all
+        fits.PrimaryHDU(comb_all.astype(np.float32), header=w.to_header()).writeto(
+            target_dir / "combined_ALL.fits", overwrite=True
+        )
+
     # 3. Update Gaia DR3 validation and pixel coordinates
     gaia_meta = None
     gaia_pix = None
@@ -177,6 +204,16 @@ def rebuild_target(target_dir: Path):
                 pixel_files.append(f"pixels/{b}/epoch{e}.fits")
                 n_pixels_created += 1
             files["pixels"] = pixel_files
+
+        # Combined image across all epochs for this detector
+        if b in combined_stacks:
+            comb_img = combined_stacks[b]
+            p_comb = target_dir / f"combined_{b}.png"
+            fs.to_png(fs.stretch(comb_img, lo, hi, invert=use_invert), p_comb, scale,
+                      f"{label} {b}  All Epochs ({len(ims)} ep)")
+            (target_dir / "frames" / b / "combined.png").write_bytes(p_comb.read_bytes())
+            files["combined"] = f"combined_{b}.png"
+            files["combined_fits"] = f"combined_{b}.fits"
 
         if len(pil) > 1:
             pil[0].save(target_dir / f"blink_{b}.gif", save_all=True, append_images=pil[1:],

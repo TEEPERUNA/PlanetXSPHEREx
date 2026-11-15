@@ -263,6 +263,19 @@ def verify_pillar_5_contract_compliance():
             if "diff" in out_data and not (t_dir / out_data["diff"]).exists():
                 all_files_exist = False
                 missing_files.append(str(t_dir / out_data["diff"]))
+            if "combined" in out_data and not (t_dir / out_data["combined"]).exists():
+                all_files_exist = False
+                missing_files.append(str(t_dir / out_data["combined"]))
+            if "combined_fits" in out_data:
+                comb_f = t_dir / out_data["combined_fits"]
+                if not comb_f.exists():
+                    all_files_exist = False
+                    missing_files.append(str(comb_f))
+                else:
+                    with fits.open(comb_f) as hc:
+                        if hc[0].data is None or hc[0].data.shape != tuple(meta.get("shape", [31, 31])):
+                            all_files_exist = False
+                            missing_files.append(f"{comb_f}: invalid FITS shape")
 
         if not (t_dir / meta["spectrum"]).exists():
             all_files_exist = False

@@ -201,6 +201,8 @@
         "pixels/D1/epoch2.fits",
         "pixels/D1/epoch3.fits"
       ],
+      "combined": "combined_D1.png",
+      "combined_fits": "combined_D1.fits",
       "gif": "blink_D1.gif",
       "diff": "diff_D1.png"
     },
@@ -226,6 +228,8 @@
         "pixels/D2/epoch3.fits",
         "pixels/D2/epoch4.fits"
       ],
+      "combined": "combined_D2.png",
+      "combined_fits": "combined_D2.fits",
       "gif": "blink_D2.gif",
       "diff": "diff_D2.png"
     },
@@ -248,6 +252,8 @@
         "pixels/D3/epoch3.fits",
         "pixels/D3/epoch4.fits"
       ],
+      "combined": "combined_D3.png",
+      "combined_fits": "combined_D3.fits",
       "gif": "blink_D3.gif",
       "diff": "diff_D3.png"
     },
@@ -267,6 +273,8 @@
         "pixels/D4/epoch2.fits",
         "pixels/D4/epoch3.fits"
       ],
+      "combined": "combined_D4.png",
+      "combined_fits": "combined_D4.fits",
       "gif": "blink_D4.gif",
       "diff": "diff_D4.png"
     },
@@ -292,6 +300,8 @@
         "pixels/D5/epoch3.fits",
         "pixels/D5/epoch4.fits"
       ],
+      "combined": "combined_D5.png",
+      "combined_fits": "combined_D5.fits",
       "gif": "blink_D5.gif",
       "diff": "diff_D5.png"
     },
@@ -317,6 +327,8 @@
         "pixels/D6/epoch3.fits",
         "pixels/D6/epoch4.fits"
       ],
+      "combined": "combined_D6.png",
+      "combined_fits": "combined_D6.fits",
       "gif": "blink_D6.gif",
       "diff": "diff_D6.png"
     },
@@ -335,6 +347,8 @@
         "epoch3_ALL.fits",
         "epoch4_ALL.fits"
       ],
+      "combined": "combined_ALL.png",
+      "combined_fits": "combined_ALL.fits",
       "gif": "blink_ALL.gif",
       "diff": "diff_ALL.png"
     }
