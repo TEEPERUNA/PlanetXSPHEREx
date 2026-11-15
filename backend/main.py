@@ -103,7 +103,8 @@ def done_response(slug: str) -> dict:
     meta, base = find_cached(slug)
     info = read_cache_info(slug) or {}
     return {"status": "done", "job": slug, "base_url": base, "meta": meta,
-            "data_release": info.get("collection"), "timing": info.get("timing")}
+            "data_release": info.get("collection"), "timing": info.get("timing"),
+            "science_version": info.get("code_version")}
 
 
 def friendly_error(e: Exception) -> str:
@@ -243,12 +244,29 @@ def cache_info_path(slug: str) -> Path:
     return OUTPUT_DIR / slug / "cache.json"
 
 
+def _science_version() -> str:
+    """Short hash of the science code. When Emil changes the processing, cached results made
+    with older code are rebuilt in the background (examples/ excluded, Emil rebuilds those)."""
+    import hashlib
+    h = hashlib.sha1()
+    for name in ("fetch_spherex.py", "gaia_validation.py"):
+        p = ROOT / "science" / name
+        if p.exists():
+            h.update(p.read_bytes().replace(b"\r\n", b"\n"))
+    return h.hexdigest()[:10]
+
+
+SCIENCE_VERSION = _science_version()
+NEW_EPOCH_DAYS = float(os.environ.get("NEW_EPOCH_DAYS", "30"))  # newer images than this = new data
+
+
 def write_cache_info(slug: str, fingerprint, collection, source: str, timing: dict | None = None):
     p = cache_info_path(slug)
     if p.parent.exists():
         old = read_cache_info(slug) or {}
         p.write_text(json.dumps({"fingerprint": fingerprint, "collection": collection,
                                  "source": source, "checked_at": time.time(),
+                                 "code_version": SCIENCE_VERSION,
                                  "timing": timing or old.get("timing")}))
 
 
@@ -259,35 +277,78 @@ def read_cache_info(slug: str):
         return None
 
 
+def _check_path(slug: str) -> Path:
+    return OUTPUT_DIR / "_checks" / f"{slug}.json"
+
+
+def read_example_check(slug: str):
+    try:
+        return json.loads(_check_path(slug).read_text())
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def write_example_check(slug: str, newest_mjd):
+    p = _check_path(slug)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({"checked_at": time.time(), "newest_irsa_mjd": newest_mjd}))
+
+
 def maybe_refresh(slug: str, make_pipeline) -> bool:
-    """Stale-while-revalidate: the cached result is returned right away; if it is older than
-    CACHE_TTL_HOURS we check IRSA for new SPHEREx data in the background and rebuild if needed.
-    Returns True if a refresh is running."""
+    """Stale-while-revalidate: the cached result is always returned right away; a light
+    background check then decides whether it must be rebuilt. Returns True if a check runs.
+
+    - Results in the cache (OUTPUT_DIR): rebuilt if IRSA has new images (fingerprint changed)
+      or if they were made with older science code. Checked at most every CACHE_TTL_HOURS.
+    - Precomputed examples/ (challenge targets): only rebuilt if IRSA has images more than
+      NEW_EPOCH_DAYS newer than the example's last epoch (= a new SPHEREx survey pass).
+      The rebuilt result goes to the cache and then takes priority over the example.
+    """
     rkey = f"{slug}__refresh"
     if jobs.get(rkey, {}).get("status") == "processing":
         return True
     if jobs.get(slug, {}).get("status") in ("queued", "processing"):
         return False
     hit = find_cached(slug)
-    if hit and hit[1].startswith("/api/examples/"):
-        return False  # curated precomputed results in the repo are never rebuilt automatically
-    info = read_cache_info(slug)
-    if info and time.time() - info.get("checked_at", 0) < CACHE_TTL_HOURS * 3600:
+    if not hit:
         return False
+    meta, base = hit
+    ttl = CACHE_TTL_HOURS * 3600
+    from_examples = base.startswith("/api/examples/")
+    if from_examples:
+        chk = read_example_check(slug)
+        if chk and time.time() - chk.get("checked_at", 0) < ttl:
+            return False
+        info, old_code = None, False
+    else:
+        info = read_cache_info(slug)
+        old_code = bool(info) and info.get("code_version") not in (None, SCIENCE_VERSION)
+        if info and not old_code and time.time() - info.get("checked_at", 0) < ttl:
+            return False
     jobs[rkey] = {"status": "processing"}
 
     def runner():
         try:
             pipe = make_pipeline()
-            new_fp = pipe.images().fingerprint
-            if info and info.get("fingerprint") == new_fp:
-                write_cache_info(slug, new_fp, info.get("collection"), info.get("source", "s3"))
+            imgs = pipe.images()                     # one light IRSA query
+            if from_examples:
+                newest = float(imgs.table["mjd"].max())
+                last = max((e.get("mjd_mean") or 0) for e in meta.get("epochs", [])) or 0
+                if newest > last + NEW_EPOCH_DAYS:
+                    print(f"  New SPHEREx survey pass for {slug} (newest MJD {newest:.1f} > "
+                          f"example {last:.1f}) -> rebuilding into cache")
+                    pipe(lambda *a: None, slug, PER_GROUP)
+                write_example_check(slug, newest)
+            elif info and info.get("fingerprint") == imgs.fingerprint and not old_code:
+                write_cache_info(slug, imgs.fingerprint, info.get("collection"),
+                                 info.get("source", "s3"))
             else:
-                print(f"  New SPHEREx data for {slug} ({new_fp}) -> rebuilding")
+                why = "science code changed" if old_code else f"new SPHEREx data ({imgs.fingerprint})"
+                print(f"  Rebuilding {slug}: {why}")
                 pipe(lambda *a: None, slug, PER_GROUP)
             jobs[rkey] = {"status": "done"}
         except Exception as e:  # noqa: BLE001
-            traceback.print_exc()
+            print(f"  Refresh check for {slug} failed: {type(e).__name__}: {str(e)[:120]}")
             jobs[rkey] = {"status": "error", "error": str(e)}
 
     executor.submit(runner)
