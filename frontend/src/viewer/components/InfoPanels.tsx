@@ -53,6 +53,10 @@ export function InfoPanels() {
           <dd>Shows the sky coordinates and the measured values of that pixel: brightness, background, signal-to-noise and wavelength.</dd>
           <dt>Flags</dt>
           <dd>Amber flags mean the pixel value is unreliable; others are just information. Hover a flag for its meaning, or see Flag info above.</dd>
+          <dt>Light curve</dt>
+          <dd>Brightness of the target on each date. Relative: 1.0 is the band's average, so a line that rises or falls means the target changed. The vertical line is the date on screen.</dd>
+          <dt>Spectrum of a pixel</dt>
+          <dd>Click the image to see the spectrum of that pixel (one point per detector and date). "Back to image centre" returns to the full centre spectrum.</dd>
           <dt>Spectrum</dt>
           <dd>Brightness against wavelength for the target, one colour per epoch.</dd>
         </dl>

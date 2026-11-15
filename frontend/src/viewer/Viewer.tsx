@@ -8,11 +8,13 @@ import { EpochInfo } from "./components/EpochInfo";
 import { GaiaFieldInfo, GaiaInfo } from "./components/GaiaInfo";
 import { GaiaOverlay } from "./components/GaiaOverlay";
 import { InfoPanels } from "./components/InfoPanels";
+import { LightCurveChart } from "./components/LightCurveChart";
 import { PlaybackControls } from "./components/PlaybackControls";
 import { SpectrumChart } from "./components/SpectrumChart";
 import { LoadingProgress, StatusView } from "./components/StatusView";
 import { useBlink } from "./hooks/useBlink";
 import { useGaiaField } from "./hooks/useGaiaField";
+import { usePixelSpectrum } from "./hooks/usePixelSpectrum";
 import { usePixelValues } from "./hooks/usePixelValues";
 import { useSources } from "./hooks/useSources";
 import { availableBands, framesFor, joinUrl, nearestFrame } from "./lib/frames";
@@ -88,6 +90,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const [compareA, setCompareA] = useState<number | null>(null); // dates (mjd), like anchorMjd
   const [compareB, setCompareB] = useState<number | null>(null);
   const [pickPx, setPickPx] = useState<Pixel | null>(null); // pixel chosen for a candidate report
+  const [spectrumPx, setSpectrumPx] = useState<Pixel | null>(null); // clicked pixel shown in the spectrum
   const [candidates, setCandidates] = useState<Candidate[]>([]);
 
   // Community reports in this field. Optional extra, so a failed request just shows none.
@@ -144,6 +147,9 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const hoverStar = hoverPx ? nearestStar(fieldStars, hoverPx.x, hoverPx.y) : null;
   const showGaiaButton = hasGaia || fieldStars.length > 0;
 
+  // Spectrum of the clicked pixel from the per-pixel files (only when the result has them).
+  const pixelSpectrum = usePixelSpectrum(meta, baseUrl, spectrumPx);
+
   // Values of the pixel under the cursor, for the epoch on screen.
   const pixelInfo = usePixelValues(meta, baseUrl, activeBand, currentEpoch?.index ?? null, hoverPx);
 
@@ -189,7 +195,10 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         filter={`brightness(${brightness}) contrast(${contrast})`}
         alt={`${meta.target}, ${activeBand}, ${frames[idx]?.epoch.date ?? ""}`}
         onHover={setHoverPx}
-        onPick={setPickPx}
+        onPick={(p) => {
+          setPickPx(p);
+          if (pixelSpectrum.available) setSpectrumPx(p);
+        }}
         overlay={
           <>
             {showGaiaButton && showGaia && (
@@ -291,6 +300,24 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
             url={joinUrl(baseUrl, meta.spectrum)}
             epochs={meta.epochs}
             ranges={meta.detector_ranges_um}
+            highlightEpoch={diffOn ? undefined : frames[idx]?.epoch.index}
+            pixel={
+              spectrumPx
+                ? {
+                    label: `Pixel (${spectrumPx.x}, ${spectrumPx.y})`,
+                    rows: pixelSpectrum.rows,
+                    approx: pixelSpectrum.approx,
+                    onBack: () => setSpectrumPx(null),
+                  }
+                : null
+            }
+          />
+        )}
+
+        {meta.light_curve != null && (
+          <LightCurveChart
+            lightCurve={meta.light_curve}
+            epochs={meta.epochs}
             highlightEpoch={diffOn ? undefined : frames[idx]?.epoch.index}
           />
         )}
