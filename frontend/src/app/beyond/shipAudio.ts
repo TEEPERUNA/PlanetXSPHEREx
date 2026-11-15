@@ -79,6 +79,38 @@ export class ShipAudio {
     for (const o of this.humOsc) o.frequency.setTargetAtTime((on ? 1.5 : 1) * (o === this.humOsc[0] ? 55 : 55.6), t, 0.8);
   }
 
+  // One short tone with a quick fade.
+  private tone(freq: number, at: number, dur: number, type: OscillatorType = "sine", vol = 0.16): void {
+    const ctx = this.ctx;
+    if (!ctx || !this.master) return;
+    const t = ctx.currentTime + at;
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.type = type;
+    o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(this.master);
+    o.start(t);
+    o.stop(t + dur + 0.05);
+  }
+
+  // Target locked: three quick rising beeps.
+  lockOn(): void {
+    [660, 990, 1480].forEach((f, i) => this.tone(f, i * 0.07, 0.12, "square", 0.07));
+  }
+
+  // Missed: a short low buzz.
+  miss(): void {
+    this.tone(110, 0, 0.25, "sawtooth", 0.09);
+  }
+
+  // Mission complete or promotion: a bright arpeggio.
+  fanfare(): void {
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(f, i * 0.09, 0.5, "triangle", 0.14));
+  }
+
   // Two-note chime when a result arrives.
   chime(): void {
     const ctx = this.ctx;
