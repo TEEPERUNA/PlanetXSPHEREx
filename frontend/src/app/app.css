@@ -7,9 +7,9 @@
   --border-strong: #353a43;
   --text: #ece8e1;
   --muted: #8e939c;
-  --accent: #ff8a3d; /* infrared amber: SPHEREx is an infrared telescope */
-  --accent-soft: rgb(255 138 61 / 0.12);
-  --accent-text: #140a02;
+  --accent: #22d3ee;
+  --accent-soft: rgb(34 211 238 / 0.12);
+  --accent-text: #021216;
   --danger: #ff6b6b;
   --radius: 10px;
   --sans: "Inter", system-ui, sans-serif;
@@ -19,7 +19,7 @@
 * { box-sizing: border-box; }
 body {
   margin: 0; min-height: 100dvh; color: var(--text); font: 15px/1.5 var(--sans);
-  background: radial-gradient(1200px 400px at 50% -200px, rgb(255 138 61 / 0.07), transparent 70%), var(--bg);
+  background: radial-gradient(1200px 400px at 50% -200px, rgb(34 211 238 / 0.07), transparent 70%), var(--bg);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -30,11 +30,10 @@ body {
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px;
   padding: 16px 0; border-bottom: 1px solid var(--border);
 }
-.app__header h1 { display: flex; align-items: center; gap: 10px; margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: 0.01em; }
-.app__header .note { flex: 1; }
+.app__header h1 { flex: 1; display: flex; align-items: center; gap: 10px; margin: 0; font-size: 1.05rem; font-weight: 600; letter-spacing: 0.01em; }
 .app__mark {
   width: 14px; height: 14px; border-radius: 50%;
-  border: 2px solid var(--accent); box-shadow: 0 0 10px rgb(255 138 61 / 0.5), inset 0 0 0 2px var(--bg), inset 0 0 0 4px var(--accent);
+  border: 2px solid var(--accent); box-shadow: 0 0 10px rgb(34 211 238 / 0.5), inset 0 0 0 2px var(--bg), inset 0 0 0 4px var(--accent);
 }
 .app__download {
   padding: 7px 14px; font-size: 13px; font-weight: 500; color: var(--text); text-decoration: none;
@@ -43,7 +42,6 @@ body {
 }
 .app__download:hover { border-color: var(--accent); }
 .app__download:active { transform: translateY(1px) scale(0.98); }
-@media (max-width: 600px) { .app__header .note { flex-basis: 100%; order: 3; } .app__header h1 { flex: 1; } }
 
 .app h2 { margin: 0; font-size: 1.25rem; font-weight: 600; letter-spacing: -0.01em; }
 
@@ -87,7 +85,7 @@ body {
 .app button:disabled { opacity: 0.4; cursor: default; }
 .app button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .app button.primary { min-height: 42px; padding: 10px 22px; font-weight: 600; background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
-.app button.primary:hover:not(:disabled) { background: #ff9d5c; border-color: #ff9d5c; }
+.app button.primary:hover:not(:disabled) { background: #67e8f9; border-color: #67e8f9; }
 .app :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .pills { display: flex; flex-wrap: wrap; gap: 6px; }

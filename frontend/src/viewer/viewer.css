@@ -142,24 +142,31 @@
   display: flex;
 }
 
-.controls__transport button {
+/* .controls prefix: app.css rounds every .app button and loads after this file */
+.controls .controls__transport button {
   border-radius: 0;
 }
 
-.controls__transport button + button {
+.controls .controls__transport button + button {
   margin-left: -1px;
 }
 
-.controls__transport button:first-child {
+.controls .controls__transport button:first-child {
   border-radius: 999px 0 0 999px;
 }
 
-.controls__transport button:last-child {
+.controls .controls__transport button:last-child {
   border-radius: 0 999px 999px 0;
 }
 
-.controls__transport button:nth-child(2) {
+.controls .controls__transport button:nth-child(2) {
   min-width: 72px;
+}
+
+/* Focus ring inside the group so it does not stick out as a pill */
+.controls .controls__transport button:focus-visible {
+  position: relative;
+  outline-offset: -3px;
 }
 
 .controls__slider {
@@ -191,9 +198,9 @@
     radial-gradient(1.5px 1.5px at 64% 72%, #fff7, transparent 60%),
     radial-gradient(1px 1px at 28% 84%, #fff5, transparent 60%),
     radial-gradient(1px 1px at 90% 58%, #fff6, transparent 60%),
-    radial-gradient(1.5px 1.5px at 42% 38%, #ffd2b0aa, transparent 60%),
+    radial-gradient(1.5px 1.5px at 42% 38%, #b0f0ffaa, transparent 60%),
     radial-gradient(1px 1px at 6% 64%, #fff4, transparent 60%),
-    radial-gradient(600px 300px at 50% 50%, rgb(255 138 61 / 0.06), transparent 70%),
+    radial-gradient(600px 300px at 50% 50%, rgb(34 211 238 / 0.06), transparent 70%),
     #050607;
 }
 
@@ -240,7 +247,7 @@
   gap: 6px;
   padding: 10px 14px;
   background: var(--accent-soft, transparent);
-  border: 1px solid rgb(255 138 61 / 0.35);
+  border: 1px solid rgb(34 211 238 / 0.35);
   border-radius: 8px;
   font-size: 0.9rem;
 }
@@ -342,4 +349,60 @@
   width: 10px;
   height: 10px;
   border-radius: 50%;
+}
+
+/* Info dropdowns (Controls info, Website info) */
+.info summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+
+.info summary::-webkit-details-marker {
+  display: none;
+}
+
+.info summary::after {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid var(--muted, currentColor);
+  border-bottom: 2px solid var(--muted, currentColor);
+  transform: rotate(45deg);
+  transition: transform 0.15s;
+}
+
+.info[open] summary::after {
+  transform: rotate(-135deg);
+}
+
+.info summary:hover {
+  color: var(--accent, inherit);
+}
+
+.info p,
+.info dl {
+  margin: 0 0 10px;
+  color: var(--muted, inherit);
+  font-size: 0.85rem;
+}
+
+.info dt {
+  margin-top: 8px;
+  color: var(--text, inherit);
+  font-weight: 600;
+}
+
+.info dd {
+  margin: 2px 0 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .info summary::after {
+    transition: none;
+  }
 }

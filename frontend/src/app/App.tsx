@@ -1,10 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { Viewer } from "../viewer";
 import { searchFromUrl, useSky } from "../state";
 import { SearchForm } from "./SearchForm";
 import "./app.css";
 
 const initial = searchFromUrl();
+
+// The download attribute is ignored for other origins (the GIF is on the API),
+// so fetch it and save a local copy. If that fails the link opens the GIF as before.
+async function saveGif(e: MouseEvent<HTMLAnchorElement>) {
+  e.preventDefault();
+  const link = e.currentTarget;
+  try {
+    const res = await fetch(link.href);
+    if (!res.ok) throw new Error(String(res.status));
+    const url = URL.createObjectURL(await res.blob());
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = link.href.split("/").pop() || "spherex.gif";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch {
+    window.open(link.href, "_blank", "noopener");
+  }
+}
 
 export function App() {
   const { status, setTarget } = useSky();
@@ -33,9 +52,8 @@ export function App() {
           <span className="app__mark" aria-hidden="true" />
           SPHEREx Sky
         </h1>
-        <p className="note">See how a patch of sky changes over time.</p>
         {result && gif && (
-          <a className="app__download" href={result.baseUrl + gif} download>
+          <a className="app__download" href={result.baseUrl + gif} download onClick={saveGif}>
             Download GIF
           </a>
         )}

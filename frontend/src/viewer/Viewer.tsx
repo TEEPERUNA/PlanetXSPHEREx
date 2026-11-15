@@ -4,6 +4,7 @@ import { CursorInfo } from "./components/CursorInfo";
 import { EpochInfo } from "./components/EpochInfo";
 import { GaiaInfo } from "./components/GaiaInfo";
 import { GaiaOverlay } from "./components/GaiaOverlay";
+import { InfoPanels } from "./components/InfoPanels";
 import { PlaybackControls } from "./components/PlaybackControls";
 import { SpectrumChart } from "./components/SpectrumChart";
 import { LoadingProgress, StatusView } from "./components/StatusView";
@@ -183,6 +184,8 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         )}
 
         {meta.credit && <p className="viewer__credit">Data: {meta.credit}</p>}
+
+        <InfoPanels />
       </div>
     </div>
   );
