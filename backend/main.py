@@ -268,6 +268,9 @@ def maybe_refresh(slug: str, make_pipeline) -> bool:
         return True
     if jobs.get(slug, {}).get("status") in ("queued", "processing"):
         return False
+    hit = find_cached(slug)
+    if hit and hit[1].startswith("/api/examples/"):
+        return False  # curated precomputed results in the repo are never rebuilt automatically
     info = read_cache_info(slug)
     if info and time.time() - info.get("checked_at", 0) < CACHE_TTL_HOURS * 3600:
         return False
