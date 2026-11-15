@@ -85,28 +85,27 @@ def rebuild_target(target_dir: Path):
                 except Exception as ex:
                     print(f"  Warning: could not read {f_path}: {ex}")
 
-        # Combined ALL stack if present
-        all_path = target_dir / f"epoch{e}_ALL.fits"
-        if all_path.exists():
-            try:
-                with fits.open(all_path) as h:
-                    stacks[(e, "ALL")] = h[0].data.astype(np.float32)
-            except Exception:
-                pass
-        elif any((e, b) in stacks for b in bands):
-            # Compute ALL stack if missing
-            per = [fs.robust_norm(stacks[(e, b)]) for b in bands if (e, b) in stacks]
-            if per:
-                per_arr = np.array(per)
-                valid_mask = ~np.isnan(per_arr)
-                n_valid = np.sum(valid_mask, axis=0)
-                with np.errstate(invalid="ignore", divide="ignore"):
-                    all_band = np.nansum(per_arr, axis=0) / np.sqrt(np.maximum(n_valid, 1))
-                    all_band[n_valid == 0] = np.nan
-                stacks[(e, "ALL")] = all_band
-                fits.PrimaryHDU(all_band.astype(np.float32), header=w.to_header()).writeto(
-                    target_dir / f"epoch{e}_ALL.fits", overwrite=True
-                )
+        # 2b. Always recompute ALL stack from D1-D6 stacks (preserving NaNs where all detectors are missing)
+        per = [fs.robust_norm(stacks[(e, b)]) for b in bands if (e, b) in stacks]
+        if per:
+            per_arr = np.array(per)
+            valid_mask = ~np.isnan(per_arr)
+            n_valid = np.sum(valid_mask, axis=0)
+            with np.errstate(invalid="ignore", divide="ignore"):
+                all_band = np.nansum(per_arr, axis=0) / np.sqrt(np.maximum(n_valid, 1))
+                all_band[n_valid == 0] = np.nan
+            stacks[(e, "ALL")] = all_band
+            fits.PrimaryHDU(all_band.astype(np.float32), header=w.to_header()).writeto(
+                target_dir / f"epoch{e}_ALL.fits", overwrite=True
+            )
+        else:
+            all_path = target_dir / f"epoch{e}_ALL.fits"
+            if all_path.exists():
+                try:
+                    with fits.open(all_path) as h:
+                        stacks[(e, "ALL")] = h[0].data.astype(np.float32)
+                except Exception:
+                    pass
 
     # 3. Update Gaia DR3 validation and pixel coordinates
     gaia_meta = None
