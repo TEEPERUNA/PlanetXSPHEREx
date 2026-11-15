@@ -141,7 +141,14 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
         onContrast={setContrast}
       />
 
-      {meta.spectrum && <SpectrumChart url={joinUrl(baseUrl, meta.spectrum)} />}
+      {meta.spectrum && (
+        <SpectrumChart
+          url={joinUrl(baseUrl, meta.spectrum)}
+          epochs={meta.epochs}
+          ranges={meta.detector_ranges_um}
+          highlightEpoch={diffOn ? undefined : frames[idx]?.epoch.index}
+        />
+      )}
 
       {meta.credit && <p className="viewer__credit">Data: {meta.credit}</p>}
     </div>
