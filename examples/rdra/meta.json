@@ -1,0 +1,402 @@
+{
+  "target": "R Draconis",
+  "ra_deg": 246.66125,
+  "dec_deg": 66.752222,
+  "fov_arcmin": 3.0,
+  "pixel_scale_arcsec": 6.15,
+  "shape": [
+    31,
+    31
+  ],
+  "bands": [
+    "D1",
+    "D2",
+    "D3",
+    "D4",
+    "D5",
+    "D6"
+  ],
+  "detector_ranges_um": {
+    "D1": [
+      0.75,
+      1.09
+    ],
+    "D2": [
+      1.1,
+      1.62
+    ],
+    "D3": [
+      1.63,
+      2.41
+    ],
+    "D4": [
+      2.42,
+      3.82
+    ],
+    "D5": [
+      3.83,
+      4.41
+    ],
+    "D6": [
+      4.42,
+      5.0
+    ]
+  },
+  "epochs": [
+    {
+      "index": 0,
+      "mjd_mean": 60793.074850666664,
+      "n_images": 3,
+      "detectors": {
+        "D3": {
+          "n_images": 1,
+          "flagged_frac": 0.3983353151010702
+        },
+        "D6": {
+          "n_images": 2,
+          "flagged_frac": 0.32461355529131986
+        }
+      },
+      "date": "2025-04-28"
+    },
+    {
+      "index": 1,
+      "mjd_mean": 60846.55171961538,
+      "n_images": 13,
+      "detectors": {
+        "D1": {
+          "n_images": 3,
+          "flagged_frac": 0.33888228299643286
+        },
+        "D2": {
+          "n_images": 3,
+          "flagged_frac": 0.42489100277447484
+        },
+        "D4": {
+          "n_images": 3,
+          "flagged_frac": 0.4787950852160126
+        },
+        "D5": {
+          "n_images": 3,
+          "flagged_frac": 0.361474435196195
+        },
+        "D6": {
+          "n_images": 1,
+          "flagged_frac": 0.22515212981744423
+        }
+      },
+      "date": "2025-06-20"
+    },
+    {
+      "index": 2,
+      "mjd_mean": 60926.494266249996,
+      "n_images": 4,
+      "detectors": {
+        "D1": {
+          "n_images": 2,
+          "flagged_frac": 0.3585017835909632
+        },
+        "D4": {
+          "n_images": 2,
+          "flagged_frac": 0.4815695600475624
+        }
+      },
+      "date": "2025-09-08"
+    },
+    {
+      "index": 3,
+      "mjd_mean": 61022.274760230765,
+      "n_images": 13,
+      "detectors": {
+        "D1": {
+          "n_images": 1,
+          "flagged_frac": 0.29369797859690844
+        },
+        "D2": {
+          "n_images": 3,
+          "flagged_frac": 0.4229092350376536
+        },
+        "D3": {
+          "n_images": 3,
+          "flagged_frac": 0.40190249702734837
+        },
+        "D5": {
+          "n_images": 3,
+          "flagged_frac": 0.3670233848592945
+        },
+        "D6": {
+          "n_images": 3,
+          "flagged_frac": 0.3099484740388427
+        }
+      },
+      "date": "2025-12-13"
+    },
+    {
+      "index": 4,
+      "mjd_mean": 61083.555934,
+      "n_images": 2,
+      "detectors": {
+        "D3": {
+          "n_images": 1,
+          "flagged_frac": 0.3876337693222354
+        },
+        "D6": {
+          "n_images": 1,
+          "flagged_frac": 0.30439952437574314
+        }
+      },
+      "date": "2026-02-12"
+    },
+    {
+      "index": 5,
+      "mjd_mean": 61127.112085,
+      "n_images": 2,
+      "detectors": {
+        "D3": {
+          "n_images": 1,
+          "flagged_frac": 0.4708680142687277
+        },
+        "D6": {
+          "n_images": 1,
+          "flagged_frac": 0.3091557669441142
+        }
+      },
+      "date": "2026-03-28"
+    },
+    {
+      "index": 6,
+      "mjd_mean": 61212.8291974,
+      "n_images": 10,
+      "detectors": {
+        "D1": {
+          "n_images": 1,
+          "flagged_frac": 0.34942528735632183
+        },
+        "D2": {
+          "n_images": 3,
+          "flagged_frac": 0.43321442726912407
+        },
+        "D3": {
+          "n_images": 1,
+          "flagged_frac": 0.35315101070154575
+        },
+        "D4": {
+          "n_images": 1,
+          "flagged_frac": 0.5564803804994055
+        },
+        "D5": {
+          "n_images": 3,
+          "flagged_frac": 0.3650416171224733
+        },
+        "D6": {
+          "n_images": 1,
+          "flagged_frac": 0.27586206896551724
+        }
+      },
+      "date": "2026-06-21"
+    },
+    {
+      "index": 7,
+      "mjd_mean": 61262.407798,
+      "n_images": 2,
+      "detectors": {
+        "D1": {
+          "n_images": 1,
+          "flagged_frac": 0.31272294887039237
+        },
+        "D4": {
+          "n_images": 1,
+          "flagged_frac": 0.5362663495838288
+        }
+      },
+      "date": "2026-08-10"
+    },
+    {
+      "index": 8,
+      "mjd_mean": 61307.989319,
+      "n_images": 2,
+      "detectors": {
+        "D1": {
+          "n_images": 1,
+          "flagged_frac": 0.33055885850178357
+        },
+        "D4": {
+          "n_images": 1,
+          "flagged_frac": 0.544589774078478
+        }
+      },
+      "date": "2026-09-24"
+    }
+  ],
+  "outputs": {
+    "D1": {
+      "frames": [
+        "frames/D1/epoch1.png",
+        "frames/D1/epoch2.png",
+        "frames/D1/epoch3.png",
+        "frames/D1/epoch6.png",
+        "frames/D1/epoch7.png",
+        "frames/D1/epoch8.png"
+      ],
+      "gif": "blink_D1.gif",
+      "diff": "diff_D1.png"
+    },
+    "D2": {
+      "frames": [
+        "frames/D2/epoch1.png",
+        "frames/D2/epoch3.png",
+        "frames/D2/epoch6.png"
+      ],
+      "gif": "blink_D2.gif",
+      "diff": "diff_D2.png"
+    },
+    "D3": {
+      "frames": [
+        "frames/D3/epoch0.png",
+        "frames/D3/epoch3.png",
+        "frames/D3/epoch4.png",
+        "frames/D3/epoch5.png",
+        "frames/D3/epoch6.png"
+      ],
+      "gif": "blink_D3.gif",
+      "diff": "diff_D3.png"
+    },
+    "D4": {
+      "frames": [
+        "frames/D4/epoch1.png",
+        "frames/D4/epoch2.png",
+        "frames/D4/epoch6.png",
+        "frames/D4/epoch7.png",
+        "frames/D4/epoch8.png"
+      ],
+      "gif": "blink_D4.gif",
+      "diff": "diff_D4.png"
+    },
+    "D5": {
+      "frames": [
+        "frames/D5/epoch1.png",
+        "frames/D5/epoch3.png",
+        "frames/D5/epoch6.png"
+      ],
+      "gif": "blink_D5.gif",
+      "diff": "diff_D5.png"
+    },
+    "D6": {
+      "frames": [
+        "frames/D6/epoch0.png",
+        "frames/D6/epoch1.png",
+        "frames/D6/epoch3.png",
+        "frames/D6/epoch4.png",
+        "frames/D6/epoch5.png",
+        "frames/D6/epoch6.png"
+      ],
+      "gif": "blink_D6.gif",
+      "diff": "diff_D6.png"
+    },
+    "ALL": {
+      "frames": [
+        "frames/ALL/epoch0.png",
+        "frames/ALL/epoch1.png",
+        "frames/ALL/epoch2.png",
+        "frames/ALL/epoch3.png",
+        "frames/ALL/epoch4.png",
+        "frames/ALL/epoch5.png",
+        "frames/ALL/epoch6.png",
+        "frames/ALL/epoch7.png",
+        "frames/ALL/epoch8.png"
+      ],
+      "gif": "blink_ALL.gif",
+      "diff": "diff_ALL.png"
+    }
+  },
+  "spectrum": "spectrum.csv",
+  "lightcurve": "lightcurve.csv",
+  "lightcurve_png": "lightcurve.png",
+  "light_curve": {
+    "is_variable": true,
+    "mean_flux": 0.031,
+    "std_flux": 0.015,
+    "amplitude_flux": 0.055,
+    "epochs": [
+      {
+        "epoch": 0,
+        "mjd": 60793.07,
+        "flux": 0.032,
+        "err": 0.007
+      },
+      {
+        "epoch": 1,
+        "mjd": 60846.55,
+        "flux": 0.022,
+        "err": 0.006
+      },
+      {
+        "epoch": 2,
+        "mjd": 60926.49,
+        "flux": 0.024,
+        "err": 0.003
+      },
+      {
+        "epoch": 3,
+        "mjd": 61022.27,
+        "flux": 0.022,
+        "err": 0.003
+      },
+      {
+        "epoch": 4,
+        "mjd": 61083.56,
+        "flux": 0.015,
+        "err": 0.01
+      },
+      {
+        "epoch": 5,
+        "mjd": 61127.11,
+        "flux": 0.034,
+        "err": 0.009
+      },
+      {
+        "epoch": 6,
+        "mjd": 61212.83,
+        "flux": 0.028,
+        "err": 0.003
+      },
+      {
+        "epoch": 7,
+        "mjd": 61262.41,
+        "flux": 0.028,
+        "err": 0.003
+      },
+      {
+        "epoch": 8,
+        "mjd": 61307.99,
+        "flux": 0.07,
+        "err": 0.003
+      }
+    ]
+  },
+  "gaia_validation": {
+    "status": "CONFIRMED_MATCH",
+    "gaia_dr3_source_id": 1646271926618580736,
+    "target": "R Draconis",
+    "message": "Confirmed Gaia DR3 counterpart. Proper motion propagated from J2016.0 to 2026.73.",
+    "reference_epoch": "J2016.0",
+    "target_epoch": 2026.73,
+    "predicted_ra": 246.661319,
+    "predicted_dec": 66.752259,
+    "pmra_masyr": 9.12,
+    "pmdec_masyr": 12.44,
+    "parallax_mas": 1.38,
+    "phot_g_mean_mag": 7.62,
+    "accumulated_shift_arcsec": 0.17,
+    "residual_offset_arcsec": 0.166,
+    "is_match": true
+  },
+  "versions": [
+    "7.0.5"
+  ],
+  "generated": "2026-11-14 11:16:03.011",
+  "pmra_masyr": 0.0,
+  "pmdec_masyr": 0.0,
+  "propagated_to": 2026.87,
+  "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team"
+}

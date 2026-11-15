@@ -1,0 +1,262 @@
+{
+  "target": "RW Aurigae",
+  "ra_deg": 76.95625,
+  "dec_deg": 30.401111,
+  "fov_arcmin": 3.0,
+  "pixel_scale_arcsec": 6.15,
+  "shape": [
+    31,
+    31
+  ],
+  "bands": [
+    "D1",
+    "D2",
+    "D3",
+    "D4",
+    "D5",
+    "D6"
+  ],
+  "detector_ranges_um": {
+    "D1": [
+      0.75,
+      1.09
+    ],
+    "D2": [
+      1.1,
+      1.62
+    ],
+    "D3": [
+      1.63,
+      2.41
+    ],
+    "D4": [
+      2.42,
+      3.82
+    ],
+    "D5": [
+      3.83,
+      4.41
+    ],
+    "D6": [
+      4.42,
+      5.0
+    ]
+  },
+  "epochs": [
+    {
+      "index": 0,
+      "mjd_mean": 60927.80234188889,
+      "n_images": 18,
+      "detectors": {
+        "D1": {
+          "n_images": 3,
+          "flagged_frac": 0.8652397938961554
+        },
+        "D2": {
+          "n_images": 3,
+          "flagged_frac": 0.9968291716210861
+        },
+        "D3": {
+          "n_images": 3,
+          "flagged_frac": 1.0
+        },
+        "D4": {
+          "n_images": 3,
+          "flagged_frac": 0.982164090368609
+        },
+        "D5": {
+          "n_images": 3,
+          "flagged_frac": 1.0
+        },
+        "D6": {
+          "n_images": 3,
+          "flagged_frac": 0.9996036464526358
+        }
+      },
+      "date": "2025-09-09"
+    },
+    {
+      "index": 1,
+      "mjd_mean": 61103.859514466676,
+      "n_images": 15,
+      "detectors": {
+        "D1": {
+          "n_images": 3,
+          "flagged_frac": 0.8660325009908839
+        },
+        "D2": {
+          "n_images": 3,
+          "flagged_frac": 0.9972255251684502
+        },
+        "D3": {
+          "n_images": 3,
+          "flagged_frac": 0.9992072929052714
+        },
+        "D4": {
+          "n_images": 2,
+          "flagged_frac": 0.9845422116527943
+        },
+        "D5": {
+          "n_images": 2,
+          "flagged_frac": 1.0
+        },
+        "D6": {
+          "n_images": 2,
+          "flagged_frac": 0.9994054696789536
+        }
+      },
+      "date": "2026-03-04"
+    },
+    {
+      "index": 2,
+      "mjd_mean": 61294.258355375,
+      "n_images": 16,
+      "detectors": {
+        "D1": {
+          "n_images": 3,
+          "flagged_frac": 0.8707887435592548
+        },
+        "D2": {
+          "n_images": 3,
+          "flagged_frac": 0.998414585810543
+        },
+        "D3": {
+          "n_images": 2,
+          "flagged_frac": 0.9994054696789536
+        },
+        "D4": {
+          "n_images": 3,
+          "flagged_frac": 0.9825604439159731
+        },
+        "D5": {
+          "n_images": 3,
+          "flagged_frac": 1.0
+        },
+        "D6": {
+          "n_images": 2,
+          "flagged_frac": 0.9994054696789536
+        }
+      },
+      "date": "2026-09-11"
+    }
+  ],
+  "outputs": {
+    "D1": {
+      "frames": [
+        "frames/D1/epoch0.png",
+        "frames/D1/epoch1.png",
+        "frames/D1/epoch2.png"
+      ],
+      "gif": "blink_D1.gif",
+      "diff": "diff_D1.png"
+    },
+    "D2": {
+      "frames": [
+        "frames/D2/epoch0.png",
+        "frames/D2/epoch1.png",
+        "frames/D2/epoch2.png"
+      ],
+      "gif": "blink_D2.gif",
+      "diff": "diff_D2.png"
+    },
+    "D3": {
+      "frames": [
+        "frames/D3/epoch0.png",
+        "frames/D3/epoch1.png",
+        "frames/D3/epoch2.png"
+      ],
+      "gif": "blink_D3.gif",
+      "diff": "diff_D3.png"
+    },
+    "D4": {
+      "frames": [
+        "frames/D4/epoch0.png",
+        "frames/D4/epoch1.png",
+        "frames/D4/epoch2.png"
+      ],
+      "gif": "blink_D4.gif",
+      "diff": "diff_D4.png"
+    },
+    "D5": {
+      "frames": [
+        "frames/D5/epoch0.png",
+        "frames/D5/epoch1.png",
+        "frames/D5/epoch2.png"
+      ],
+      "gif": "blink_D5.gif",
+      "diff": "diff_D5.png"
+    },
+    "D6": {
+      "frames": [
+        "frames/D6/epoch0.png",
+        "frames/D6/epoch1.png",
+        "frames/D6/epoch2.png"
+      ],
+      "gif": "blink_D6.gif",
+      "diff": "diff_D6.png"
+    },
+    "ALL": {
+      "frames": [
+        "frames/ALL/epoch0.png",
+        "frames/ALL/epoch1.png",
+        "frames/ALL/epoch2.png"
+      ],
+      "gif": "blink_ALL.gif",
+      "diff": "diff_ALL.png"
+    }
+  },
+  "spectrum": "spectrum.csv",
+  "lightcurve": "lightcurve.csv",
+  "lightcurve_png": "lightcurve.png",
+  "light_curve": {
+    "is_variable": true,
+    "mean_flux": 107.738,
+    "std_flux": 16.552,
+    "amplitude_flux": 40.402,
+    "epochs": [
+      {
+        "epoch": 0,
+        "mjd": 60927.8,
+        "flux": 128.921,
+        "err": 0.128
+      },
+      {
+        "epoch": 1,
+        "mjd": 61103.86,
+        "flux": 105.775,
+        "err": 0.095
+      },
+      {
+        "epoch": 2,
+        "mjd": 61294.26,
+        "flux": 88.519,
+        "err": 0.069
+      }
+    ]
+  },
+  "gaia_validation": {
+    "status": "CONFIRMED_MATCH",
+    "gaia_dr3_source_id": 162608123281132544,
+    "target": "RW Aurigae",
+    "message": "Confirmed Gaia DR3 counterpart. Proper motion propagated from J2016.0 to 2026.69.",
+    "reference_epoch": "J2016.0",
+    "target_epoch": 2026.69,
+    "predicted_ra": 76.956253,
+    "predicted_dec": 30.401056,
+    "pmra_masyr": 0.74,
+    "pmdec_masyr": -18.41,
+    "parallax_mas": 6.13,
+    "phot_g_mean_mag": 10.42,
+    "accumulated_shift_arcsec": 0.2,
+    "residual_offset_arcsec": 0.197,
+    "is_match": true
+  },
+  "versions": [
+    "7.0.5"
+  ],
+  "generated": "2026-11-14 11:15:18.581",
+  "pmra_masyr": 0.0,
+  "pmdec_masyr": 0.0,
+  "propagated_to": 2026.87,
+  "credit": "NASA/IPAC Infrared Science Archive (IRSA), SPHEREx Team"
+}
