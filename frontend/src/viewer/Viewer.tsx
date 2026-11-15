@@ -10,7 +10,7 @@ import { SpectrumChart } from "./components/SpectrumChart";
 import { LoadingProgress, StatusView } from "./components/StatusView";
 import { useBlink } from "./hooks/useBlink";
 import { usePixelValues } from "./hooks/usePixelValues";
-import { availableBands, framesFor, joinUrl } from "./lib/frames";
+import { availableBands, framesFor, joinUrl, nearestFrame } from "./lib/frames";
 import { gaiaPixelAt, mjdToYear, onImage } from "./lib/gaia";
 import type { Band, Meta, Pixel, ViewerStatus } from "./types";
 import "./viewer.css";
@@ -20,10 +20,12 @@ interface ViewerProps {
   onRetry?: () => void; // shows a Try again button on errors
 }
 
-// Same position = same key, so preview -> full result keeps band, frame and filters.
-// A new position gets a new key and starts fresh.
+// Same search = same key, so preview -> full result keeps band, date and filters.
+// A new search gets a new key and starts fresh. The target name is unique per search
+// ("Barnard's Star", "RA 10.6800 Dec +41.2700"), and shape changes with the field of view.
+// Not the exact RA/Dec: a moving star's position can differ slightly between runs.
 function viewKey(meta: Meta): string {
-  return `${meta.ra_deg}|${meta.dec_deg}|${meta.shape.join("x")}`;
+  return `${meta.target}|${meta.shape.join("x")}`;
 }
 
 // Public component. The app passes the status, the viewer shows it.
@@ -68,7 +70,7 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const bands = useMemo(() => availableBands(meta), [meta]);
 
   const [band, setBand] = useState<Band>(bands[0] ?? "ALL");
-  const [frameIdx, setFrameIdx] = useState(0);
+  const [anchorMjd, setAnchorMjd] = useState<number | null>(null); // date of the frame on screen
   const [playing, setPlaying] = useState(true);
   const [fps, setFps] = useState(2);
   const [showDiff, setShowDiff] = useState(false);
@@ -76,16 +78,29 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   const [contrast, setContrast] = useState(1);
   const [hoverPx, setHoverPx] = useState<Pixel | null>(null);
   const [showGaia, setShowGaia] = useState(true);
+  const [compareOn, setCompareOn] = useState(false);
+  const [compareA, setCompareA] = useState<number | null>(null); // dates (mjd), like anchorMjd
+  const [compareB, setCompareB] = useState<number | null>(null);
 
   // The full result can have other bands and epochs than the preview.
   const activeBand: Band = bands.includes(band) ? band : (bands[0] ?? "ALL");
   const frames = useMemo(() => framesFor(meta, activeBand, baseUrl), [meta, activeBand, baseUrl]);
-  const idx = frames.length ? frameIdx % frames.length : 0;
 
   const diffPath = meta.outputs[activeBand]?.diff;
   const diffSrc = diffPath ? joinUrl(baseUrl, diffPath) : null;
   const diffOn = showDiff && diffSrc !== null;
-  const canPlay = frames.length > 1 && !diffOn;
+
+  // Compare mode: blink only between date A (default first) and date B (default last).
+  const ia = nearestFrame(frames, compareA ?? frames[0]?.epoch.mjd_mean ?? null);
+  const ib = nearestFrame(frames, compareB ?? frames[frames.length - 1]?.epoch.mjd_mean ?? null);
+  const canCompare = frames.length > 1 && !diffOn;
+  const compareActive = compareOn && canCompare;
+  const playFrames = compareActive ? [...new Set([ia, ib])].sort((x, y) => x - y).map((i) => frames[i]) : frames;
+
+  // Position in the played list, and in the full list (for the image stack and info).
+  const playIdx = nearestFrame(playFrames, anchorMjd);
+  const idx = Math.max(0, frames.indexOf(playFrames[playIdx]));
+  const canPlay = playFrames.length > 1 && !diffOn;
 
   // Gaia button only when the predicted position lands on the image for some epoch.
   const bandEpochs = frames.map((f) => f.epoch);
@@ -98,14 +113,22 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
   // Values of the pixel under the cursor, for the epoch on screen.
   const pixelInfo = usePixelValues(meta, baseUrl, activeBand, currentEpoch?.index ?? null, hoverPx);
 
-  // Move forward or back, wrapping around.
+  // Move forward or back, wrapping around. Stores the date, not the position.
   function step(delta: number) {
-    setFrameIdx((i) => (frames.length ? (i + delta + frames.length) % frames.length : 0));
+    if (playFrames.length === 0) return;
+    const next = (playIdx + delta + playFrames.length) % playFrames.length;
+    setAnchorMjd(playFrames[next].epoch.mjd_mean);
   }
 
+  // Turning compare on starts at date A.
+  function toggleCompare() {
+    if (!compareOn && frames[ia]) setAnchorMjd(frames[ia].epoch.mjd_mean);
+    setCompareOn((c) => !c);
+  }
+
+  // Keeps the date on screen if the new band has it, otherwise the nearest one.
   function changeBand(next: Band) {
     setBand(next);
-    setFrameIdx(0);
   }
 
   useBlink(playing && canPlay, fps, () => step(1));
@@ -139,6 +162,14 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
 
       <div className="viewer__side">
         <EpochInfo frames={frames} frameIdx={idx} band={activeBand} showDiff={diffOn} />
+        {compareActive && (
+          <p className="viewer__compare">
+            Comparing{" "}
+            <strong className={idx === ia ? "is-current" : undefined}>A {frames[ia].epoch.date}</strong> ↔{" "}
+            <strong className={idx === ib ? "is-current" : undefined}>B {frames[ib].epoch.date}</strong>
+            {ia === ib && " (pick two different dates)"}
+          </p>
+        )}
         <CursorInfo
           pixel={hoverPx}
           meta={meta}
@@ -169,6 +200,20 @@ function LoadedViewer({ meta, baseUrl, notice }: LoadedProps) {
           hasGaia={hasGaia}
           showGaia={showGaia}
           onToggleGaia={() => setShowGaia((s) => !s)}
+          dates={frames.map((f) => ({ mjd: f.epoch.mjd_mean, date: f.epoch.date }))}
+          compareOn={compareActive}
+          canCompare={canCompare}
+          onToggleCompare={toggleCompare}
+          compareA={frames[ia]?.epoch.mjd_mean ?? 0}
+          compareB={frames[ib]?.epoch.mjd_mean ?? 0}
+          onCompareA={(mjd) => {
+            setCompareA(mjd);
+            setAnchorMjd(mjd);
+          }}
+          onCompareB={(mjd) => {
+            setCompareB(mjd);
+            setAnchorMjd(mjd);
+          }}
           brightness={brightness}
           onBrightness={setBrightness}
           contrast={contrast}

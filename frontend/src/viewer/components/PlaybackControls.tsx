@@ -21,6 +21,16 @@ interface Props {
   showGaia: boolean;
   onToggleGaia: () => void;
 
+  // Compare two dates: the blink alternates between date A and date B only.
+  dates: { mjd: number; date: string }[]; // dates of the current band, in order
+  compareOn: boolean;
+  canCompare: boolean; // false with fewer than two dates or in diff mode
+  onToggleCompare: () => void;
+  compareA: number; // mjd of date A
+  compareB: number;
+  onCompareA: (mjd: number) => void;
+  onCompareB: (mjd: number) => void;
+
   brightness: number;
   onBrightness: (value: number) => void;
   contrast: number;
@@ -90,6 +100,42 @@ export function PlaybackControls(p: Props) {
           >
             Gaia position
           </button>
+        )}
+      </div>
+
+      <div className="controls__row controls__compare">
+        <button
+          type="button"
+          onClick={p.onToggleCompare}
+          disabled={!p.canCompare}
+          aria-pressed={p.compareOn}
+          className={p.compareOn ? "is-active" : undefined}
+        >
+          Compare two dates
+        </button>
+        {p.compareOn && (
+          <>
+            <label className="controls__select">
+              A
+              <select id="viewer-compare-a" value={p.compareA} onChange={(e) => p.onCompareA(Number(e.target.value))}>
+                {p.dates.map((d) => (
+                  <option key={d.mjd} value={d.mjd}>
+                    {d.date}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="controls__select">
+              B
+              <select id="viewer-compare-b" value={p.compareB} onChange={(e) => p.onCompareB(Number(e.target.value))}>
+                {p.dates.map((d) => (
+                  <option key={d.mjd} value={d.mjd}>
+                    {d.date}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </>
         )}
       </div>
 

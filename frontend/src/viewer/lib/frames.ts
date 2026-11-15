@@ -24,6 +24,18 @@ export function framesFor(meta: Meta, band: Band, baseUrl: string): Frame[] {
   return frames;
 }
 
+// Frame closest in time to `mjd`, or the first frame when nothing is picked yet.
+// Remembering a date (not a list position) keeps the same epoch on screen when
+// the band changes or the full result replaces the preview.
+export function nearestFrame(frames: Frame[], mjd: number | null): number {
+  if (mjd === null || frames.length === 0) return 0;
+  let best = 0;
+  for (let i = 1; i < frames.length; i++) {
+    if (Math.abs(frames[i].epoch.mjd_mean - mjd) < Math.abs(frames[best].epoch.mjd_mean - mjd)) best = i;
+  }
+  return best;
+}
+
 // Bands that have at least one frame.
 export function availableBands(meta: Meta): Band[] {
   return BANDS.filter((band) => (meta.outputs[band]?.frames.length ?? 0) > 0);
