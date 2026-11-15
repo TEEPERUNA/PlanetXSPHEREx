@@ -116,7 +116,7 @@ viewer/
 │   ├── EpochInfo.tsx     # päivämäärä ja kuvien määrä
 │   ├── CursorInfo.tsx    # pikseli, RA ja Dec
 │   ├── PlaybackControls.tsx  # kaista, toisto, nopeus, diff, kirkkaus, kontrasti
-│   ├── SpectrumChart.tsx # lataa CSV:n; kaavio puuttuu vielä
+│   ├── SpectrumChart.tsx # SVG-kaavio: virhepalkit, värit epookin mukaan, D1–D6
 │   └── StatusView.tsx    # tyhjä, lataus, virhe
 ├── hooks/
 │   └── useBlink.ts       # toiston ajastus
@@ -124,6 +124,7 @@ viewer/
     ├── frames.ts         # kuvat kaistalle, epookin numero tiedostonimestä
     ├── skyCoords.ts      # pikseli → RA/Dec
     ├── parseSpectrum.ts  # spectrum.csv → rivit
+    ├── chartScale.ts     # akselit ja asteikot käsin piirrettyyn kaavioon
     └── stage.ts          # backendin vaiheen nimi → teksti käyttäjälle
 ```
 
@@ -173,7 +174,17 @@ import { Viewer, type ViewerStatus } from "../viewer";
 
 ## 6. Työjärjestys
 
-**Tilanne:** rakenne on valmis. Kuvapino, ohjaimet, epookin tiedot, koordinaatit, tilat ja CSV:n lukeminen on kirjoitettu. Spektrikaavio puuttuu, koska kirjastoa ei ole vielä valittu. Vite + React -pohja puuttuu yhä.
+**Tilanne:** rakenne on valmis. Kuvapino, ohjaimet, epookin tiedot, koordinaatit, tilat ja CSV:n lukeminen on kirjoitettu. Myös spektrikaavio on valmis. Se on piirretty SVG:llä ilman kirjastoa, joten `package.json`:iin ei tarvita uusia paketteja.
+
+**Spektrikaavio:**
+- x on aallonpituus (µm) ja y vuo (MJy/sr), virhepalkkien kanssa. Y-akseli alkaa nollasta, ellei vuo mene sen alle.
+- Värit epookin mukaan, ja selite näyttää päivämäärät.
+- Ilmaisinalueet D1–D6 näkyvät taustalla vuorottaisina raitoina.
+- Blinkissä näkyvän epookin pisteet korostetaan ja muut himmennetään. Erotuskuvan aikana kaikki näkyvät tasavahvoina.
+- Hiiri tai napautus näyttää lähimmän pisteen arvon.
+- Akselit tarkistettu kaikilla 5 kohteella: jokainen piste virhepalkkeineen mahtuu piirtoalueelle.
+
+Juhon frontend on branchissa `front-end`. Viewer kääntyy sen kanssa (React 19, TypeScript 7, Vite 8).
 
 **Testaus ennen pohjaa:** Node on asennettu. Erillinen Vite + React -testiympäristö (repon ulkopuolella) ajaa viewerin lähdekoodia Erikin julkaistua API:a vasten: `https://planetx-api-38053485414.us-east4.run.app`. Testatut tapaukset: 5 haastekohdetta, vapaa koordinaatti (M31), virheellinen syöte ja simuloitu esikatseluajo. TypeScriptin tiukka tarkistus menee läpi.
 
@@ -214,7 +225,8 @@ Tarkistettu `fetch_spherex.py`:n tuottamaa `meta.json`:ia vasten (14.11.2026).
 - [ ] Kuka tekee Vite-pohjan ja kopioi mock-datan (`examples/barnard/` → `public/mock/barnard/`)?
 - [ ] Propsien muoto pitää sopia Juhon kanssa.
 - [ ] Viewerin paikka sivulla ja toiminta mobiilissa (Juho).
-- [ ] Spektrikaavion kirjasto: Chart.js (`react-chartjs-2` ja error bar -plugin) vai uPlot.
+- [x] Spektrikaavio: piirretty SVG:llä, ei kirjastoa.
+- [ ] R Draconiksen spektrin vuo on lähes nolla (−0,0…0,1 MJy/sr), vaikka kohde on kirkas Mira-muuttuja. Kyllästyminen? (Emil)
 - [ ] Gaia-sijainnit: Emililtä uutena `meta.json`-avaimena (katso `science/gaia_validation.py`) vai suoraan Gaiasta?
 - [x] CORS backendissä (Erik): kaikki osoitteet sallittu.
 - [ ] `api/` tekee `baseUrl`:sta täydellisen osoitteen ja välittää `preview`-kentän (Juho).

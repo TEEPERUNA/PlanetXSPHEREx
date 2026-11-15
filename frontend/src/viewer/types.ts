@@ -27,6 +27,7 @@ export interface Meta {
   dec_deg: number;
   pixel_scale_arcsec: number;
   shape: [number, number]; // [height, width] in SPHEREx pixels
+  detector_ranges_um?: Partial<Record<Detector, [number, number]>>;
   epochs: Epoch[];
   outputs: Partial<Record<Band, BandOutput>>;
   spectrum?: string;

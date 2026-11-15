@@ -131,7 +131,86 @@
   font-size: 1rem;
 }
 
-.spectrum__note {
+.spectrum__note,
+.spectrum__readout {
   margin: 0;
   opacity: 0.8;
+}
+
+.spectrum__readout {
+  min-height: 1.5em; /* no jump when the text changes */
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.spectrum__chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+}
+
+.spectrum__band {
+  fill: currentColor;
+  opacity: 0.05;
+}
+
+.spectrum__grid {
+  stroke: currentColor;
+  opacity: 0.12;
+}
+
+.spectrum__axis {
+  stroke: currentColor;
+  opacity: 0.6;
+}
+
+.spectrum__tick,
+.spectrum__bandlabel,
+.spectrum__title {
+  fill: currentColor;
+  font-size: 11px;
+}
+
+.spectrum__tick,
+.spectrum__bandlabel {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.spectrum__point line {
+  stroke-width: 1.2;
+}
+
+/* Epochs not shown in the blink right now */
+.spectrum__point.is-dim {
+  opacity: 0.3;
+}
+
+.spectrum__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.spectrum__legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.75;
+}
+
+.spectrum__legend li.is-current {
+  opacity: 1;
+  font-weight: 700;
+}
+
+.spectrum__swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
 }
