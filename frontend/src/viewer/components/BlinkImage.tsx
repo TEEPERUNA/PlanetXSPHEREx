@@ -1,4 +1,4 @@
-import type { PointerEvent } from "react";
+import type { PointerEvent, ReactNode } from "react";
 import type { Pixel } from "../types";
 
 interface Props {
@@ -9,11 +9,12 @@ interface Props {
   filter: string; // CSS filter for brightness and contrast
   alt: string;
   onHover: (pixel: Pixel | null) => void;
+  overlay?: ReactNode; // SVG content drawn on top, in SPHEREx pixel units
 }
 
 // Image stack + SVG overlay.
 // All frames stay in the DOM and only one is visible, so the blink never waits for loading.
-export function BlinkImage({ srcs, activeIdx, diffSrc, shape, filter, alt, onHover }: Props) {
+export function BlinkImage({ srcs, activeIdx, diffSrc, shape, filter, alt, onHover, overlay }: Props) {
   const [height, width] = shape;
 
   // Screen position -> SPHEREx pixel.
@@ -62,8 +63,10 @@ export function BlinkImage({ srcs, activeIdx, diffSrc, shape, filter, alt, onHov
         />
       )}
 
-      {/* Coordinates are SPHEREx pixels. Gaia circles go here later. */}
-      <svg className="blink__overlay" viewBox={`0 0 ${width} ${height}`} aria-hidden="true" />
+      {/* Coordinates are SPHEREx pixels, e.g. Gaia circles. */}
+      <svg className="blink__overlay" viewBox={`0 0 ${width} ${height}`} aria-hidden="true">
+        {overlay}
+      </svg>
     </div>
   );
 }

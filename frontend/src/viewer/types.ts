@@ -21,6 +21,19 @@ export interface BandOutput {
   diff?: string;
 }
 
+// Science's position check against Gaia DR3 (or CatWISE for objects Gaia cannot see).
+// Only for the challenge targets. Every field can be missing or null.
+export interface GaiaValidation {
+  status?: string; // "CONFIRMED_MATCH", "VALIDATED_NON_GAIA", "QUERY_ERROR", ...
+  message?: string;
+  predicted_ra?: number | null; // degrees, at target_epoch
+  predicted_dec?: number | null;
+  pmra_masyr?: number | null; // proper motion, RA already includes cos(dec)
+  pmdec_masyr?: number | null;
+  target_epoch?: number | null; // decimal year
+  residual_offset_arcsec?: number | null;
+}
+
 export interface Meta {
   target: string;
   ra_deg: number; // image centre
@@ -32,6 +45,7 @@ export interface Meta {
   outputs: Partial<Record<Band, BandOutput>>;
   spectrum?: string;
   credit?: string;
+  gaia_validation?: GaiaValidation | null;
 }
 
 // A finished result: meta.json + absolute base URL for its files.

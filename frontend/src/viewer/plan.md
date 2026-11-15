@@ -115,6 +115,8 @@ viewer/
 │   ├── BlinkImage.tsx    # kuvapino, SVG-kerros, hiiren pikseli
 │   ├── EpochInfo.tsx     # päivämäärä ja kuvien määrä
 │   ├── CursorInfo.tsx    # pikseli, RA ja Dec
+│   ├── GaiaOverlay.tsx   # Gaia-ympyrä ja rata SVG-kerrokseen
+│   ├── GaiaInfo.tsx      # selitysrivi ympyrälle
 │   ├── PlaybackControls.tsx  # kaista, toisto, nopeus, diff, kirkkaus, kontrasti
 │   ├── SpectrumChart.tsx # SVG-kaavio: virhepalkit, värit epookin mukaan, D1–D6
 │   └── StatusView.tsx    # tyhjä, lataus, virhe
@@ -125,6 +127,7 @@ viewer/
     ├── skyCoords.ts      # pikseli → RA/Dec
     ├── parseSpectrum.ts  # spectrum.csv → rivit
     ├── chartScale.ts     # akselit ja asteikot käsin piirrettyyn kaavioon
+    ├── gaia.ts           # Gaia-ennuste epookin päivämäärälle → pikseli
     └── stage.ts          # backendin vaiheen nimi → teksti käyttäjälle
 ```
 
@@ -196,7 +199,15 @@ Juhon frontend on branchissa `front-end`. Viewer kääntyy sen kanssa (React 19,
 | 2 | Erotuskuva, nopeus, askellus, kirkkaus ja kontrasti sekä koordinaatit hiiren kohdalla | kaikki ohjaimet toimivat ja Barnardin tähden kohdalla näkyy sen koordinaatit |
 | 3 | Tyhjä-, lataus- ja virhetila sekä kytkentä Juhon appiin | syötetyt koordinaatit näyttävät kuvat oikealta backendiltä |
 | 4 | Spektrikaavio | kaavio näkyy virhepalkkeineen |
-| 5 | Gaia-ympyrät (jos aikaa jää) | ympyrät osuvat tähteen joka epookissa |
+| 5 | Gaia-ympyrät (jos aikaa jää) ✅ | ympyrät osuvat tähteen joka epookissa |
+
+**Gaia-ympyrät:**
+- Lähde on `meta.gaia_validation`: `predicted_ra/dec` hetkellä `target_epoch` sekä ominaisliike. Viewer siirtää sijainnin jokaisen epookin päivämäärään (`mjd_mean`) ja muuntaa sen pikseliksi.
+- Blinkissä vihreä ympyrä näyttää näkyvän epookin sijainnin, ja pienet pisteet näyttävät radan kaikkien epookkien yli. Erotuskuvassa katkoviiva on ensimmäinen ja yhtenäinen viiva viimeinen epookki.
+- Nappi "Gaia position" näkyy vain, kun ennuste osuu kuvaan. Muuten kuvan alla kerrotaan, kuinka kaukana ennuste on.
+- WISE 0855:llä lähde on CatWISE, koska Gaia ei näe kohdetta.
+- Lasku täsmää Emilin `pixel_coords`-arvoihin 0,01 px:n tarkkuudella.
+- Jos ennuste on yli 2 px kuvan keskeltä, selitysrivi varoittaa, että ympyrä voi osoittaa eri kohdetta.
 
 Jokaisen vaiheen jälkeen tehdään commit (`feat(viewer): …`) ja merge mainiin. Mainin pitää aina buildata.
 
@@ -226,6 +237,7 @@ Tarkistettu `fetch_spherex.py`:n tuottamaa `meta.json`:ia vasten (14.11.2026).
 - [ ] Propsien muoto pitää sopia Juhon kanssa.
 - [ ] Viewerin paikka sivulla ja toiminta mobiilissa (Juho).
 - [x] Spektrikaavio: piirretty SVG:llä, ei kirjastoa.
+- [ ] Gaia-ennusteet eivät osu kuvan keskelle (Emil). Barnardilla ennuste on 172″ keskeltä ja kuvan ulkopuolella, vaikka liikettä on vain noin 5″ ennusteen ja kuvan ajanhetken välillä. Epsilon Indi B:llä poikkeama on 78″, ja `gaia_dr3_source_id` on koodin kommentin mukaan Epsilon Indi A:n. Silti molemmat ovat `CONFIRMED_MATCH`. RW Aur ja R Dra osuvat keskelle, ja WISE 0855:llä (CatWISE) poikkeama on 17″.
 - [ ] R Draconiksen spektrin vuo on lähes nolla (−0,0…0,1 MJy/sr), vaikka kohde on kirkas Mira-muuttuja. Kyllästyminen? (Emil)
 - [ ] Gaia-sijainnit: Emililtä uutena `meta.json`-avaimena (katso `science/gaia_validation.py`) vai suoraan Gaiasta?
 - [x] CORS backendissä (Erik): kaikki osoitteet sallittu.

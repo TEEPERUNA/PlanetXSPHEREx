@@ -59,6 +59,40 @@
   pointer-events: none;
 }
 
+/* Gaia predicted position (green, like the science previews) */
+.gaia__ring {
+  fill: none;
+  stroke: #22c55e;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke; /* 2 screen px at any size */
+}
+
+.gaia__ring--first {
+  stroke-dasharray: 4 3;
+}
+
+.gaia__dot {
+  fill: #22c55e;
+  opacity: 0.8;
+}
+
+.viewer__gaia {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.85;
+}
+
+.viewer__gaia-key {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #22c55e;
+  border-radius: 50%;
+}
+
 /* Controls */
 .controls {
   display: grid;

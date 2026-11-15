@@ -17,6 +17,10 @@ interface Props {
   showDiff: boolean;
   onToggleDiff: () => void;
 
+  hasGaia: boolean; // false when there is no prediction on the image
+  showGaia: boolean;
+  onToggleGaia: () => void;
+
   brightness: number;
   onBrightness: (value: number) => void;
   contrast: number;
@@ -74,6 +78,17 @@ export function PlaybackControls(p: Props) {
         >
           Difference image
         </button>
+
+        {p.hasGaia && (
+          <button
+            type="button"
+            onClick={p.onToggleGaia}
+            aria-pressed={p.showGaia}
+            className={p.showGaia ? "is-active" : undefined}
+          >
+            Gaia position
+          </button>
+        )}
       </div>
 
       <div className="controls__row">

@@ -14,3 +14,15 @@ export function pixelToSky(x: number, y: number, meta: Meta): { ra: number; dec:
 
   return { ra: (ra + 360) % 360, dec };
 }
+
+// Sky coordinates -> SPHEREx pixel (the opposite of pixelToSky).
+// Whole numbers are pixel centres, so (15, 15) is the image centre.
+export function skyToPixel(ra: number, dec: number, meta: Meta): { x: number; y: number } {
+  const [height, width] = meta.shape;
+  const scaleDeg = meta.pixel_scale_arcsec / 3600;
+  const dRa = ((ra - meta.ra_deg + 540) % 360) - 180; // handles RA wrapping past 0°/360°
+
+  const x = (width - 1) / 2 - (dRa * Math.cos((meta.dec_deg * Math.PI) / 180)) / scaleDeg;
+  const y = (height - 1) / 2 - (dec - meta.dec_deg) / scaleDeg;
+  return { x, y };
+}
